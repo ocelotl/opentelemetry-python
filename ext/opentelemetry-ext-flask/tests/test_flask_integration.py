@@ -14,11 +14,11 @@
 
 import unittest
 
-from flask import Flask, request
+import flask
 from werkzeug.test import Client
 from werkzeug.wrappers import BaseResponse
 
-import opentelemetry.ext.flask as otel_flask
+from opentelemetry.ext.flask import patch
 from opentelemetry import trace as trace_api
 from opentelemetry.ext.testutil.wsgitestutil import WsgiTestBase
 
@@ -45,7 +45,8 @@ class TestFlaskIntegration(WsgiTestBase):
     def setUp(self):
         super().setUp()
 
-        self.app = Flask(__name__)
+        patch()
+        self.app = flask.Flask(__name__)
 
         def hello_endpoint(helloid):
             if helloid == 500:
@@ -54,7 +55,7 @@ class TestFlaskIntegration(WsgiTestBase):
 
         self.app.route("/hello/<int:helloid>")(hello_endpoint)
 
-        otel_flask.instrument_app(self.app)
+        # otel_flask.instrument_app(self.app)
         self.client = Client(self.app, BaseResponse)
 
     def test_only_strings_in_environ(self):
@@ -67,7 +68,7 @@ class TestFlaskIntegration(WsgiTestBase):
         nonstring_keys = set()
 
         def assert_environ():
-            for key in request.environ:
+            for key in flask.request.environ:
                 if not isinstance(key, str):
                     nonstring_keys.add(key)
             return "hi"
