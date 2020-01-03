@@ -13,10 +13,33 @@
 # limitations under the License.
 
 from abc import ABC, abstractmethod
+from functools import wraps
 
 
 class BasePatcher(ABC):
     """An ABC for patchers"""
+
+    @staticmethod
+    def protect(method):
+
+        name = method.__name__
+
+        @wraps(method)
+        def protected(self):
+
+            if name == "patch":
+                self.unpatch._protected = False
+
+            elif name == "unpatch":
+                self.patch._protected = False
+
+            getattr(self, name)._protected = True
+
+            return method(self)
+
+        protected._protected = name == "unpatch"
+
+        return protected
 
     @abstractmethod
     def patch(self) -> None:
