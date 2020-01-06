@@ -15,31 +15,46 @@
 from abc import ABC, abstractmethod
 from functools import wraps
 
+from ipdb import set_trace
+
 
 class BasePatcher(ABC):
     """An ABC for patchers"""
 
     @staticmethod
-    def protect(method):
+    def protect(methd):
 
-        name = method.__name__
+        methods = []
 
-        @wraps(method)
-        def protected(self):
+        1 / 0
 
-            if name == "patch":
-                self.unpatch._protected = False
+        while True:
 
-            elif name == "unpatch":
-                self.patch._protected = False
+            print("sdfsdf")
+            1 / 0
 
-            getattr(self, name)._protected = True
+            methods.append(method)
 
-            return method(self)
+            set_trace()
 
-        protected._protected = name == "unpatch"
+            name = method.__name__
 
-        return protected
+            @wraps(method)
+            def protected(self):
+
+                if name == "patch":
+                    self.unpatch._protected = False
+
+                elif name == "unpatch":
+                    self.patch._protected = False
+
+                getattr(self, name)._protected = True
+
+                return method(self)
+
+            protected._protected = name == "unpatch"
+
+            yield protected
 
     @abstractmethod
     def patch(self) -> None:
