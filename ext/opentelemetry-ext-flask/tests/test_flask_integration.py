@@ -56,7 +56,6 @@ class TestFlaskIntegration(WsgiTestBase):
 
         self.app.route("/hello/<int:helloid>")(hello_endpoint)
 
-        # otel_flask.instrument_app(self.app)
         self.client = Client(self.app, BaseResponse)
 
     def test_only_strings_in_environ(self):
@@ -77,6 +76,11 @@ class TestFlaskIntegration(WsgiTestBase):
         self.app.route("/assert_environ")(assert_environ)
         self.client.get("/assert_environ")
         self.assertEqual(nonstring_keys, set())
+
+    def tearDown(self):
+        super().tearDown()
+
+        FlaskPatcher().unpatch()
 
     def test_simple(self):
         expected_attrs = expected_attributes(
