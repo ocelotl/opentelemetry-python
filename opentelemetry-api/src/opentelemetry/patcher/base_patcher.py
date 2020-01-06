@@ -14,47 +14,54 @@
 
 from abc import ABC, abstractmethod
 from functools import wraps
+from logging import getLogger
 
-from ipdb import set_trace
+_LOG = getLogger(__name__)
 
 
 class BasePatcher(ABC):
     """An ABC for patchers"""
 
     @staticmethod
-    def protect(methd):
+    def protect(class_):
 
-        methods = []
+        class_._unprotected_patch = class_.patch
 
-        1 / 0
+        @wraps(class_.patch)
+        def protected_patch(self):
+            if not protected_patch._protected:
+                protected_patch._protected = True
+                protected_unpatch._protected = True
 
-        while True:
+                return self._unprotected_patch()
 
-            print("sdfsdf")
-            1 / 0
+            else:
+                _LOG.warning("Attempting to patch while already patched")
 
-            methods.append(method)
+                return None
 
-            set_trace()
+        protected_patch._protected = False
+        class_.patch = protected_patch
 
-            name = method.__name__
+        class_._unprotected_unpatch = class_.unpatch
 
-            @wraps(method)
-            def protected(self):
+        @wraps(class_.unpatch)
+        def protected_unpatch(self):
+            if not protected_unpatch._protected:
+                protected_unpatch._protected = True
+                protected_patch._protected = False
 
-                if name == "patch":
-                    self.unpatch._protected = False
+                return self._unprotected_unpatch()
 
-                elif name == "unpatch":
-                    self.patch._protected = False
+            else:
+                _LOG.warning("Attempting to unpatch while already unpatched")
 
-                getattr(self, name)._protected = True
+                return None
 
-                return method(self)
+        protected_unpatch._protected = True
+        class_.unpatch = protected_unpatch
 
-            protected._protected = name == "unpatch"
-
-            yield protected
+        return class_
 
     @abstractmethod
     def patch(self) -> None:
