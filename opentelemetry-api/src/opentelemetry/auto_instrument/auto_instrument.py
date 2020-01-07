@@ -16,12 +16,12 @@
 
 from distutils.spawn import find_executable
 from os import environ, execl
-from os.path import dirname, join
+from os.path import dirname
 from sys import argv
 
 
 def run() -> None:
-    environ["PYTHONPATH"] = join(dirname(__file__), "initialize")
+    environ["PYTHONPATH"] = dirname(__file__)
     python3 = find_executable(argv[1])
     execl(python3, python3, *argv[2:])  # type: ignore
     exit(0)  # pylint: disable=consider-using-sys-exit
