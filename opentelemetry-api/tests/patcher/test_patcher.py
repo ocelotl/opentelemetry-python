@@ -18,12 +18,9 @@ from opentelemetry.patcher.base_patcher import BasePatcher
 
 
 class TestSampler(TestCase):
-
     def test_protect(self):
-
         @BasePatcher.protect
         class TestPatcher(BasePatcher):
-
             def patch(self):
                 return 1
 

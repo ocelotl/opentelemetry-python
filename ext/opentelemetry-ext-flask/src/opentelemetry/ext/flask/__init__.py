@@ -33,9 +33,7 @@ class _PatchedFlask(flask.Flask):
             # we better avoid it.
             environ[_ENVIRON_STARTTIME_KEY] = time_ns()
 
-            def _start_response(
-                status, response_headers, *args, **kwargs
-            ):
+            def _start_response(status, response_headers, *args, **kwargs):
                 span = flask.request.environ.get(_ENVIRON_SPAN_KEY)
                 if span:
                     otel_wsgi.add_response_attributes(
@@ -67,9 +65,7 @@ class _PatchedFlask(flask.Flask):
                 otel_wsgi.get_header_from_environ, environ
             )
 
-            tracer = trace.tracer_source().get_tracer(
-                __name__, __version__
-            )
+            tracer = trace.tracer_source().get_tracer(__name__, __version__)
 
             attributes = otel_wsgi.collect_request_attributes(environ)
             if flask.request.url_rule:
@@ -90,9 +86,7 @@ class _PatchedFlask(flask.Flask):
 
         @self.teardown_request
         def _teardown_flask_request(exc):
-            activation = flask.request.environ.get(
-                _ENVIRON_ACTIVATION_KEY
-            )
+            activation = flask.request.environ.get(_ENVIRON_ACTIVATION_KEY)
             if not activation:
                 logger.warning(
                     "Flask environ's OpenTelemetry activation missing"

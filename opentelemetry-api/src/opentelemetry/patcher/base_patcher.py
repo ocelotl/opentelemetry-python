@@ -23,7 +23,7 @@ class BasePatcher(ABC):
     """An ABC for patchers"""
 
     @staticmethod
-    def protect(class_):
+    def protect(class_) -> None:  # type: ignore[no-untyped-def]
         """
         Provides a class decorator that protects patch and unpatch methods
 
@@ -43,6 +43,8 @@ class BasePatcher(ABC):
                 ...
         """
 
+        # pylint: disable=protected-access
+
         class_._unprotected_patch = class_.patch
         class_._unprotected_patch._protected = False
 
@@ -54,10 +56,9 @@ class BasePatcher(ABC):
 
                 return self._unprotected_patch()
 
-            else:
-                _LOG.warning("Attempting to patch while already patched")
+            _LOG.warning("Attempting to patch while already patched")
 
-                return None
+            return None
 
         class_.patch = protected_patch
 
@@ -72,10 +73,9 @@ class BasePatcher(ABC):
 
                 return self._unprotected_unpatch()
 
-            else:
-                _LOG.warning("Attempting to unpatch while already unpatched")
+            _LOG.warning("Attempting to unpatch while already unpatched")
 
-                return None
+            return None
 
         class_.unpatch = protected_unpatch
 
