@@ -24,7 +24,6 @@ def run() -> None:
     environ["PYTHONPATH"] = dirname(__file__)
     python3 = find_executable(argv[1])
     execl(python3, python3, *argv[2:])  # type: ignore
-    exit(0)  # pylint: disable=consider-using-sys-exit
 
 
 if __name__ == "__main__":
