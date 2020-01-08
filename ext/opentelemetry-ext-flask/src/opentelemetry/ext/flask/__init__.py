@@ -8,7 +8,7 @@ import flask
 import opentelemetry.ext.wsgi as otel_wsgi
 from opentelemetry import propagators, trace
 from opentelemetry.ext.flask.version import __version__
-from opentelemetry.patcher.base_patcher import BasePatcher
+from opentelemetry.patcher import BasePatcher
 from opentelemetry.util import time_ns
 
 logger = getLogger(__name__)
@@ -105,7 +105,10 @@ class _PatchedFlask(flask.Flask):
 
 @BasePatcher.protect
 class FlaskPatcher(BasePatcher):
-    """A patcher for flask.Flask"""
+    """A patcher for flask.Flask
+
+    See `BasePatcher`
+    """
 
     def __init__(self):
         self._patched = False

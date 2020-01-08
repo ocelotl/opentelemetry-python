@@ -15,7 +15,7 @@
 
 from unittest import TestCase
 
-from opentelemetry.patcher.base_patcher import BasePatcher
+from opentelemetry.patcher import BasePatcher
 
 
 class TestSampler(TestCase):

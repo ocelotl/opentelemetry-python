@@ -16,6 +16,7 @@ and integration packages.
    :caption: OpenTelemetry API:
 
    opentelemetry.context
+   opentelemetry.patcher
    opentelemetry.metrics
    opentelemetry.trace
    opentelemetry.util.loader

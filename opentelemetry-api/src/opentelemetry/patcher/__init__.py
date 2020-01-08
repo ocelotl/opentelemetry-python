@@ -11,9 +11,98 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# type: ignore
 
 """
 OpenTelemetry patcher
 
 This includes the base patcher class and a no-op implementation.
 """
+
+from abc import ABC, abstractmethod
+from functools import wraps
+from logging import getLogger
+
+_LOG = getLogger(__name__)
+
+
+class BasePatcher(ABC):
+    """An ABC for patchers"""
+
+    @staticmethod
+    def protect(class_) -> None:
+        """
+        Provides a class decorator that protects patch and unpatch methods
+
+        A protected patch method can't be called again until its corresponding
+        unpatch method has been called and vice versa. A protected patch method
+        must be called first before its corresponding unpatch method can be
+        called.
+
+        To use this decorator simply decorate the patcher class:
+
+        .. code-block:: python
+
+            from opentelemetry.patcher.base_patcher import BasePatcher
+
+            @BasePatcher.protect
+            class PatcherClass(BasePatcher):
+                ...
+        """
+
+        # pylint: disable=protected-access
+
+        class_._unprotected_patch = class_.patch
+        class_._unprotected_patch._protected = False
+
+        @wraps(class_.patch)
+        def protected_patch(self):
+            if not self._unprotected_patch.__func__._protected:
+                self._unprotected_patch.__func__._protected = True
+                self._unprotected_unpatch.__func__._protected = False
+
+                return self._unprotected_patch()
+
+            _LOG.warning("Attempting to patch while already patched")
+
+            return None
+
+        class_.patch = protected_patch
+
+        class_._unprotected_unpatch = class_.unpatch
+        class_._unprotected_unpatch._protected = True
+
+        @wraps(class_.unpatch)
+        def protected_unpatch(self):
+            if not self._unprotected_unpatch.__func__._protected:
+                self._unprotected_unpatch.__func__._protected = True
+                self._unprotected_patch.__func__._protected = False
+
+                return self._unprotected_unpatch()
+
+            _LOG.warning("Attempting to unpatch while already unpatched")
+
+            return None
+
+        class_.unpatch = protected_unpatch
+
+        return class_
+
+    @abstractmethod
+    def patch(self) -> None:
+        """Patch"""
+
+    @abstractmethod
+    def unpatch(self) -> None:
+        """Unpatch"""
+
+
+class NoOpPatcher(BasePatcher):
+    def patch(self) -> None:
+        """Patch"""
+
+    def unpatch(self) -> None:
+        """Unpatch"""
+
+
+__all__ = ["BasePatcher", "NoOpPatcher"]
