@@ -114,8 +114,6 @@ class FlaskPatcher(BasePatcher):
     def patch(self):
         flask.Flask = _PatchedFlask
 
-    patch.var = 99
-
     def unpatch(self):
         flask.Flask = self._original_flask
 

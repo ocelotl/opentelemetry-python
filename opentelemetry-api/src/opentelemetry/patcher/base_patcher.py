@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# type: ignore
 
 from abc import ABC, abstractmethod
 from functools import wraps
@@ -23,7 +24,7 @@ class BasePatcher(ABC):
     """An ABC for patchers"""
 
     @staticmethod
-    def protect(class_) -> None:  # type: ignore[no-untyped-def]
+    def protect(class_) -> None:
         """
         Provides a class decorator that protects patch and unpatch methods
 

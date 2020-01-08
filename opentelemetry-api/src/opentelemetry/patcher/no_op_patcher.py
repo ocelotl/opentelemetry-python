@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from opentelemetry.patcher.base_patcher import BasePatcher
+from opentelemetry.patcher.base_patcher import BasePatcher  # type: ignore
 
 
-class NoOpPatcher(BasePatcher):
+class NoOpPatcher(BasePatcher):  # type: ignore
     def patch(self) -> None:
         """Patch"""
 
