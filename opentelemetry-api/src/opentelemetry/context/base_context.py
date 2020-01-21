@@ -191,6 +191,8 @@ class BaseContext(Context):
         if context:
             return context.get(key)
 
+        from pdb import set_trace
+        set_trace()
         return self.current().get(key)
 
     def set_value(

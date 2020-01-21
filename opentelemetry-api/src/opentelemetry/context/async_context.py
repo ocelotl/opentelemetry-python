@@ -35,11 +35,14 @@ else:
 
             def get(self) -> object:
                 try:
+                    print(self.contextvar.get())
                     return self.contextvar.get()
                 except LookupError:
                     value = self.default()
+                    print(value)
                     self.set(value)
                     return value
 
             def set(self, value: object) -> None:
+                print(value)
                 self.contextvar.set(value)
