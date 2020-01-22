@@ -12,19 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import itertools
-import string
 import typing
 from typing import Optional
 
-from opentelemetry import context as ctx_api
-from opentelemetry.propagation import Extractor, Injector
-
-PRINTABLE = frozenset(
-    itertools.chain(
-        string.ascii_letters, string.digits, string.punctuation, " "
-    )
-)
+from opentelemetry.context import Context, get_value, set_value
 
 
 # TODO: are Entry* classes still needed here?
@@ -53,7 +44,7 @@ class EntryKey(str):
     @staticmethod
     def create(value: str) -> "EntryKey":
         # pylint: disable=len-as-condition
-        if not 0 < len(value) <= 255 or any(c not in PRINTABLE for c in value):
+        if not 0 < len(value) <= 255 or not str.isprintable(value):
             raise ValueError("Invalid EntryKey", value)
 
         return typing.cast(EntryKey, value)
@@ -67,7 +58,7 @@ class EntryValue(str):
 
     @staticmethod
     def create(value: str) -> "EntryValue":
-        if any(c not in PRINTABLE for c in value):
+        if not str.isprintable(value):
             raise ValueError("Invalid EntryValue", value)
 
         return typing.cast(EntryValue, value)
@@ -93,24 +84,24 @@ class CorrelationContextManager:
         cls,
         key: str,
         value: "object",
-        context: Optional[ctx_api.Context] = None,
-    ) -> ctx_api.Context:
-        return ctx_api.set_value(key, value, context=context)
+        context: Optional[Context] = None,
+    ) -> Context:
+        return set_value(key, value, context=context)
 
     @classmethod
     def correlation(
-        cls, key: str, context: Optional[ctx_api.Context] = None
+        cls, key: str, context: Optional[Context] = None
     ) -> "object":
-        return ctx_api.value(key, context=context)
+        return get_value(key, context=context)
 
     @classmethod
     def remove_correlation(
-        cls, context: Optional[ctx_api.Context] = None
-    ) -> ctx_api.Context:
+        cls, context: Optional[Context] = None
+    ) -> Context:
         pass
 
     @classmethod
     def clear_correlation(
-        cls, context: Optional[ctx_api.Context] = None
-    ) -> ctx_api.Context:
+        cls, context: Optional[Context] = None
+    ) -> Context:
         pass

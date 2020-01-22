@@ -58,7 +58,7 @@ import abc
 import typing
 
 import opentelemetry.trace as trace
-from opentelemetry.context import Context, current
+from opentelemetry.context import Context, get_current
 
 ContextT = typing.TypeVar("ContextT")
 
@@ -139,7 +139,8 @@ class Injector(abc.ABC):
 
 
 class DefaultExtractor(Extractor):
-    """The default Extractor that is used when no Extractor implementation is configured.
+    """The default Extractor that is used when no Extractor implementation is
+    configured.
 
     All operations are no-ops.
     """
@@ -157,7 +158,8 @@ class DefaultExtractor(Extractor):
 
 
 class DefaultInjector(Injector):
-    """The default Injector that is used when no Injector implementation is configured.
+    """The default Injector that is used when no Injector implementation is
+    configured.
 
     All operations are no-ops.
     """
