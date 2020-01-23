@@ -18,11 +18,12 @@ import unittest
 from unittest import mock
 
 from opentelemetry import trace as trace_api
-from opentelemetry.context import new_context, set_current
+from opentelemetry.context import get_current
 from opentelemetry.sdk import trace
 from opentelemetry.trace import sampling
 from opentelemetry.trace.status import StatusCanonicalCode
 from opentelemetry.util import time_ns
+from ..utils import new_context
 
 
 def new_tracer() -> trace_api.Tracer:
@@ -132,7 +133,7 @@ class TestTracerSampling(unittest.TestCase):
 
 class TestSpanCreation(unittest.TestCase):
     def setUp(self):
-        set_current(new_context())
+        get_current().set_current(new_context())
 
     def test_start_span_invalid_spancontext(self):
         """If an invalid span context is passed as the parent, the created

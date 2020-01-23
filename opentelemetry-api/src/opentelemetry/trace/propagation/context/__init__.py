@@ -13,18 +13,18 @@
 # limitations under the License.
 from typing import Optional
 
-from opentelemetry import context as ctx_api
+from opentelemetry.context import Context, get_current
 from opentelemetry.trace import INVALID_SPAN_CONTEXT, Span, SpanContext
 from opentelemetry.trace.propagation import ContextKeys
 
 
 def span_context_from_context(
-    context: Optional[ctx_api.Context] = None,
+    context: Optional[Context] = None,
 ) -> SpanContext:
     span = span_from_context(context=context)
     if span:
         return span.get_context()
-    sc = ctx_api.value(ContextKeys.span_context_key(), context=context)  # type: ignore
+    sc = get_current().get_value(ContextKeys.span_context_key(), context=context)  # type: ignore  # noqa
     if sc:
         return sc
 
@@ -32,18 +32,18 @@ def span_context_from_context(
 
 
 def with_span_context(
-    span_context: SpanContext, context: Optional[ctx_api.Context] = None
-) -> ctx_api.Context:
-    return ctx_api.set_value(
+    span_context: SpanContext, context: Optional[Context] = None
+) -> Context:
+    return get_current().set_value(
         ContextKeys.span_context_key(), span_context, context=context
     )
 
 
-def span_from_context(context: Optional[ctx_api.Context] = None) -> Span:
-    return ctx_api.value(ContextKeys.span_key(), context=context)  # type: ignore
+def span_from_context(context: Optional[Context] = None) -> Span:
+    return get_current().value(ContextKeys.span_key(), context=context)  # type: ignore  # noqa
 
 
-def with_span(
-    span: Span, context: Optional[ctx_api.Context] = None
-) -> ctx_api.Context:
-    return ctx_api.set_value(ContextKeys.span_key(), span, context=context)
+def with_span(span: Span, context: Optional[Context] = None) -> Context:
+    return get_current().set_value(
+        ContextKeys.span_key(), span, context=context
+    )

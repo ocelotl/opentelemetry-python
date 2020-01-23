@@ -21,17 +21,25 @@ from contextlib import contextmanager
 from types import TracebackType
 from typing import Iterator, Optional, Sequence, Tuple, Type
 
-from opentelemetry import context as ctx_api
-from opentelemetry import trace as trace_api
+from opentelemetry.context import Context, get_value
 from opentelemetry.sdk import util
 from opentelemetry.sdk.util import BoundedDict, BoundedList
-from opentelemetry.trace import SpanContext, sampling
+from opentelemetry.trace import (
+    SpanContext,
+    sampling,
+    Span,
+    ParentSpan,
+    Event,
+    Link,
+    SpanKind,
+    Tracer,
+    DefaultSpan,
+    TracerSource
+)
 from opentelemetry.trace.propagation.context import (
-    ContextKeys,
     span_context_from_context,
     span_from_context,
     with_span,
-    with_span_context,
 )
 from opentelemetry.trace.status import Status, StatusCanonicalCode
 from opentelemetry.util import time_ns, types
@@ -73,7 +81,8 @@ class SpanProcessor:
         """
 
     def shutdown(self) -> None:
-        """Called when a :class:`opentelemetry.sdk.trace.Tracer` is shutdown."""
+        """Called when a :class:`opentelemetry.sdk.trace.Tracer` is shutdown.
+        """
 
 
 class MultiSpanProcessor(SpanProcessor):
@@ -105,7 +114,7 @@ class MultiSpanProcessor(SpanProcessor):
             sp.shutdown()
 
 
-class Span(trace_api.Span):
+class Span(Span):
     """See `opentelemetry.trace.Span`.
 
     Users should create `Span` objects via the `Tracer` instead of this
@@ -134,15 +143,15 @@ class Span(trace_api.Span):
     def __init__(
         self,
         name: str,
-        context: trace_api.SpanContext,
-        parent: trace_api.ParentSpan = None,
+        context: SpanContext,
+        parent: ParentSpan = None,
         sampler: Optional[sampling.Sampler] = None,
         trace_config: None = None,  # TODO
         resource: None = None,  # TODO
         attributes: types.Attributes = None,  # TODO
-        events: Sequence[trace_api.Event] = None,  # TODO
-        links: Sequence[trace_api.Link] = (),
-        kind: trace_api.SpanKind = trace_api.SpanKind.INTERNAL,
+        events: Sequence[Event] = None,  # TODO
+        links: Sequence[Link] = (),
+        kind: SpanKind = SpanKind.INTERNAL,
         span_processor: SpanProcessor = SpanProcessor(),
         instrumentation_info: "InstrumentationInfo" = None,
         set_status_on_exception: bool = True,
@@ -224,14 +233,14 @@ class Span(trace_api.Span):
         timestamp: Optional[int] = None,
     ) -> None:
         self.add_lazy_event(
-            trace_api.Event(
+            Event(
                 name,
                 Span.empty_attributes if attributes is None else attributes,
                 time_ns() if timestamp is None else timestamp,
             )
         )
 
-    def add_lazy_event(self, event: trace_api.Event) -> None:
+    def add_lazy_event(self, event: Event) -> None:
         with self._lock:
             if not self.is_recording_events():
                 return
@@ -287,7 +296,7 @@ class Span(trace_api.Span):
     def is_recording_events(self) -> bool:
         return True
 
-    def set_status(self, status: trace_api.Status) -> None:
+    def set_status(self, status: Status) -> None:
         with self._lock:
             has_ended = self.end_time is not None
         if has_ended:
@@ -375,7 +384,7 @@ class InstrumentationInfo:
         return self._name
 
 
-class Tracer(trace_api.Tracer):
+class Tracer(Tracer):
     """See `opentelemetry.trace.Tracer`.
 
     Args:
@@ -392,19 +401,19 @@ class Tracer(trace_api.Tracer):
         self.source = source
         self.instrumentation_info = instrumentation_info
 
-    def get_current_span(self, context: Optional[ctx_api.Context] = None):
+    def get_current_span(self, context: Optional[Context] = None):
         """See `opentelemetry.trace.Tracer.get_current_span`."""
         return span_from_context(context=context)
 
     def start_as_current_span(
         self,
         name: str,
-        parent: trace_api.ParentSpan = trace_api.Tracer.CURRENT_SPAN,
-        kind: trace_api.SpanKind = trace_api.SpanKind.INTERNAL,
+        parent: ParentSpan = Tracer.CURRENT_SPAN,
+        kind: SpanKind = SpanKind.INTERNAL,
         attributes: Optional[types.Attributes] = None,
-        links: Sequence[trace_api.Link] = (),
-        context: Optional[ctx_api.Context] = None,
-    ) -> Iterator[trace_api.Span]:
+        links: Sequence[Link] = (),
+        context: Optional[Context] = None,
+    ) -> Iterator[Span]:
         """See `opentelemetry.trace.Tracer.start_as_current_span`."""
 
         span = self.start_span(
@@ -415,28 +424,28 @@ class Tracer(trace_api.Tracer):
     def start_span(  # pylint: disable=too-many-locals
         self,
         name: str,
-        parent: trace_api.ParentSpan = trace_api.Tracer.CURRENT_SPAN,
-        kind: trace_api.SpanKind = trace_api.SpanKind.INTERNAL,
+        parent: ParentSpan = Tracer.CURRENT_SPAN,
+        kind: SpanKind = SpanKind.INTERNAL,
         attributes: Optional[types.Attributes] = None,
-        links: Sequence[trace_api.Link] = (),
+        links: Sequence[Link] = (),
         start_time: Optional[int] = None,
         set_status_on_exception: bool = True,
-        context: Optional[ctx_api.Context] = None,
-    ) -> trace_api.Span:
+        context: Optional[Context] = None,
+    ) -> Span:
         """See `opentelemetry.trace.Tracer.start_span`."""
 
         if parent is Tracer.CURRENT_SPAN:
             parent = self.get_current_span(context=context)
 
         parent_context = parent
-        if isinstance(parent_context, trace_api.Span):
+        if isinstance(parent_context, Span):
             parent_context = parent.get_context()
 
         if parent_context is None:
             parent_context = span_context_from_context(context)
 
         if parent_context is not None and not isinstance(
-            parent_context, trace_api.SpanContext
+            parent_context, SpanContext
         ):
             raise TypeError
 
@@ -450,7 +459,7 @@ class Tracer(trace_api.Tracer):
             trace_options = parent_context.trace_options
             trace_state = parent_context.trace_state
 
-        context = trace_api.SpanContext(
+        context = SpanContext(
             trace_id, generate_span_id(), trace_options, trace_state
         )
 
@@ -481,7 +490,7 @@ class Tracer(trace_api.Tracer):
                 parent=parent,
                 sampler=self.source.sampler,
                 attributes=span_attributes,
-                span_processor=self.source._active_span_processor,  # pylint:disable=protected-access
+                span_processor=self.source._active_span_processor,  # pylint:disable=protected-access  # noqa
                 kind=kind,
                 links=links,
                 instrumentation_info=self.instrumentation_info,
@@ -489,13 +498,13 @@ class Tracer(trace_api.Tracer):
             )
             span.start(start_time=start_time)
         else:
-            span = trace_api.DefaultSpan(context=context)
+            span = DefaultSpan(context=context)
         return span
 
     @contextmanager
     def use_span(
-        self, span: trace_api.Span, end_on_exit: bool = False
-    ) -> Iterator[trace_api.Span]:
+        self, span: Span, end_on_exit: bool = False
+    ) -> Iterator[Span]:
         """See `opentelemetry.trace.Tracer.use_span`."""
         try:
             span_snapshot = span_from_context()
@@ -510,13 +519,14 @@ class Tracer(trace_api.Tracer):
                 span.end()
 
 
-class TracerSource(trace_api.TracerSource):
+class TracerSource(TracerSource):
     def __init__(
         self,
-        sampler: sampling.Sampler = trace_api.sampling.ALWAYS_ON,
+        sampler: sampling.Sampler = sampling.ALWAYS_ON,
         shutdown_on_exit: bool = True,
     ):
-        # TODO: How should multiple TracerSources behave? Should they get their own contexts?
+        # TODO: How should multiple TracerSources behave? Should they get their
+        # own contexts?
         # This could be done by adding `str(id(self))` to the slot name.
         self._current_span_name = "current_span"
         self._active_span_processor = MultiSpanProcessor()
@@ -529,7 +539,7 @@ class TracerSource(trace_api.TracerSource):
         self,
         instrumenting_module_name: str,
         instrumenting_library_version: str = "",
-    ) -> "trace_api.Tracer":
+    ) -> "Tracer":
         if not instrumenting_module_name:  # Reject empty strings too.
             instrumenting_module_name = "ERROR:MISSING MODULE NAME"
             logger.error("get_tracer called with missing module name.")
@@ -541,10 +551,10 @@ class TracerSource(trace_api.TracerSource):
         )
 
     def get_current_span(
-        self, context: Optional[ctx_api.Context] = None
+        self, context: Optional[Context] = None
     ) -> Span:
         """See `opentelemetry.trace.Tracer.get_current_span`."""
-        return ctx_api.value(self._current_span_name, context=context)
+        return get_value(self._current_span_name, context=context)
 
     def add_span_processor(self, span_processor: SpanProcessor) -> None:
         """Registers a new :class:`SpanProcessor` for this `TracerSource`.

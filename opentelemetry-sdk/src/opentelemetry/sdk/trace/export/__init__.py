@@ -18,7 +18,6 @@ import threading
 import typing
 from enum import Enum
 
-from opentelemetry import context
 from opentelemetry.util import time_ns
 
 from .. import Span, SpanProcessor
@@ -38,15 +37,17 @@ class SpanExporter:
     Interface to be implemented by services that want to export recorded in
     its own format.
 
-    To export data this MUST be registered to the :class`opentelemetry.sdk.trace.Tracer` using a
-    `SimpleExportSpanProcessor` or a `BatchExportSpanProcessor`.
+    To export data this MUST be registered to the
+    :class`opentelemetry.sdk.trace.Tracer` using a `SimpleExportSpanProcessor`
+    or a `BatchExportSpanProcessor`.
     """
 
     def export(self, spans: typing.Sequence[Span]) -> "SpanExportResult":
         """Exports a batch of telemetry data.
 
         Args:
-            spans: The list of `opentelemetry.trace.Span` objects to be exported
+            spans: The list of `opentelemetry.trace.Span` objects to be
+            exported
 
         Returns:
             The result of the export
@@ -73,12 +74,15 @@ class SimpleExportSpanProcessor(SpanProcessor):
         pass
 
     def on_end(self, span: Span) -> None:
+        # FIXME add the implementation for use
+        """
         with context.use(suppress_instrumentation=True):
             try:
                 self.span_exporter.export((span,))
             # pylint: disable=broad-except
             except Exception:
                 logger.exception("Exception while exporting Span.")
+        """
 
     def shutdown(self) -> None:
         self.span_exporter.shutdown()
@@ -111,7 +115,8 @@ class BatchExportSpanProcessor(SpanProcessor):
 
         if max_export_batch_size > max_queue_size:
             raise ValueError(
-                "max_export_batch_size must be less than and equal to max_export_batch_size."
+                "max_export_batch_size must be less than and equal to"
+                "max_export_batch_size."
             )
 
         self.span_exporter = span_exporter
@@ -129,7 +134,7 @@ class BatchExportSpanProcessor(SpanProcessor):
         # precallocated list to send spans to exporter
         self.spans_list = [
             None
-        ] * self.max_export_batch_size  # type: typing.List[typing.Optional[Span]]
+        ] * self.max_export_batch_size  # type: typing.List[typing.Optional[Span]]  # noqa
         self.worker_thread.start()
 
     def on_start(self, span: Span) -> None:
@@ -182,6 +187,8 @@ class BatchExportSpanProcessor(SpanProcessor):
         while idx < self.max_export_batch_size and self.queue:
             self.spans_list[idx] = self.queue.pop()
             idx += 1
+        # FIXME add and use implementation for use below
+        """
         with context.use(suppress_instrumentation=True):
             try:
                 # Ignore type b/c the Optional[None]+slicing is too "clever"
@@ -192,6 +199,7 @@ class BatchExportSpanProcessor(SpanProcessor):
             # pylint: disable=broad-except
             except Exception:
                 logger.exception("Exception while exporting Span batch.")
+        """
 
         # clean up list
         for index in range(idx):
