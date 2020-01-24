@@ -58,7 +58,7 @@ setuptools.setup(
     zip_safe=False,
     entry_points={
         "opentelemetry_context": [
-            "contextvars = "
+            "contextvars_context = "
             "opentelemetry.sdk.context.contextvars_context:ContextVarsContext"
         ]
     },
