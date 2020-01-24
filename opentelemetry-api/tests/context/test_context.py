@@ -25,11 +25,11 @@ class TestContext(TestCase):
     def setUp(self):
         self.mock_context = patch("opentelemetry.context._CONTEXT").start()
 
-        self.mock_context_copy = Mock(**{"get_value.return_value": "foo"})
+        self.mock_context_copy = Mock(**{"get_value.return_value": "value"})
         self.mock_context.configure_mock(
             **{
                 "copy.return_value": self.mock_context_copy,
-                "get_value.return_value": "foo"
+                "get_value.return_value": "value",
             }
         )
 
@@ -40,11 +40,25 @@ class TestContext(TestCase):
         self.assertIs(get_current(), self.mock_context)
 
     def test_set_current(self):
-
         mock_context = Mock()
-
         set_current(mock_context)
-
         from opentelemetry.context import _CONTEXT
-
         self.assertIs(_CONTEXT, mock_context)
+
+    def test_set_value(self):
+        self.assertIs(
+            set_value(self.mock_context, "key", "value"),
+            self.mock_context_copy
+        )
+        self.mock_context_copy.set_value.assert_called_with("key", "value")
+
+    def test_get_value(self):
+        self.assertEqual(get_value(self.mock_context, "key"), "value")
+        self.mock_context.get_value.assert_called_with("key")
+
+    def test_remove_value(self):
+        self.assertIs(
+            remove_value(self.mock_context, "key"),
+            self.mock_context_copy
+        )
+        self.mock_context_copy.remove_value.assert_called_with("key")

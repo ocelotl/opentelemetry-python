@@ -33,7 +33,7 @@ def create_key(key: str) -> "object":
     raise NotImplementedError
 
 
-def get_value(key: str, context: "Context") -> "object":
+def get_value(context: "Context", key: str) -> "object":
     return context.get_value(key)
 
 
@@ -43,7 +43,7 @@ def set_value(context: "Context", key: str, value: "object") -> "Context":
     return new_context
 
 
-def remove_value(context: "Context", key: str, value: "object") -> "Context":
+def remove_value(context: "Context", key: str) -> "Context":
     new_context = context.copy()
     new_context.remove_value(key)
     return new_context
