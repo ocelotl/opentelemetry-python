@@ -51,14 +51,14 @@ class TestContext(unittest.TestCase):
         self.tracer_source.add_span_processor(span_processor)
 
     def test_context(self):
-        self.assertIsNone(get_current().value("say-something"))
+        self.assertIsNone(get_current().get_value("say-something"))
         empty_context = get_current()
         get_current().set_value("say-something", "foo")
-        self.assertEqual(get_current().value("say-something"), "foo")
+        self.assertEqual(get_current().get_value("say-something"), "foo")
         second_context = get_current()
 
         do_work()
-        self.assertEqual(get_current().value("say-something"), "bar")
+        self.assertEqual(get_current().get_value("say-something"), "bar")
         third_context = get_current()
 
         self.assertIsNone(empty_context.get("say-something"))
@@ -154,9 +154,9 @@ class TestContext(unittest.TestCase):
         context2 = get_current().set_value("a", "zzz")
         context3 = get_current().set_value("a", "---", context)
         current_context = get_current()
-        self.assertEqual("yyy", get_current().value("a", context=context))
-        self.assertEqual("zzz", get_current().value("a", context=context2))
-        self.assertEqual("---", get_current().value("a", context=context3))
+        self.assertEqual("yyy", get_current().get_value("a", context=context))
+        self.assertEqual("zzz", get_current().get_value("a", context=context2))
+        self.assertEqual("---", get_current().get_value("a", context=context3))
         self.assertEqual(
-            "zzz", get_current().value("a", context=current_context)
+            "zzz", get_current().get_value("a", context=current_context)
         )
