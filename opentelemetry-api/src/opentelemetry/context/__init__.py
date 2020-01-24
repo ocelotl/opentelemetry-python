@@ -25,7 +25,7 @@ _CONTEXT = {
     entry_point.name: entry_point.load() for entry_point in (
         iter_entry_points("opentelemetry_context")
     )
-}[environ.get("OPENTELEMETRY_CONTEXT", "no_op_context")]
+}[environ.get("OPENTELEMETRY_CONTEXT", "no_op_context")]()
 
 
 def create_key(key: str) -> "object":
@@ -54,7 +54,7 @@ def remove_value(
 
 
 def get_current() -> "Context":
-    return _CONTEXT
+    return _CONTEXT.copy()
 
 
 def set_current(context: "Context"):

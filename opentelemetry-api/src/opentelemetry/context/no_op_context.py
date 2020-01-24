@@ -21,7 +21,9 @@ class NoOpContext(Context):
     def set_value(self, key: str, value: "object"):
         """Set a value in this context"""
 
-    def get_value(self, key: str) -> "object":
+    # def get_value(self, key: str) -> "object":
+    #     """Get a value from this context"""
+    def get_value(self, key):
         """Get a value from this context"""
 
     def remove_value(self, key: str):
