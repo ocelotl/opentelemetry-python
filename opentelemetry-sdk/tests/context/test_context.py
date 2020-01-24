@@ -17,7 +17,9 @@ import contextvars
 import unittest
 from multiprocessing.dummy import Pool as ThreadPool
 
-from opentelemetry.context import get_current, set_value, set_current
+from opentelemetry.context import (
+    get_current, set_value, set_current, get_value
+)
 from opentelemetry.sdk import trace
 from opentelemetry.sdk.trace import export
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
@@ -27,7 +29,7 @@ from ..utils import new_context, merge_context_correlation
 
 
 def do_work():
-    get_current().set_value("say-something", "bar")
+    set_value("say-something", "bar")
 
 
 class TestContext(unittest.TestCase):
@@ -51,19 +53,24 @@ class TestContext(unittest.TestCase):
         self.tracer_source.add_span_processor(span_processor)
 
     def test_context(self):
-        self.assertIsNone(get_current().get_value("say-something"))
         empty_context = get_current()
-        get_current().set_value("say-something", "foo")
-        self.assertEqual(get_current().get_value("say-something"), "foo")
+
+        from pdb import set_trace
+        set_trace()
+        set_value("say-something", "foo")
         second_context = get_current()
 
+        self.assertEqual(get_value("say-something"), "foo")
+
         do_work()
-        self.assertEqual(get_current().get_value("say-something"), "bar")
+
         third_context = get_current()
 
-        self.assertIsNone(empty_context.get("say-something"))
-        self.assertEqual(second_context.get("say-something"), "foo")
-        self.assertEqual(third_context.get("say-something"), "bar")
+        self.assertEqual(get_value("say-something"), "bar")
+
+        self.assertIsNone(empty_context.get_value("say-something"))
+        self.assertEqual(second_context.get_value("say-something"), "foo")
+        self.assertEqual(third_context.get_value("say-something"), "bar")
 
     # FIXME Merge context has been removed. The merge method could be moved
     # outside of the methods of the merge object itself. Review this with Alex.
