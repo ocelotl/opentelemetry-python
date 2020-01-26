@@ -59,7 +59,8 @@ setuptools.setup(
     entry_points={
         "opentelemetry_context": [
             "contextvars_context = "
-            "opentelemetry.sdk.context.contextvars_context:ContextVarsContext"
+            "opentelemetry.sdk.contextvars_context.contextvars_context:"
+            "ContextVarsContext"
         ]
     },
 )

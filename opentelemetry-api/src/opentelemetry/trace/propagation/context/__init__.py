@@ -40,10 +40,8 @@ def with_span_context(
 
 
 def span_from_context(context: Optional[Context] = None) -> Span:
-    return get_current().value(ContextKeys.span_key(), context=context)  # type: ignore  # noqa
+    return get_current().get_value(ContextKeys.span_key())  # type: ignore  # noqa
 
 
 def with_span(span: Span, context: Optional[Context] = None) -> Context:
-    return get_current().set_value(
-        ContextKeys.span_key(), span, context=context
-    )
+    return get_current().set_value(ContextKeys.span_key(), span)

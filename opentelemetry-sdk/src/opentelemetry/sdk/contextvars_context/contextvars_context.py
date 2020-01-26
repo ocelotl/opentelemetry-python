@@ -63,7 +63,7 @@ elif (3, 4) < version_info <= (3, 5, 2):
     # It needs only to be imported to activate the patching of the contextvars
     # backport (see the comment in setup.py)
     # noinspection PyUnresolvedReferences
-    import aiocontextvars  # noqa
+    import aiocontextvars
 
     def _run_coroutine_threadsafe(coro, loop):
         """
@@ -111,6 +111,17 @@ class ContextVarsContext(Context):
         """Remove a value from this context"""
         if key in self._contextvars.keys():
             self._contextvars.pop(key)
+
+    def copy(self) -> "Context":
+        """Return a copy of this context"""
+
+        context_copy = ContextVarsContext()
+
+        for key, value in self._contextvars.items():
+            context_copy._contextvars[key] = ContextVar(key)
+            context_copy._contextvars[key].set(value)
+
+        return context_copy
 
 
 __all__ = ["ContextVarsContext"]

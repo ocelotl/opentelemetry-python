@@ -28,8 +28,8 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
 from ..utils import new_context, merge_context_correlation
 
 
-def do_work():
-    set_value("say-something", "bar")
+def do_work(context):
+    return set_value(context, "say-something", "bar")
 
 
 class TestContext(unittest.TestCase):
@@ -55,20 +55,16 @@ class TestContext(unittest.TestCase):
     def test_context(self):
         empty_context = get_current()
 
-        from pdb import set_trace
-        set_trace()
-        set_value("say-something", "foo")
-        second_context = get_current()
+        second_context = set_value(empty_context, "say-something", "foo")
 
-        self.assertEqual(get_value("say-something"), "foo")
+        self.assertEqual(get_value(second_context, "say-something"), "foo")
 
-        do_work()
+        third_context = do_work(second_context)
 
-        third_context = get_current()
+        self.assertEqual(get_value(third_context, "say-something"), "bar")
 
-        self.assertEqual(get_value("say-something"), "bar")
-
-        self.assertIsNone(empty_context.get_value("say-something"))
+        with self.assertRaises(KeyError):
+            empty_context.get_value("say-something")
         self.assertEqual(second_context.get_value("say-something"), "foo")
         self.assertEqual(third_context.get_value("say-something"), "bar")
 

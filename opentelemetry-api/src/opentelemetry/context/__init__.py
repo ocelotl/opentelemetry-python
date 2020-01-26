@@ -61,6 +61,7 @@ def set_current(context: "Context"):
 __all__ = [
     "get_value",
     "set_value",
+    "remove_value",
     "get_current",
     "set_current",
     "Context",
