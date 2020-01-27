@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from sys import version_info
+from copy import copy
 from contextvars import ContextVar
 
 from opentelemetry.context import Context
@@ -119,7 +120,7 @@ class ContextVarsContext(Context):
 
         for key, value in self._contextvars.items():
             context_copy._contextvars[key] = ContextVar(key)
-            context_copy._contextvars[key].set(value)
+            context_copy._contextvars[key].set(copy(value))
 
         return context_copy
 
