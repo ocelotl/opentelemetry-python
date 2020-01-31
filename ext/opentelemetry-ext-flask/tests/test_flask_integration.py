@@ -14,6 +14,8 @@
 
 import unittest
 
+# FIXME Find out why 3 test cases of py37-test-ext-flask fail if I use from
+# flask import Flask, request
 import flask
 from werkzeug.test import Client
 from werkzeug.wrappers import BaseResponse

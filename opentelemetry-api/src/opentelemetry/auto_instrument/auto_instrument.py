@@ -14,15 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from distutils.spawn import find_executable
-from os import environ, execl
+from shutil import which
+from os import execl
 from os.path import dirname
-from sys import argv
+from sys import argv, path
 
 
 def run() -> None:
-    environ["PYTHONPATH"] = dirname(__file__)
-    python3 = find_executable(argv[1])
+    path.insert(0, dirname(__name__))
+    python3 = which(argv[1])
     execl(python3, python3, *argv[2:])  # type: ignore
 
 
