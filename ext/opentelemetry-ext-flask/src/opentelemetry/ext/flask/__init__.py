@@ -111,7 +111,6 @@ class FlaskPatcher(BasePatcher):
     """
 
     def __init__(self):
-        self._patched = False
         self._original_flask = flask.Flask
 
     def patch(self):
