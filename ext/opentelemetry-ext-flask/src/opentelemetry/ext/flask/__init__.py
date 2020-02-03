@@ -1,16 +1,17 @@
 # Note: This package is not named "flask" because of
 # https://github.com/PyCQA/pylint/issues/2648
 
-import logging
+from logging import getLogger
 
-import opentelemetry.ext.wsgi as otel_wsgi
-from opentelemetry.patcher.base_patcher import BasePatcher
-from opentelemetry import propagators, trace
-from opentelemetry.util import time_ns
-from opentelemetry.ext.flask.version import __version__
 import flask
 
-logger = logging.getLogger(__name__)
+import opentelemetry.ext.wsgi as otel_wsgi
+from opentelemetry import propagators, trace
+from opentelemetry.ext.flask.version import __version__
+from opentelemetry.patcher.base_patcher import BasePatcher
+from opentelemetry.util import time_ns
+
+logger = getLogger(__name__)
 
 _ENVIRON_STARTTIME_KEY = "opentelemetry-flask.starttime_key"
 _ENVIRON_SPAN_KEY = "opentelemetry-flask.span_key"
@@ -18,11 +19,10 @@ _ENVIRON_ACTIVATION_KEY = "opentelemetry-flask.activation_key"
 
 
 class FlaskPatcher(BasePatcher):
+    """A patcher for flask.Flask"""
 
     def patch(self):
-
         class PatchedFlask(flask.Flask):
-
             def __init__(self, *args, **kwargs):
 
                 super().__init__(*args, **kwargs)
@@ -55,6 +55,7 @@ class FlaskPatcher(BasePatcher):
                         return start_response(
                             status, response_headers, *args, **kwargs
                         )
+
                     return wsgi(environ, _start_response)
 
                 self.wsgi_app = wrapped_app

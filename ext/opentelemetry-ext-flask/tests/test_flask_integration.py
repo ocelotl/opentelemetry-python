@@ -18,8 +18,8 @@ import flask
 from werkzeug.test import Client
 from werkzeug.wrappers import BaseResponse
 
-from opentelemetry.ext.flask import patch
 from opentelemetry import trace as trace_api
+from opentelemetry.ext.flask import FlaskPatcher
 from opentelemetry.ext.testutil.wsgitestutil import WsgiTestBase
 
 
@@ -45,7 +45,8 @@ class TestFlaskIntegration(WsgiTestBase):
     def setUp(self):
         super().setUp()
 
-        patch()
+        FlaskPatcher().patch()
+
         self.app = flask.Flask(__name__)
 
         def hello_endpoint(helloid):

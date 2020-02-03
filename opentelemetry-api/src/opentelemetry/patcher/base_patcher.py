@@ -16,13 +16,14 @@ from abc import ABC, abstractmethod
 
 
 class BasePatcher(ABC):
+    """An ABC for patchers"""
 
     @abstractmethod
-    def patch(self):
+    def patch(self) -> None:
         """Patch"""
 
     @abstractmethod
-    def unpatch(self):
+    def unpatch(self) -> None:
         """Unpatch"""
 
 

@@ -22,11 +22,11 @@ import requests
 
 import opentelemetry.ext.http_requests
 from opentelemetry import trace
-from opentelemetry.ext.flask import instrument_app
+from opentelemetry.ext.flask import FlaskPatcher
 from opentelemetry.sdk.trace import TracerSource
 
 
-def configure_opentelemetry(flask_app: flask.Flask):
+def configure_opentelemetry():
     """Configure a flask application to use OpenTelemetry.
 
     This activates the specific components:
@@ -54,9 +54,9 @@ def configure_opentelemetry(flask_app: flask.Flask):
     # and the frameworks and libraries that are used together, automatically
     # creating Spans and propagating context as appropriate.
     opentelemetry.ext.http_requests.enable(trace.tracer_source())
-    instrument_app(flask_app)
 
 
+FlaskPatcher().patch()
 app = flask.Flask(__name__)
 
 
@@ -73,4 +73,4 @@ def hello():
     return "hello"
 
 
-configure_opentelemetry(app)
+configure_opentelemetry()

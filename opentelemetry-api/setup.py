@@ -46,7 +46,7 @@ setuptools.setup(
         ],
         "opentelemetry_patcher": [
             "no_op_patcher = opentelemetry.patcher.no_op_patcher:NoOpPatcher"
-        ]
+        ],
     },
     description="OpenTelemetry Python API",
     include_package_data=True,

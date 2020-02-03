@@ -16,11 +16,10 @@ from opentelemetry.patcher.base_patcher import BasePatcher
 
 
 class NoOpPatcher(BasePatcher):
-
-    def patch(self):
+    def patch(self) -> None:
         """Patch"""
 
-    def unpatch(self):
+    def unpatch(self) -> None:
         """Unpatch"""
 
 
