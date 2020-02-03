@@ -21,7 +21,7 @@ from sys import argv, path
 
 
 def run() -> None:
-    path.insert(0, dirname(__name__))
+    path.insert(0, dirname(__file__))
     python3 = which(argv[1])
     execl(python3, python3, *argv[2:])  # type: ignore
 
