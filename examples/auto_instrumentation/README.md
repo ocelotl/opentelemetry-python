@@ -1,6 +1,6 @@
 # Overview
 
-This example shows how to use the auto-instrumentation agent in OpenTelemetry.
+This example shows how to use auto-instrumentation in OpenTelemetry.
 
 A uninstrumented script will be executed once without the agent and then a instrumented script will
 be run with the agent. The results should show a `Span` being started in both cases.
