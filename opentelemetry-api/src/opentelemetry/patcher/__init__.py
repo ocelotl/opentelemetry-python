@@ -70,10 +70,10 @@ class BasePatcher(ABC):
 
 
 class NoOpPatcher(BasePatcher):
-    def patch(self) -> None:
+    def _patch(self) -> None:
         """Patch"""
 
-    def unpatch(self) -> None:
+    def _unpatch(self) -> None:
         """Unpatch"""
 
 
