@@ -13,6 +13,7 @@
 # limitations under the License.
 # type: ignore
 
+from logging import WARNING
 from unittest import TestCase
 
 from opentelemetry.patcher import BasePatcher
@@ -20,18 +21,24 @@ from opentelemetry.patcher import BasePatcher
 
 class TestSampler(TestCase):
     def test_protect(self):
-        @BasePatcher.protect
         class TestPatcher(BasePatcher):
-            def patch(self):
-                return 1
+            def _patch(self):
+                return "patched"
 
-            def unpatch(self):
-                return 1
+            def _unpatch(self):
+                return "unpatched"
 
         test_patcher = TestPatcher()
 
-        self.assertIs(test_patcher.unpatch(), None)
-        self.assertEqual(test_patcher.patch(), 1)
-        self.assertIs(test_patcher.patch(), None)
-        self.assertEqual(test_patcher.unpatch(), 1)
-        self.assertIs(test_patcher.unpatch(), None)
+        with self.assertLogs(level=WARNING):
+            self.assertIs(test_patcher.unpatch(), None)
+
+        self.assertEqual(test_patcher.patch(), "patched")
+
+        with self.assertLogs(level=WARNING):
+            self.assertIs(test_patcher.patch(), None)
+
+        self.assertEqual(test_patcher.unpatch(), "unpatched")
+
+        with self.assertLogs(level=WARNING):
+            self.assertIs(test_patcher.unpatch(), None)
