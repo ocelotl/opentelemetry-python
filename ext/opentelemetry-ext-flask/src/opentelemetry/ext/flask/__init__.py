@@ -1,7 +1,7 @@
 # Note: This package is not named "flask" because of
 # https://github.com/PyCQA/pylint/issues/2648
 
-from logging import getLogger
+import logging
 
 import flask
 
@@ -11,7 +11,7 @@ from opentelemetry.ext.flask.version import __version__
 from opentelemetry.patcher import BasePatcher
 from opentelemetry.util import time_ns
 
-logger = getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 _ENVIRON_STARTTIME_KEY = "opentelemetry-flask.starttime_key"
 _ENVIRON_SPAN_KEY = "opentelemetry-flask.span_key"
