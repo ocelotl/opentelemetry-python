@@ -19,26 +19,26 @@ from unittest import TestCase
 from opentelemetry.patcher import BasePatcher
 
 
-class TestSampler(TestCase):
+class TestPatcher(TestCase):
     def test_protect(self):
-        class TestPatcher(BasePatcher):
+        class Patcher(BasePatcher):
             def _patch(self):
                 return "patched"
 
             def _unpatch(self):
                 return "unpatched"
 
-        test_patcher = TestPatcher()
+        patcher = Patcher()
 
         with self.assertLogs(level=WARNING):
-            self.assertIs(test_patcher.unpatch(), None)
+            self.assertIs(patcher.unpatch(), None)
 
-        self.assertEqual(test_patcher.patch(), "patched")
-
-        with self.assertLogs(level=WARNING):
-            self.assertIs(test_patcher.patch(), None)
-
-        self.assertEqual(test_patcher.unpatch(), "unpatched")
+        self.assertEqual(patcher.patch(), "patched")
 
         with self.assertLogs(level=WARNING):
-            self.assertIs(test_patcher.unpatch(), None)
+            self.assertIs(patcher.patch(), None)
+
+        self.assertEqual(patcher.unpatch(), "unpatched")
+
+        with self.assertLogs(level=WARNING):
+            self.assertIs(patcher.unpatch(), None)
