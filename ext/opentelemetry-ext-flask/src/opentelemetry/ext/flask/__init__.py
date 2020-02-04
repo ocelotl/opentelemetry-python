@@ -103,7 +103,6 @@ class _PatchedFlask(flask.Flask):
                 )
 
 
-@BasePatcher.protect
 class FlaskPatcher(BasePatcher):
     """A patcher for flask.Flask
 
@@ -113,11 +112,11 @@ class FlaskPatcher(BasePatcher):
     def __init__(self):
         self._original_flask = None
 
-    def patch(self):
+    def _patch(self):
         self._original_flask = flask.Flask
         flask.Flask = _PatchedFlask
 
-    def unpatch(self):
+    def _unpatch(self):
         flask.Flask = self._original_flask
 
 
