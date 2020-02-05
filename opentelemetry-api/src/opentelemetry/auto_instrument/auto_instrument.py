@@ -15,13 +15,28 @@
 # limitations under the License.
 
 from shutil import which
-from os import execl
-from os.path import dirname
-from sys import argv, path
+from os import environ, execl
+from os.path import dirname, pathsep
+from sys import argv
+
+
+def _add_bootstrap_to_pythonpath(bootstrap_dir):
+    """
+    Add our bootstrap directory to the head of $PYTHONPATH to ensure
+    it is loaded before program code
+    """
+    python_path = environ.get('PYTHONPATH', '')
+
+    if python_path:
+        new_path = '%s%s%s' % (
+            bootstrap_dir, pathsep, environ['PYTHONPATH'])
+        environ['PYTHONPATH'] = new_path
+    else:
+        environ['PYTHONPATH'] = bootstrap_dir
 
 
 def run() -> None:
-    path.insert(0, dirname(__file__))
+    _add_bootstrap_to_pythonpath(dirname(__file__))
     python3 = which(argv[1])
     execl(python3, python3, *argv[2:])  # type: ignore
 
