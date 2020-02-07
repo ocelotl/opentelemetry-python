@@ -26,16 +26,6 @@ class Context(ABC):
     """
 
     @abstractmethod
-    def set_value(self, key: str, value: "object") -> None:
-        """
-        Set a value in this context
-
-        Args:
-            key: The key for the value to set.
-            value: The value to set.
-        """
-
-    @abstractmethod
     def get_value(self, key: str) -> "object":
         """
         Get a value from this context
@@ -45,14 +35,6 @@ class Context(ABC):
         """
 
     @abstractmethod
-    def remove_value(self, key: str) -> None:
-        """
-        Remove a value from this context
-
-        Args:
-            key: The key for the value to remove.
-        """
-
     def copy(self) -> "Context":
         """Return a copy of this context"""
 

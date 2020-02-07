@@ -32,9 +32,14 @@ def get_value(key: str, context: typing.Optional[Context] = None) -> "object":
 
     Args:
         key: The key of the value to retrieve.
-        context: The context from which to retrieve the value, if None, the current context is used.
+        context: The context from which to retrieve the value, if None, the
+        current context is used.
     """
-    return context.get_value(key) if context else get_current().get_value(key)
+
+    if context is None:
+        context = get_current()
+
+    return context.get_value(key)
 
 
 def set_value(
@@ -51,7 +56,9 @@ def set_value(
         value: The value of the entry to set
         context: The context to copy, if None, the current context is used
     """
-    new_context = context.copy() if context else get_current().copy()
+    new_context = context.copy() if (
+        context is not None else get_current().copy()
+    )
     new_context.set_value(key, value)
     return new_context
 
@@ -80,8 +87,9 @@ def get_current() -> Context:
     """
     global _CONTEXT  # pylint: disable=global-statement
     if _CONTEXT is None:
-        # FIXME use a better implementation of a configuration manager to avoid having
-        # to get configuration values straight from environment variables
+        # FIXME use a better implementation of a configuration manager to avoid
+        # having to get configuration values straight from environment
+        # variables
 
         configured_context = environ.get(
             "OPENTELEMETRY_CONTEXT", "default_context"
