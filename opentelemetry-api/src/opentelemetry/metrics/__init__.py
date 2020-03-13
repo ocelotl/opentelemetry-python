@@ -421,24 +421,37 @@ def get_meter_provider() -> MeterProvider:
     global _METER_PROVIDER  # pylint: disable=global-statement
 
     if _METER_PROVIDER is None:
-        configured_meter_provider = (
-            Configuration().meter_provider  # type: ignore # pylint: disable=no-member
-        )
+        api_ep = None
+        sdk_ep = None
+        other_eps = []
+        for ep in iter_entry_points("opentelemetry_meter_provider"):
+            if ep.dist.project_name == 'opentelemetry-api':
+                api_ep = ep
+            elif ep.dist.project_name == 'opentelemetry-sdk':
+                sdk_ep = ep
+            else:
+                other_eps.append(ep)
+
+        if len(other_eps) > 1:
+            raise ValueError(
+                "Found multiple third-party packages with meter provider "
+                "entry points: {}"
+                .format([oep.dist.project_name for oep in other_eps]))
 
         try:
-            _METER_PROVIDER = next(  # type: ignore
-                iter_entry_points(
-                    "opentelemetry_meter_provider",
-                    name=configured_meter_provider,  # type: ignore
-                )
-            ).load()()
+            if other_eps:
+                _METER_PROVIDER = other_eps[0].load()()
+            elif sdk_ep is not None:
+                _METER_PROVIDER = sdk_ep.load()()
+            else:
+                _METER_PROVIDER = api_ep.load()()
+
         except Exception:  # pylint: disable=broad-except
             # FIXME Decide on how to handle this. Should an exception be
             # raised here, or only a message should be logged and should
             # we fall back to the default meter provider?
             logger.error(
-                "Failed to load configured meter provider %s",
-                configured_meter_provider,  # type: ignore
+                "Failed to load meter provider"
             )
             raise
 
