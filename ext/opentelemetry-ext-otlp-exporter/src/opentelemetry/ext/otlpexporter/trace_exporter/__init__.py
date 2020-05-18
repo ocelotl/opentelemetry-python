@@ -15,32 +15,29 @@
 """OpenTelemetry Collector Exporter."""
 
 import logging
-from typing import Optional, Sequence
+from typing import Sequence
 
 import grpc
 from opencensus.proto.agent.trace.v1 import (
     trace_service_pb2,
     trace_service_pb2_grpc,
 )
-from opencensus.proto.trace.v1 import trace_pb2
 
 import opentelemetry.ext.otcollector.util as utils
-import opentelemetry.trace as trace_api
-from opentelemetry.sdk.trace import Span, SpanContext
+from opentelemetry.sdk.trace import Span
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
-from opentelemetry.trace import SpanKind, TraceState
 
-DEFAULT_ENDPOINT = "localhost:55678"
+from .otlp import trace_pb2
 
 logger = logging.getLogger(__name__)
 
 
 # pylint: disable=no-member
-class CollectorSpanExporter(SpanExporter):
-    """OpenTelemetry Collector span exporter.
+class OTLPSpanExporter(SpanExporter):
+    """OTLP span exporter
 
     Args:
-        endpoint: OpenTelemetry Collector OpenCensus receiver endpoint.
+        endpoint: OTLP collector endpoint
         service_name: Name of Collector service.
         host_name: Host name.
         client: TraceService client stub.
@@ -48,7 +45,7 @@ class CollectorSpanExporter(SpanExporter):
 
     def __init__(
         self,
-        endpoint=DEFAULT_ENDPOINT,
+        endpoint,
         service_name=None,
         host_name=None,
         client=None,
