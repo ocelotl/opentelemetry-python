@@ -16,7 +16,15 @@
 
 import logging
 
+from backoff import expo, on_predicate
+from grpc import StatusCode
+from typing import Sequence
+
 from opentelemetry.sdk.metrics.export import MetricsExporter
+from opentelemetry.sdk.metrics.export import (
+    MetricRecord,
+    MetricsExportResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +33,59 @@ logger = logging.getLogger(__name__)
 class OTLPMetricsExporter(MetricsExporter):
     """OTLP metrics exporter"""
 
-    def export(self):
-        pass
+
+    def __init__(self):
+        self._client = trace_service_pb2_grpc.TraceServiceStub(
+            grpc.insecure_channel(self.endpoint)
+        )
+
+    def export(
+        self, metric_records: Sequence[MetricRecord]
+    ) -> MetricsExportResult:
+        # expo returns a generator that yields delay values which grow
+        # exponentially. Once delay is greater than max_value, the yielded
+        # value will remain constant.
+        # max_value is set to 900 (900 seconds is 15 minutes) to use the same
+        # value as used in the Go implementation.
+        for delay in expo(max_value=900):
+            try:
+                for _ in self.client.Export(
+                    self.generate_metrics_requests(metric_records)
+                ):
+                    pass
+
+                return MetricsExportResult.SUCESS
+
+            except grpc.RpcError as error:
+
+                if error.code() in [
+                    StatusCode.CANCELLED,
+                    StatusCode.DEADLINE_EXCEEDED,
+                    StatusCode.PERMISSION_DENIED,
+                    StatusCode.UNAUTHENTICATED,
+                    StatusCode.RESOURCE_EXHAUSTED,
+                    StatusCode.ABORTED,
+                    StatusCode.OUT_OF_RANGE,
+                    StatusCode.UNAVAILABLE,
+                    StatusCode.DATA_LOSS,
+                ]:
+                    sleep(delay)
+                    continue
+
+                if error.code() == StatusCode.OK:
+                    return MetricsExportResult.SUCESS
+
+                return MetricsExportResult.FAILURE
+
+
+
+
+                # Find out from the error code if another attempt is to be made.
+                # Find out if the server has returned a delay, if so, use it to
+                # wait instead of exponential backoff.
+                return MetricsExportResult.FAILURE
+
+            return MetricsExportResult.SUCESS
 
     def shutdown(self):
         pass
