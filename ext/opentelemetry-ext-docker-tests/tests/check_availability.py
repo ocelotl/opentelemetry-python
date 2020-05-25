@@ -110,6 +110,3 @@ def check_docker_services_availability():
     check_mysql_connection()
     check_postgres_connection()
     check_redis_connection()
-
-
-check_docker_services_availability()

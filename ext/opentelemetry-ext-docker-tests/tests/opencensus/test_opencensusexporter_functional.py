@@ -47,7 +47,7 @@ class TestOpenCensusSpanExporter(TestBase):
 
         trace.get_tracer_provider().add_span_processor(self.span_processor)
 
-    def test_export(self):
+    def test_aaxport(self):
         with self.tracer.start_as_current_span("foo"):
             with self.tracer.start_as_current_span("bar"):
                 with self.tracer.start_as_current_span("baz"):

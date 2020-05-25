@@ -15,11 +15,13 @@
 """OTLP Metrics Exporter."""
 
 import logging
+from time import sleep
 
-from backoff import expo, on_predicate
-from grpc import StatusCode
+from backoff import expo
+from grpc import StatusCode, insecure_channel, RpcError
 from typing import Sequence
 
+from opentelemetry.proto.collector.trace.v1 import trace_service_pb2
 from opentelemetry.sdk.metrics.export import MetricsExporter
 from opentelemetry.sdk.metrics.export import (
     MetricRecord,
@@ -33,10 +35,9 @@ logger = logging.getLogger(__name__)
 class OTLPMetricsExporter(MetricsExporter):
     """OTLP metrics exporter"""
 
-
     def __init__(self):
-        self._client = trace_service_pb2_grpc.TraceServiceStub(
-            grpc.insecure_channel(self.endpoint)
+        self._client = trace_service_pb2.TraceServiceStub(
+            insecure_channel(self.endpoint)
         )
 
     def export(
@@ -56,7 +57,7 @@ class OTLPMetricsExporter(MetricsExporter):
 
                 return MetricsExportResult.SUCESS
 
-            except grpc.RpcError as error:
+            except RpcError as error:
 
                 if error.code() in [
                     StatusCode.CANCELLED,
@@ -77,10 +78,8 @@ class OTLPMetricsExporter(MetricsExporter):
 
                 return MetricsExportResult.FAILURE
 
-
-
-
-                # Find out from the error code if another attempt is to be made.
+                # Find out from the error code if another attempt is to be
+                # made.
                 # Find out if the server has returned a delay, if so, use it to
                 # wait instead of exponential backoff.
                 return MetricsExportResult.FAILURE

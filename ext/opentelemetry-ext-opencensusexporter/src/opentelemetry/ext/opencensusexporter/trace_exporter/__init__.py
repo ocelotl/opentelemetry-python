@@ -54,7 +54,7 @@ class OpenCensusSpanExporter(SpanExporter):
         self.endpoint = endpoint
         if client is None:
             self.channel = grpc.insecure_channel(self.endpoint)
-            self.client = trace_service_pb2_grpc.TraceServiceStub(
+            self.client = trace_service_pb2.TraceService(
                 channel=self.channel
             )
         else:
@@ -65,9 +65,12 @@ class OpenCensusSpanExporter(SpanExporter):
     def export(self, spans: Sequence[Span]) -> SpanExportResult:
         try:
             responses = self.client.Export(self.generate_span_requests(spans))
-
+            from ipdb import set_trace
+            set_trace()
             # Read response
-            for _ in responses:
+            for response in responses:
+                set_trace()
+                True
                 pass
 
         except grpc.RpcError:

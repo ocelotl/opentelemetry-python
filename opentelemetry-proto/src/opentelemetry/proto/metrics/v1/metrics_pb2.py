@@ -65,7 +65,7 @@ _METRICDESCRIPTOR_TYPE = _descriptor.EnumDescriptor(
   serialized_start=1160,
   serialized_end=1235,
 )
-_sym_db.RegisterEnumDescriptor(ekETRICDESCRIPTOR_TYPE)
+_sym_db.RegisterEnumDescriptor(_METRICDESCRIPTOR_TYPE)
 
 _METRICDESCRIPTOR_TEMPORALITY = _descriptor.EnumDescriptor(
   name='Temporality',
