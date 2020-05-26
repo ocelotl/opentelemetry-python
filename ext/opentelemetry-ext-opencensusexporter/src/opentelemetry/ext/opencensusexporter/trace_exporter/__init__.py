@@ -20,9 +20,8 @@ from typing import Sequence
 import grpc
 from opencensus.proto.agent.trace.v1 import (
     trace_service_pb2,
-    trace_service_pb2_grpc,
 )
-from opencensus.proto.trace.v1 import trace_pb2
+from opentelemetry.proto.trace.v1 import trace_pb2
 
 import opentelemetry.ext.opencensusexporter.util as utils
 from opentelemetry.sdk.trace import Span
@@ -65,12 +64,8 @@ class OpenCensusSpanExporter(SpanExporter):
     def export(self, spans: Sequence[Span]) -> SpanExportResult:
         try:
             responses = self.client.Export(self.generate_span_requests(spans))
-            from ipdb import set_trace
-            set_trace()
             # Read response
             for response in responses:
-                set_trace()
-                True
                 pass
 
         except grpc.RpcError:
