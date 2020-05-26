@@ -21,9 +21,12 @@ from backoff import expo
 from grpc import StatusCode, insecure_channel, RpcError
 from typing import Sequence
 
-from opentelemetry.proto.collector.trace.v1 import trace_service_pb2
-from opentelemetry.sdk.metrics.export import MetricsExporter
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import (
+    TraceService
+)
+from opentelemetry.proto.metrics.v1.metrics_pb2 import Metric
 from opentelemetry.sdk.metrics.export import (
+    MetricsExporter,
     MetricRecord,
     MetricsExportResult,
 )
@@ -36,9 +39,8 @@ class OTLPMetricsExporter(MetricsExporter):
     """OTLP metrics exporter"""
 
     def __init__(self):
-        self._client = trace_service_pb2.TraceServiceStub(
-            insecure_channel(self.endpoint)
-        )
+        super().__init__()
+        self._client = TraceService(insecure_channel(self.endpoint))
 
     def export(
         self, metric_records: Sequence[MetricRecord]
@@ -88,3 +90,9 @@ class OTLPMetricsExporter(MetricsExporter):
 
     def shutdown(self):
         pass
+
+
+def translate_to_collector(
+    metric_records: Sequence[MetricRecord],
+) -> Sequence[Metric]:
+    pass
