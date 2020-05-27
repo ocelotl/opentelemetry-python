@@ -112,31 +112,19 @@ def translate_to_collector(
     collector_metrics = []
     for metric_record in metric_records:
 
-        label_values = []
-        label_keys = []
-        for label_tuple in metric_record.labels:
-            label_keys.append(LabelKey(key=label_tuple[0]))
-            label_values.append(
-                LabelValue(
-                    has_value=label_tuple[1] is not None, value=label_tuple[1]
-                )
-            )
-
         metric_descriptor = MetricDescriptor(
             name=metric_record.metric.name,
             description=metric_record.metric.description,
             unit=metric_record.metric.unit,
             type=get_collector_metric_type(metric_record.metric),
-            label_keys=label_keys,
+            # FIXME: define which temporality is to be used
         )
 
-        timeseries = TimeSeries(
-            label_values=label_values,
-            points=[get_collector_point(metric_record)],
-        )
         collector_metrics.append(
             Metric(
-                metric_descriptor=metric_descriptor, timeseries=[timeseries]
+                # FIXME: the type of the metric determines the data filed to
+                # be used here
+                metric_descriptor=metric_descriptor, 
             )
         )
     return collector_metrics
