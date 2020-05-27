@@ -29,6 +29,7 @@ from opentelemetry.proto.collector.metrics.v1.\
 from opentelemetry.proto.metrics.v1.metrics_pb2 import (
     Metric, MetricDescriptor
 )
+from opentelemetry.sdk.metrics import Counter
 from opentelemetry.sdk.metrics.export import (
     MetricsExporter,
     MetricRecord,
@@ -110,13 +111,29 @@ def translate_to_collector(
     metric_records: Sequence[MetricRecord],
 ) -> Sequence[Metric]:
     collector_metrics = []
+
     for metric_record in metric_records:
+        if isinstance(metric, Counter):
+            metric_temporality = MetricDescriptor.CUMULATIVE
+
+            if metric.value_type == int:
+                metric_type = MetricDescriptor.INT64
+            elif metric.value_type == float:
+                metric_type =  MetricDescriptor.DOUBLE
+
+        elif isinstance(metric, Measure):
+            pass
+
+        elif isinstance(metric, Observer):
+            pass
+
+        metric_type = MetricDescriptor.UNSPECIFIED
 
         metric_descriptor = MetricDescriptor(
             name=metric_record.metric.name,
             description=metric_record.metric.description,
             unit=metric_record.metric.unit,
-            type=get_collector_metric_type(metric_record.metric),
+            type=metric_type,
             # FIXME: define which temporality is to be used
         )
 
