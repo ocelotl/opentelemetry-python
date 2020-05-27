@@ -23,7 +23,8 @@ from grpc import StatusCode, insecure_channel, RpcError
 from typing import Sequence
 
 from opentelemetry.trace import SpanKind
-from opentelemetru.proto.trace.v1.trace.trace_pb2 import Span, Status
+from opentelemetru.proto.trace.v1.trace.trace_pb2 import Span as CollectorSpan
+from opentelemetru.proto.trace.v1.trace.trace_pb2 import Status
 from opentelemetry.proto.collector.trace.v1.\
         trace_service_pb2_grpc import TraceServiceStub
 from opentelemetry.proto.collector.trace.v1.\
@@ -102,47 +103,56 @@ class OTLPSpanExporter(SpanExporter):
 
 
 # pylint: disable=too-many-branches
-def translate_to_collector(spans: Sequence[SDKSpan]):
+def translate_to_collector(sdk_spans: Sequence[SDKSpan]):
     collector_spans = []
-    for span in spans:
+    for sdk_span in sdk_spans:
         status = None
-        if span.status is not None:
+        if sdk_span.status is not None:
             status = Status(
-                code=span.status.canonical_code.value,
-                message=span.status.description,
+                code=sdk_span.status.canonical_code.value,
+                message=sdk_span.status.description,
             )
 
-        collector_span = Span(
-            name=trace_pb2.TruncatableString(value=span.name),
-            kind=get_collector_span_kind(span.kind),
-            trace_id=span.context.trace_id.to_bytes(16, "big"),
-            span_id=span.context.span_id.to_bytes(8, "big"),
-            start_time=proto_timestamp_from_time_ns(span.start_time),
-            end_time=proto_timestamp_from_time_ns(span.end_time),
+        if sdk_span.kind is SpanKind.SERVER:
+            collector_span_kind = CollectorSpan.CollectorSpanKind.SERVER
+
+        elif sdk_span.kind is SpanKind.CLIENT:
+            collector_span_kind = CollectorSpan.SpanKind.CLIENT
+
+        collector_span_kind = CollectorSpan.SpanKind.SPAN_KIND_UNSPECIFIED
+
+        collector_span = CollectorSpan(
+            name=sdk_span.name,
+            kind=collector_span_kind,
+            trace_id=sdk_span.context.trace_id.to_bytes(16, "big"),
+            span_id=sdk_span.context.span_id.to_bytes(8, "big"),
+            start_time_unix_nano=proto_timestamp_from_time_ns(
+                sdk_span.start_time),
+            end_time_unix_nano=proto_timestamp_from_time_ns(sdk_span.end_time),
             status=status,
         )
 
         parent_id = 0
-        if span.parent is not None:
-            parent_id = span.parent.span_id
+        if sdk_span.parent is not None:
+            parent_id = sdk_span.parent.span_id
 
         collector_span.parent_span_id = parent_id.to_bytes(8, "big")
 
-        if span.context.trace_state is not None:
-            for (key, value) in span.context.trace_state.items():
+        if sdk_span.context.trace_state is not None:
+            for (key, value) in sdk_span.context.trace_state.items():
                 collector_span.tracestate.entries.add(key=key, value=value)
 
-        if span.attributes:
-            for (key, value) in span.attributes.items():
+        if sdk_span.attributes:
+            for (key, value) in sdk_span.attributes.items():
                 add_proto_attribute_value(
                     collector_span.attributes, key, value
                 )
 
-        if span.events:
-            for event in span.events:
+        if sdk_span.events:
+            for event in sdk_span.events:
 
-                collector_annotation = Span.TimeEvent.Annotation(
-                    description=trace_pb2.TruncatableString(value=event.name)
+                collector_annotation = CollectorSpan.TimeEvent.Annotation(
+                    description=event.name
                 )
 
                 if event.attributes:
@@ -156,8 +166,8 @@ def translate_to_collector(spans: Sequence[SDKSpan]):
                     annotation=collector_annotation,
                 )
 
-        if span.links:
-            for link in span.links:
+        if sdk_span.links:
+            for link in sdk_span.links:
                 collector_span_link = collector_span.links.link.add()
                 collector_span_link.trace_id = link.context.trace_id.to_bytes(
                     16, "big"
@@ -167,15 +177,15 @@ def translate_to_collector(spans: Sequence[SDKSpan]):
                 )
 
                 collector_span_link.type = (
-                    Span.Link.Type.TYPE_UNSPECIFIED
+                    CollectorSpan.Link.Type.TYPE_UNSPECIFIED
                 )
-                if span.parent is not None:
+                if sdk_span.parent is not None:
                     if (
-                        link.context.span_id == span.parent.span_id
-                        and link.context.trace_id == span.parent.trace_id
+                        link.context.span_id == sdk_span.parent.span_id
+                        and link.context.trace_id == sdk_span.parent.trace_id
                     ):
                         collector_span_link.type = (
-                            Span.Link.Type.PARENT_LINKED_SPAN
+                            CollectorSpan.Link.Type.PARENT_LINKED_SPAN
                         )
 
                 if link.attributes:
@@ -186,15 +196,6 @@ def translate_to_collector(spans: Sequence[SDKSpan]):
 
         collector_spans.append(collector_span)
     return collector_spans
-
-
-# pylint: disable=no-member
-def get_collector_span_kind(kind: SpanKind):
-    if kind is SpanKind.SERVER:
-        return Span.SpanKind.SERVER
-    if kind is SpanKind.CLIENT:
-        return Span.SpanKind.CLIENT
-    return Span.SpanKind.SPAN_KIND_UNSPECIFIED
 
 
 def add_proto_attribute_value(pb_attributes, key, value):
