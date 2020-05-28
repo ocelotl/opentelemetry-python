@@ -14,6 +14,25 @@
 
 from unittest import TestCase
 
+from pytest import fixture
+
+from opentelemetry.proto.collector.trace.v1.\
+    trace_service_pb2 import (
+        ExportTraceServiceRequest, ExportTraceServiceResponse
+    )
+
+
+@fixture(scope="module")
+def grpc_add_to_server():
+    from opentelemetry.proto.collector.trace.v1.\
+        trace_service_pb2_grpc import add_TraceServiceServicer_to_server
+
+    return add_TraceServiceServicer_to_server
+
+
+@fixture(scope="module")
+def gprc_servicer():
+    from servicer
 
 # pylint: disable=no-member
 class TestOTLPSpanExporter(TestCase):
