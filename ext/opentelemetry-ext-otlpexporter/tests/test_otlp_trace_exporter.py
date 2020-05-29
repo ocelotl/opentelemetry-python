@@ -12,30 +12,102 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from ipdb import set_trace
+# from pytest import fixture
+from grpc import server, insecure_channel, StatusCode
+
+from concurrent.futures import ThreadPoolExecutor
+
 from unittest import TestCase
 
-from pytest import fixture
+from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
 from opentelemetry.proto.collector.trace.v1.\
     trace_service_pb2 import (
         ExportTraceServiceRequest, ExportTraceServiceResponse
     )
 
+from opentelemetry.proto.collector.trace.v1.\
+    trace_service_pb2_grpc import (
+        add_TraceServiceServicer_to_server,
+        TraceServiceServicer,
+        TraceServiceStub
+    )
 
+
+class MockTraceServiceServicer(TraceServiceServicer):
+    def Export(self, request, context):
+        context.set_details("var")
+        context.set_code(StatusCode.ABORTED)
+        response = ExportTraceServiceResponse()
+        return response
+
+
+class TestRealServer(TestCase):
+    def setUp(self):
+
+        self.server = server(
+            ThreadPoolExecutor(max_workers=10),
+            options=[("grpc.min_recoisdfnect_backoff_ms", 3)]
+        )
+
+        add_TraceServiceServicer_to_server(
+            MockTraceServiceServicer(), self.server
+        )
+
+        self.server.add_insecure_port("[::]:50051")
+
+        self.server.start()
+
+    def tearDown(self):
+        self.server.stop(None)
+
+    def test_server(self):
+        with insecure_channel("localhost:50051") as channel:
+            stub = TraceServiceStub(channel)
+
+            try:
+                response = stub.Export(
+                    ExportTraceServiceRequest(
+                        resource_spans=[ResourceSpans()]
+                    )
+                )
+                response
+            except Exception as error:
+                error
+                set_trace()
+                True
+
+
+"""
 @fixture(scope="module")
 def grpc_add_to_server():
-    from opentelemetry.proto.collector.trace.v1.\
-        trace_service_pb2_grpc import add_TraceServiceServicer_to_server
 
     return add_TraceServiceServicer_to_server
 
 
 @fixture(scope="module")
-def gprc_servicer():
-    from servicer
+def grpc_servicer():
+    return TestServiceServicer()
 
-# pylint: disable=no-member
-class TestOTLPSpanExporter(TestCase):
 
-    def test_case(self):
-        pass
+@fixture(scope="module")
+def grpc_stub_cls(grpc_channel):
+    from opentelemetry.proto.collector.trace.v1.\
+        trace_service_pb2_grpc import TraceServiceStub
+
+    return TraceServiceStub
+
+
+def case(grpc_stub):
+    request = ExportTraceServiceRequest()
+    try:
+        response = grpc_stub.Export(request)
+        response
+    except Exception as error:
+        error
+        set_trace()
+        True
+
+    # assert response.resource_spans == [1, 2]
+"""
