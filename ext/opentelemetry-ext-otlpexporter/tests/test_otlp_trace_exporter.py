@@ -20,6 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from unittest import TestCase
 
+from opentelemetry.ext.otlpexporter.trace_exporter import OTLPSpanExporter
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
 from opentelemetry.proto.collector.trace.v1.\
@@ -97,3 +98,8 @@ class TestRealServer(TestCase):
                 set_trace()
                 error
                 True
+
+    def test_otlp_span_exporter(self):
+
+        exporter = OTLPSpanExporter()
+        exporter.export()
