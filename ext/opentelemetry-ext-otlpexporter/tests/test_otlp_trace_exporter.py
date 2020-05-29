@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# from pytest import fixture
 from grpc import server, insecure_channel, StatusCode
 from google.rpc.error_details_pb2 import RetryInfo
 
@@ -94,5 +93,7 @@ class TestRealServer(TestCase):
                     metadata=(("random", "sdf"),)
                 )
             except Exception as error:
+                from ipdb import set_trace
+                set_trace()
                 error
                 True

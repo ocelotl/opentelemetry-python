@@ -17,6 +17,7 @@
 import logging
 from time import sleep
 
+from google.rpc.error_details_pb2 import RetryInfo
 from google.protobuf.timestamp_pb2 import Timestamp
 from backoff import expo
 from grpc import StatusCode, insecure_channel, RpcError
@@ -73,6 +74,18 @@ class OTLPSpanExporter(SpanExporter):
                     StatusCode.UNAVAILABLE,
                     StatusCode.DATA_LOSS,
                 ]:
+
+                    retry_info_bin = dict(error.trailing_metadata()).get(
+                        "google.rpc.retryinfo-bin"
+                    )
+                    if retry_info_bin is not None:
+                        retry_info = RetryInfo()
+                        retry_info.ParseFromString(retry_info_bin)
+                        delay = (
+                            retry_info.retry_delay.seconds +
+                            retry_info.retry_delay.nanos / 1.0e9
+                        )
+
                     sleep(delay)
                     continue
 
@@ -81,121 +94,115 @@ class OTLPSpanExporter(SpanExporter):
 
                 return SpanExportResult.FAILURE
 
-                # Find out from the error code if another attempt is to be
-                # made.
-                # Find out if the server has returned a delay, if so, use it to
-                # wait instead of exponential backoff.
-                return SpanExportResult.FAILURE
-
             return SpanExportResult.SUCESS
 
     def generate_spans_requests(
-        self, spans: Sequence[SDKSpan]
+        self, sdk_spans: Sequence[SDKSpan]
     ) -> ExportTraceServiceRequest:
-        collector_metrics = translate_to_collector(spans)
+
+        collector_spans = []
+        for sdk_span in sdk_spans:
+            status = None
+            if sdk_span.status is not None:
+                status = Status(
+                    code=sdk_span.status.canonical_code.value,
+                    message=sdk_span.status.description,
+                )
+
+            if sdk_span.kind is SpanKind.SERVER:
+                collector_span_kind = CollectorSpan.CollectorSpanKind.SERVER
+
+            elif sdk_span.kind is SpanKind.CLIENT:
+                collector_span_kind = CollectorSpan.SpanKind.CLIENT
+
+            collector_span_kind = CollectorSpan.SpanKind.SPAN_KIND_UNSPECIFIED
+
+            collector_span = CollectorSpan(
+                name=sdk_span.name,
+                kind=collector_span_kind,
+                trace_id=sdk_span.context.trace_id.to_bytes(16, "big"),
+                span_id=sdk_span.context.span_id.to_bytes(8, "big"),
+                start_time_unix_nano=proto_timestamp_from_time_ns(
+                    sdk_span.start_time),
+                end_time_unix_nano=proto_timestamp_from_time_ns(
+                    sdk_span.end_time
+                ),
+                status=status,
+            )
+
+            parent_id = 0
+            if sdk_span.parent is not None:
+                parent_id = sdk_span.parent.span_id
+
+            collector_span.parent_span_id = parent_id.to_bytes(8, "big")
+
+            if sdk_span.context.trace_state is not None:
+                for (key, value) in sdk_span.context.trace_state.items():
+                    collector_span.tracestate.entries.add(key=key, value=value)
+
+            if sdk_span.attributes:
+                for (key, value) in sdk_span.attributes.items():
+                    add_proto_attribute_value(
+                        collector_span.attributes, key, value
+                    )
+
+            if sdk_span.events:
+                for event in sdk_span.events:
+
+                    collector_annotation = CollectorSpan.TimeEvent.Annotation(
+                        description=event.name
+                    )
+
+                    if event.attributes:
+                        for (key, value) in event.attributes.items():
+                            add_proto_attribute_value(
+                                collector_annotation.attributes, key, value
+                            )
+
+                    collector_span.time_events.time_event.add(
+                        time=proto_timestamp_from_time_ns(event.timestamp),
+                        annotation=collector_annotation,
+                    )
+
+            if sdk_span.links:
+                for link in sdk_span.links:
+                    collector_span_link = collector_span.links.link.add()
+                    collector_span_link.trace_id = (
+                        link.context.trace_id.to_bytes(16, "big")
+                    )
+                    collector_span_link.span_id = (
+                        link.context.span_id.to_bytes(8, "big")
+                    )
+
+                    collector_span_link.type = (
+                        CollectorSpan.Link.Type.TYPE_UNSPECIFIED
+                    )
+                    if sdk_span.parent is not None:
+                        if (
+                            link.context.span_id == sdk_span.parent.span_id
+                            and link.context.trace_id == (
+                                sdk_span.parent.trace_id
+                            )
+                        ):
+                            collector_span_link.type = (
+                                CollectorSpan.Link.Type.PARENT_LINKED_SPAN
+                            )
+
+                    if link.attributes:
+                        for (key, value) in link.attributes.items():
+                            add_proto_attribute_value(
+                                collector_span_link.attributes, key, value
+                            )
+
+            collector_spans.append(collector_span)
+
         service_request = ExportTraceServiceRequest(
-            node=self.node, metrics=collector_metrics
+            node=self.node, metrics=collector_spans
         )
         yield service_request
 
     def shutdown(self):
         pass
-
-
-# pylint: disable=too-many-branches
-def translate_to_collector(sdk_spans: Sequence[SDKSpan]):
-    collector_spans = []
-    for sdk_span in sdk_spans:
-        status = None
-        if sdk_span.status is not None:
-            status = Status(
-                code=sdk_span.status.canonical_code.value,
-                message=sdk_span.status.description,
-            )
-
-        if sdk_span.kind is SpanKind.SERVER:
-            collector_span_kind = CollectorSpan.CollectorSpanKind.SERVER
-
-        elif sdk_span.kind is SpanKind.CLIENT:
-            collector_span_kind = CollectorSpan.SpanKind.CLIENT
-
-        collector_span_kind = CollectorSpan.SpanKind.SPAN_KIND_UNSPECIFIED
-
-        collector_span = CollectorSpan(
-            name=sdk_span.name,
-            kind=collector_span_kind,
-            trace_id=sdk_span.context.trace_id.to_bytes(16, "big"),
-            span_id=sdk_span.context.span_id.to_bytes(8, "big"),
-            start_time_unix_nano=proto_timestamp_from_time_ns(
-                sdk_span.start_time),
-            end_time_unix_nano=proto_timestamp_from_time_ns(sdk_span.end_time),
-            status=status,
-        )
-
-        parent_id = 0
-        if sdk_span.parent is not None:
-            parent_id = sdk_span.parent.span_id
-
-        collector_span.parent_span_id = parent_id.to_bytes(8, "big")
-
-        if sdk_span.context.trace_state is not None:
-            for (key, value) in sdk_span.context.trace_state.items():
-                collector_span.tracestate.entries.add(key=key, value=value)
-
-        if sdk_span.attributes:
-            for (key, value) in sdk_span.attributes.items():
-                add_proto_attribute_value(
-                    collector_span.attributes, key, value
-                )
-
-        if sdk_span.events:
-            for event in sdk_span.events:
-
-                collector_annotation = CollectorSpan.TimeEvent.Annotation(
-                    description=event.name
-                )
-
-                if event.attributes:
-                    for (key, value) in event.attributes.items():
-                        add_proto_attribute_value(
-                            collector_annotation.attributes, key, value
-                        )
-
-                collector_span.time_events.time_event.add(
-                    time=proto_timestamp_from_time_ns(event.timestamp),
-                    annotation=collector_annotation,
-                )
-
-        if sdk_span.links:
-            for link in sdk_span.links:
-                collector_span_link = collector_span.links.link.add()
-                collector_span_link.trace_id = link.context.trace_id.to_bytes(
-                    16, "big"
-                )
-                collector_span_link.span_id = link.context.span_id.to_bytes(
-                    8, "big"
-                )
-
-                collector_span_link.type = (
-                    CollectorSpan.Link.Type.TYPE_UNSPECIFIED
-                )
-                if sdk_span.parent is not None:
-                    if (
-                        link.context.span_id == sdk_span.parent.span_id
-                        and link.context.trace_id == sdk_span.parent.trace_id
-                    ):
-                        collector_span_link.type = (
-                            CollectorSpan.Link.Type.PARENT_LINKED_SPAN
-                        )
-
-                if link.attributes:
-                    for (key, value) in link.attributes.items():
-                        add_proto_attribute_value(
-                            collector_span_link.attributes, key, value
-                        )
-
-        collector_spans.append(collector_span)
-    return collector_spans
 
 
 def add_proto_attribute_value(pb_attributes, key, value):
