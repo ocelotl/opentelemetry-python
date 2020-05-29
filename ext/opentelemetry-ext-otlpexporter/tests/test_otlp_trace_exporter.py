@@ -12,10 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from datetime import datetime
 from ipdb import set_trace
 # from pytest import fixture
 from grpc import server, insecure_channel, StatusCode
+from google.rpc.error_details_pb2 import RetryInfo
 
+from google.protobuf.duration_pb2 import Duration
 from concurrent.futures import ThreadPoolExecutor
 
 from unittest import TestCase
@@ -38,8 +41,17 @@ from opentelemetry.proto.collector.trace.v1.\
 class MockTraceServiceServicer(TraceServiceServicer):
     def Export(self, request, context):
         context.set_details("var")
-        context.set_code(StatusCode.ABORTED)
+        context.set_code(StatusCode.UNAVAILABLE)
+        context.set_trailing_metadata(
+            (
+                "google.rpc.retryinfo-bin",
+                RetryInfo(
+                    retry_delay=Duration(seconds=1)
+                ).SerializeToString()
+            )
+        )
         response = ExportTraceServiceResponse()
+        print("now:{}".format(datetime.now()))
         return response
 
 
@@ -67,12 +79,12 @@ class TestRealServer(TestCase):
             stub = TraceServiceStub(channel)
 
             try:
-                response = stub.Export(
+                stub.Export.with_call(
                     ExportTraceServiceRequest(
                         resource_spans=[ResourceSpans()]
-                    )
+                    ),
+                    metadata=(("random", "sdf"),)
                 )
-                response
             except Exception as error:
                 error
                 set_trace()
