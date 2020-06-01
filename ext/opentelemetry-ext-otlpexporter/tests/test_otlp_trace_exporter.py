@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from ipdb import set_trace
 from grpc import server, insecure_channel, StatusCode
 from google.rpc.error_details_pb2 import RetryInfo
 
@@ -69,11 +70,11 @@ class TestRealServer(TestCase):
     def setUp(self):
 
         tracer_provider = TracerProvider()
+        self.exporter = OTLPSpanExporter()
         tracer_provider.add_span_processor(
             SimpleExportSpanProcessor(self.exporter)
         )
         self.tracer = tracer_provider.get_tracer(__name__)
-        self.exporter = OTLPSpanExporter()
 
         self.server = server(ThreadPoolExecutor(max_workers=10))
 
@@ -100,7 +101,6 @@ class TestRealServer(TestCase):
                     metadata=(("random", "sdf"),)
                 )
             except Exception as error:
-                from ipdb import set_trace
                 set_trace()
                 error
                 True
@@ -112,4 +112,5 @@ class TestRealServer(TestCase):
                 with self.tracer.start_as_current_span("c"):
                     pass
 
-        self.exporter.export()
+        set_trace()
+        True

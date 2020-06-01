@@ -14,24 +14,25 @@
 
 """OTLP Span Exporter"""
 
+from ipdb import set_trace
 import logging
 from time import sleep
-
-from google.rpc.error_details_pb2 import RetryInfo
-from google.protobuf.timestamp_pb2 import Timestamp
-from backoff import expo
-from grpc import StatusCode, insecure_channel, RpcError
 from typing import Sequence
 
+from backoff import expo
+from grpc import StatusCode, insecure_channel, RpcError
+from google.rpc.error_details_pb2 import RetryInfo
+from google.protobuf.timestamp_pb2 import Timestamp
+
 from opentelemetry.trace import SpanKind
+from opentelemetry.sdk.trace import Span as SDKSpan
+from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from opentelemetry.proto.trace.v1.trace_pb2 import Span as CollectorSpan
 from opentelemetry.proto.trace.v1.trace_pb2 import Status
 from opentelemetry.proto.collector.trace.v1.\
         trace_service_pb2_grpc import TraceServiceStub
 from opentelemetry.proto.collector.trace.v1.\
-        trace_service_pb2 import ExportTraceServiceRequest
-from opentelemetry.sdk.trace import Span as SDKSpan
-from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
+        trace_service_pb2 import ExportTraceServiceRequest, TraceService
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +43,9 @@ class OTLPSpanExporter(SpanExporter):
 
     def __init__(self, endpoint="localhost:55678"):
         super().__init__()
-        self._client = TraceServiceStub(insecure_channel(endpoint))
+        self._client = TraceService(insecure_channel(endpoint))
 
-    def export(self, spans: Sequence[SDKSpan]) -> SpanExportResult:
+    def export(self, sdk_spans: Sequence[SDKSpan]) -> SpanExportResult:
         # expo returns a generator that yields delay values which grow
         # exponentially. Once delay is greater than max_value, the yielded
         # value will remain constant.
@@ -52,8 +53,8 @@ class OTLPSpanExporter(SpanExporter):
         # value as used in the Go implementation.
         for delay in expo(max_value=900):
             try:
-                for _ in self.client.Export(
-                    self.generate_metrics_requests(metric_records)
+                for _ in self._client.Export(
+                    self._generate_spans_requests(sdk_spans)
                 ):
                     pass
 
@@ -94,13 +95,16 @@ class OTLPSpanExporter(SpanExporter):
 
             return SpanExportResult.SUCESS
 
-    def generate_spans_requests(
+    def _generate_spans_requests(
         self, sdk_spans: Sequence[SDKSpan]
     ) -> ExportTraceServiceRequest:
 
+        set_trace()
         collector_spans = []
+
         for sdk_span in sdk_spans:
             status = None
+
             if sdk_span.status is not None:
                 status = Status(
                     code=sdk_span.status.canonical_code.value,
@@ -129,6 +133,7 @@ class OTLPSpanExporter(SpanExporter):
             )
 
             parent_id = 0
+
             if sdk_span.parent is not None:
                 parent_id = sdk_span.parent.span_id
 
