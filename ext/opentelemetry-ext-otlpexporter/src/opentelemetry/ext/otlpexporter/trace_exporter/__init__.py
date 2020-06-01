@@ -40,13 +40,11 @@ logger = logging.getLogger(__name__)
 class OTLPSpanExporter(SpanExporter):
     """OTLP span exporter"""
 
-    def __init__(self):
+    def __init__(self, endpoint="localhost:55678"):
         super().__init__()
-        self._client = TraceServiceStub(insecure_channel(self.endpoint))
+        self._client = TraceServiceStub(insecure_channel(endpoint))
 
-    def export(
-        self, metric_records: Sequence[SDKSpan]
-    ) -> SpanExportResult:
+    def export(self, spans: Sequence[SDKSpan]) -> SpanExportResult:
         # expo returns a generator that yields delay values which grow
         # exponentially. Once delay is greater than max_value, the yielded
         # value will remain constant.

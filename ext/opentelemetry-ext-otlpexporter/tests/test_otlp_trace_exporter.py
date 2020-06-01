@@ -20,6 +20,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 from unittest import TestCase
 
+from opentelemetry.sdk.trace.export import SimpleExportSpanProcessor
+from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.ext.otlpexporter.trace_exporter import OTLPSpanExporter
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
@@ -66,6 +68,13 @@ class MockTraceErrorServiceServicer(TraceServiceServicer):
 class TestRealServer(TestCase):
     def setUp(self):
 
+        tracer_provider = TracerProvider()
+        tracer_provider.add_span_processor(
+            SimpleExportSpanProcessor(self.exporter)
+        )
+        self.tracer = tracer_provider.get_tracer(__name__)
+        self.exporter = OTLPSpanExporter()
+
         self.server = server(ThreadPoolExecutor(max_workers=10))
 
         add_TraceServiceServicer_to_server(
@@ -98,5 +107,9 @@ class TestRealServer(TestCase):
 
     def test_otlp_span_exporter(self):
 
-        exporter = OTLPSpanExporter()
-        exporter.export()
+        with self.tracer.start_as_current_span("a"):
+            with self.tracer.start_as_current_span("b"):
+                with self.tracer.start_as_current_span("c"):
+                    pass
+
+        self.exporter.export()
