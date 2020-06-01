@@ -24,8 +24,8 @@ from grpc import StatusCode, insecure_channel, RpcError
 from typing import Sequence
 
 from opentelemetry.trace import SpanKind
-from opentelemetru.proto.trace.v1.trace.trace_pb2 import Span as CollectorSpan
-from opentelemetru.proto.trace.v1.trace.trace_pb2 import Status
+from opentelemetry.proto.trace.v1.trace_pb2 import Span as CollectorSpan
+from opentelemetry.proto.trace.v1.trace_pb2 import Status
 from opentelemetry.proto.collector.trace.v1.\
         trace_service_pb2_grpc import TraceServiceStub
 from opentelemetry.proto.collector.trace.v1.\

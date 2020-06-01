@@ -36,7 +36,7 @@ from opentelemetry.proto.collector.trace.v1.\
     )
 
 
-class MockTraceServiceServicer(TraceServiceServicer):
+class MockTraceErrorServiceServicer(TraceServiceServicer):
     def Export(self, request, context):
         context.set_details("var")
         context.set_code(StatusCode.UNAVAILABLE)
@@ -66,13 +66,10 @@ class MockTraceServiceServicer(TraceServiceServicer):
 class TestRealServer(TestCase):
     def setUp(self):
 
-        self.server = server(
-            ThreadPoolExecutor(max_workers=10),
-            options=[("grpc.min_recoisdfnect_backoff_ms", 3)]
-        )
+        self.server = server(ThreadPoolExecutor(max_workers=10))
 
         add_TraceServiceServicer_to_server(
-            MockTraceServiceServicer(), self.server
+            MockTraceErrorServiceServicer(), self.server
         )
 
         self.server.add_insecure_port("[::]:50051")
