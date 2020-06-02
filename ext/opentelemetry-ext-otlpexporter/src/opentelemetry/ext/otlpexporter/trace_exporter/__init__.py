@@ -32,7 +32,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import Status
 from opentelemetry.proto.collector.trace.v1.\
         trace_service_pb2_grpc import TraceServiceStub
 from opentelemetry.proto.collector.trace.v1.\
-        trace_service_pb2 import ExportTraceServiceRequest, TraceService
+        trace_service_pb2 import ExportTraceServiceRequest
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class OTLPSpanExporter(SpanExporter):
 
     def __init__(self, endpoint="localhost:55678"):
         super().__init__()
-        self._client = TraceService(insecure_channel(endpoint))
+        self._client = TraceServiceStub(insecure_channel(endpoint))
 
     def export(self, sdk_spans: Sequence[SDKSpan]) -> SpanExportResult:
         # expo returns a generator that yields delay values which grow
