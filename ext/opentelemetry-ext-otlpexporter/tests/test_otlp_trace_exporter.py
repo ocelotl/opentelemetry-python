@@ -101,7 +101,7 @@ class TestRealServer(TestCase):
                     metadata=(("random", "sdf"),)
                 )
             except Exception as error:
-                set_trace()
+                set_trace
                 error
                 True
 
@@ -112,5 +112,5 @@ class TestRealServer(TestCase):
                 with self.tracer.start_as_current_span("c"):
                     pass
 
-        set_trace()
+        set_trace
         True

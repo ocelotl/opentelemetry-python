@@ -99,7 +99,7 @@ class OTLPSpanExporter(SpanExporter):
         self, sdk_spans: Sequence[SDKSpan]
     ) -> ExportTraceServiceRequest:
 
-        set_trace()
+        set_trace
         collector_spans = []
 
         for sdk_span in sdk_spans:
@@ -202,7 +202,7 @@ class OTLPSpanExporter(SpanExporter):
         service_request = ExportTraceServiceRequest(
             node=self.node, metrics=collector_spans
         )
-        yield service_request
+        return service_request
 
     def shutdown(self):
         pass
