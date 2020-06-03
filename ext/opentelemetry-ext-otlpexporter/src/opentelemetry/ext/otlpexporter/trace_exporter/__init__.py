@@ -130,51 +130,63 @@ class OTLPSpanExporter(SpanExporter):
         collector_spans = []
 
         for sdk_span in sdk_spans:
-            status = None
+
+            collector_span_kwargs = {}
 
             if sdk_span.status is not None:
-                status = Status(
+                collector_span_kwargs["status"] = Status(
                     code=sdk_span.status.canonical_code.value,
                     message=sdk_span.status.description,
                 )
 
-            if sdk_span.kind is SpanKind.SERVER:
-                collector_span_kind = CollectorSpan.CollectorSpanKind.SERVER
-
-            elif sdk_span.kind is SpanKind.CLIENT:
-                collector_span_kind = CollectorSpan.SpanKind.CLIENT
-
-            collector_span_kind = CollectorSpan.SpanKind.SPAN_KIND_UNSPECIFIED
-
-            collector_span = CollectorSpan(
-                name=sdk_span.name,
-                kind=collector_span_kind,
-                trace_id=sdk_span.context.trace_id.to_bytes(16, "big"),
-                span_id=sdk_span.context.span_id.to_bytes(8, "big"),
-                start_time_unix_nano=sdk_span.start_time,
-                end_time_unix_nano=sdk_span.end_time,
-                status=status,
-            )
-c
-            parent_id = 0
-
             if sdk_span.parent is not None:
-                parent_id = sdk_span.parent.span_id
-
-            collector_span.parent_span_id = parent_id.to_bytes(8, "big")
+                collector_span_kwargs["parent_id"] = sdk_span.parent.span_id.to_bytes(
+                    8, "big"
+                )
 
             if sdk_span.context.trace_state is not None:
-                for (key, value) in sdk_span.context.trace_state.items():
-                    collector_span.tracestate.entries.add(key=key, value=value)
+                collector_span_kwargs["trace_state"] = ",".join(
+                    [
+                        "{}={}".format(key, value) for key, value in (
+                            sdk_span.context.trace_state.items()
+                        )
+                    ]
+                )
 
             if sdk_span.attributes:
-                for (key, value) in sdk_span.attributes.items():
-                    add_proto_attribute_value(
-                        collector_span.attributes, key, value
+                collector_span_kwargs["attributes"] = []
+
+                for key, value in sdk_span.attributes.items():
+
+                    attribute_key_value_kwargs = {"key": key}
+
+                    if isinstance(value, str):
+                        attribute_key_value_kwargs["string_value"] = value
+
+                    elif isinstance(value, int):
+                        attribute_key_value_kwargs["int_value"] = value
+
+                    elif isinstance(value, float):
+                        attribute_key_value_kwargs["double_value"] = value
+
+                    elif isinstance(value, bool):
+                        attribute_key_value_kwargs["bool_value"] = value
+
+                    else:
+                        logger.warning(
+                            "Unable to set attribute of type {}".format(
+                                type(value)
+                            )
+                        )
+
+                    collector_span_kwargs["attributes"].append(
+                        AttributeKeyValue(**attribute_key_value_kwargs)
                     )
 
             if sdk_span.events:
                 for event in sdk_span.events:
+
+                    collector_span_kwargs["events"] = []
 
                     collector_annotation = CollectorSpan.TimeEvent.Annotation(
                         description=event.name
@@ -221,7 +233,11 @@ c
                                 collector_span_link.attributes, key, value
                             )
 
-            collector_spans.append(collector_span)
+            collector_span_kwargs["kind"] = getattr(
+                CollectorSpan.SpanKind, sdk_span.kind.name
+            )
+
+            collector_spans.append(CollectorSpan(**collector_span_kwargs))
 
         service_request = ExportTraceServiceRequest(
             resource_spans=collector_spans
