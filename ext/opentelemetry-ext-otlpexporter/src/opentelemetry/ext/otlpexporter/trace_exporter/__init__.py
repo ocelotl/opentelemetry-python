@@ -27,8 +27,15 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from opentelemetry.trace import SpanKind
 from opentelemetry.sdk.trace import Span as SDKSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
+
+from opentelemetry.proto.common.v1.common_pb2 import (
+    AttributeKeyValue, InstrumentationLibrary
+)
+from opentelemetry.proto.resource.v1.resource_pb2 import Resource
 from opentelemetry.proto.trace.v1.trace_pb2 import Span as CollectorSpan
-from opentelemetry.proto.trace.v1.trace_pb2 import Status
+from opentelemetry.proto.trace.v1.trace_pb2 import (
+    Status, ResourceSpans, InstrumentationLibrarySpans
+)
 from opentelemetry.proto.collector.trace.v1.\
         trace_service_pb2_grpc import TraceServiceStub
 from opentelemetry.proto.collector.trace.v1.\
@@ -95,9 +102,29 @@ class OTLPSpanExporter(SpanExporter):
 
             return SpanExportResult.SUCESS
 
+
     def _generate_spans_requests(
         self, sdk_spans: Sequence[SDKSpan]
     ) -> ExportTraceServiceRequest:
+
+        ExportTraceServiceRequest(
+            resource_spans=ResourceSpans(
+                resource=Resource(
+                    attributes=[
+                        AttributeKeyValue(key="string", int_value=2)
+                    ],
+                    dropped_attributes_count=8,
+                ),
+                instrumentation_library_spans=[
+                    InstrumentationLibrarySpans(
+                        instrumentation_library=InstrumentationLibrary(
+                            name="sdf", version="sdf"
+                        ),
+                        spans=[CollectorSpan()]
+                    )
+                ]
+            )
+        )
 
         set_trace
         collector_spans = []
@@ -124,14 +151,11 @@ class OTLPSpanExporter(SpanExporter):
                 kind=collector_span_kind,
                 trace_id=sdk_span.context.trace_id.to_bytes(16, "big"),
                 span_id=sdk_span.context.span_id.to_bytes(8, "big"),
-                start_time_unix_nano=proto_timestamp_from_time_ns(
-                    sdk_span.start_time),
-                end_time_unix_nano=proto_timestamp_from_time_ns(
-                    sdk_span.end_time
-                ),
+                start_time_unix_nano=sdk_span.start_time,
+                end_time_unix_nano=sdk_span.end_time,
                 status=status,
             )
-
+c
             parent_id = 0
 
             if sdk_span.parent is not None:
@@ -200,7 +224,7 @@ class OTLPSpanExporter(SpanExporter):
             collector_spans.append(collector_span)
 
         service_request = ExportTraceServiceRequest(
-            node=self.node, metrics=collector_spans
+            resource_spans=collector_spans
         )
         return service_request
 
