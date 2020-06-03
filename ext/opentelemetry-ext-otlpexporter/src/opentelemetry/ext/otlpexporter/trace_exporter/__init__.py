@@ -14,7 +14,6 @@
 
 """OTLP Span Exporter"""
 
-from ipdb import set_trace
 import logging
 from time import sleep
 from typing import Sequence
@@ -24,7 +23,6 @@ from grpc import StatusCode, insecure_channel, RpcError
 from google.rpc.error_details_pb2 import RetryInfo
 from google.protobuf.timestamp_pb2 import Timestamp
 
-from opentelemetry.trace import SpanKind
 from opentelemetry.sdk.trace import Span as SDKSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
@@ -102,7 +100,6 @@ class OTLPSpanExporter(SpanExporter):
 
             return SpanExportResult.SUCESS
 
-
     def _generate_spans_requests(
         self, sdk_spans: Sequence[SDKSpan]
     ) -> ExportTraceServiceRequest:
@@ -126,7 +123,6 @@ class OTLPSpanExporter(SpanExporter):
             )
         )
 
-        set_trace
         collector_spans = []
 
         for sdk_span in sdk_spans:
@@ -140,8 +136,8 @@ class OTLPSpanExporter(SpanExporter):
                 )
 
             if sdk_span.parent is not None:
-                collector_span_kwargs["parent_id"] = sdk_span.parent.span_id.to_bytes(
-                    8, "big"
+                collector_span_kwargs["parent_id"] = (
+                    sdk_span.parent.span_id.to_bytes(8, "big")
                 )
 
             if sdk_span.context.trace_state is not None:
@@ -184,54 +180,38 @@ class OTLPSpanExporter(SpanExporter):
                     )
 
             if sdk_span.events:
-                for event in sdk_span.events:
+                collector_span_kwargs["events"] = []
 
-                    collector_span_kwargs["events"] = []
+                for sdk_span_event in sdk_span.events:
 
-                    collector_annotation = CollectorSpan.TimeEvent.Annotation(
-                        description=event.name
+                    collector_span_event = CollectorSpan.Event(
+                        name=sdk_span_event.name,
+                        time_unix_nano=sdk_span_event.timestamp
                     )
 
-                    if event.attributes:
-                        for (key, value) in event.attributes.items():
-                            add_proto_attribute_value(
-                                collector_annotation.attributes, key, value
-                            )
-
-                    collector_span.time_events.time_event.add(
-                        time=proto_timestamp_from_time_ns(event.timestamp),
-                        annotation=collector_annotation,
-                    )
+                    for key, value in sdk_span_event.attributes.items():
+                        collector_span_event.attributes.append(
+                            AttributeKeyValue(key=key, value=value)
+                        )
 
             if sdk_span.links:
-                for link in sdk_span.links:
-                    collector_span_link = collector_span.links.link.add()
-                    collector_span_link.trace_id = (
-                        link.context.trace_id.to_bytes(16, "big")
-                    )
-                    collector_span_link.span_id = (
-                        link.context.span_id.to_bytes(8, "big")
+                collector_span_kwargs["links"] = []
+
+                for sdk_span_link in sdk_span.links:
+
+                    collector_span_link = CollectorSpan.Link(
+                        trace_id=(
+                            sdk_span_link.context.trace_id.to_bytes(16, "big"),
+                        ),
+                        span_id=(
+                            sdk_span_link.context.span_id.to_bytes(8, "big"),
+                        )
                     )
 
-                    collector_span_link.type = (
-                        CollectorSpan.Link.Type.TYPE_UNSPECIFIED
-                    )
-                    if sdk_span.parent is not None:
-                        if (
-                            link.context.span_id == sdk_span.parent.span_id
-                            and link.context.trace_id == (
-                                sdk_span.parent.trace_id
-                            )
-                        ):
-                            collector_span_link.type = (
-                                CollectorSpan.Link.Type.PARENT_LINKED_SPAN
-                            )
-
-                    if link.attributes:
-                        for (key, value) in link.attributes.items():
-                            add_proto_attribute_value(
-                                collector_span_link.attributes, key, value
-                            )
+                    for key, value in sdk_span_link.attributes.items():
+                        collector_span_link.attributes.append(
+                            AttributeKeyValue(key=key, value=value)
+                        )
 
             collector_span_kwargs["kind"] = getattr(
                 CollectorSpan.SpanKind, sdk_span.kind.name
