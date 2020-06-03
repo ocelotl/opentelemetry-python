@@ -26,9 +26,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from opentelemetry.sdk.trace import Span as SDKSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
-from opentelemetry.proto.common.v1.common_pb2 import (
-    AttributeKeyValue, InstrumentationLibrary
-)
+from opentelemetry.proto.common.v1.common_pb2 import AttributeKeyValue
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource
 from opentelemetry.proto.trace.v1.trace_pb2 import Span as CollectorSpan
 from opentelemetry.proto.trace.v1.trace_pb2 import (
@@ -104,28 +102,40 @@ class OTLPSpanExporter(SpanExporter):
         self, sdk_spans: Sequence[SDKSpan]
     ) -> ExportTraceServiceRequest:
 
-        ExportTraceServiceRequest(
-            resource_spans=ResourceSpans(
-                resource=Resource(
-                    attributes=[
-                        AttributeKeyValue(key="string", int_value=2)
-                    ],
-                    dropped_attributes_count=8,
-                ),
-                instrumentation_library_spans=[
-                    InstrumentationLibrarySpans(
-                        instrumentation_library=InstrumentationLibrary(
-                            name="sdf", version="sdf"
-                        ),
-                        spans=[CollectorSpan()]
-                    )
-                ]
-            )
-        )
+        def translate_key_values(key, value):
+            key_value = {"key": key}
 
-        collector_spans = []
+            if isinstance(value, str):
+                key_value["string_value"] = value
+
+            elif isinstance(value, int):
+                key_value["int_value"] = value
+
+            elif isinstance(value, float):
+                key_value["double_value"] = value
+
+            elif isinstance(value, bool):
+                key_value["bool_value"] = value
+
+            else:
+                raise Exception(
+                    "Invalid type {} of value {}".format(
+                        type(value), value
+                    )
+                )
+
+            return key_value
+
+        sdk_resource_instrumentation_library_spans = {}
 
         for sdk_span in sdk_spans:
+
+            if sdk_span.resource not in (
+                sdk_resource_instrumentation_library_spans.keys()
+            ):
+                sdk_resource_instrumentation_library_spans[
+                    sdk_span.resource
+                ] = InstrumentationLibrarySpans()
 
             collector_span_kwargs = {}
 
@@ -136,7 +146,7 @@ class OTLPSpanExporter(SpanExporter):
                 )
 
             if sdk_span.parent is not None:
-                collector_span_kwargs["parent_id"] = (
+                collector_span_kwargs["parent_span_id"] = (
                     sdk_span.parent.span_id.to_bytes(8, "big")
                 )
 
@@ -150,34 +160,18 @@ class OTLPSpanExporter(SpanExporter):
                 )
 
             if sdk_span.attributes:
+
                 collector_span_kwargs["attributes"] = []
 
                 for key, value in sdk_span.attributes.items():
-
-                    attribute_key_value_kwargs = {"key": key}
-
-                    if isinstance(value, str):
-                        attribute_key_value_kwargs["string_value"] = value
-
-                    elif isinstance(value, int):
-                        attribute_key_value_kwargs["int_value"] = value
-
-                    elif isinstance(value, float):
-                        attribute_key_value_kwargs["double_value"] = value
-
-                    elif isinstance(value, bool):
-                        attribute_key_value_kwargs["bool_value"] = value
-
-                    else:
-                        logger.warning(
-                            "Unable to set attribute of type {}".format(
-                                type(value)
+                    try:
+                        collector_span_kwargs["attributes"].append(
+                            AttributeKeyValue(
+                                **translate_key_values(key, value)
                             )
                         )
-
-                    collector_span_kwargs["attributes"].append(
-                        AttributeKeyValue(**attribute_key_value_kwargs)
-                    )
+                    except Exception as error:
+                        logger.exception(error)
 
             if sdk_span.events:
                 collector_span_kwargs["events"] = []
@@ -190,9 +184,14 @@ class OTLPSpanExporter(SpanExporter):
                     )
 
                     for key, value in sdk_span_event.attributes.items():
-                        collector_span_event.attributes.append(
-                            AttributeKeyValue(key=key, value=value)
-                        )
+                        try:
+                            collector_span_event.attributes.append(
+                                AttributeKeyValue(
+                                    **translate_key_values(key, value)
+                                )
+                            )
+                        except Exception as error:
+                            logger.exception(error)
 
             if sdk_span.links:
                 collector_span_kwargs["links"] = []
@@ -209,20 +208,43 @@ class OTLPSpanExporter(SpanExporter):
                     )
 
                     for key, value in sdk_span_link.attributes.items():
-                        collector_span_link.attributes.append(
-                            AttributeKeyValue(key=key, value=value)
-                        )
+                        try:
+                            collector_span_link.attributes.append(
+                                AttributeKeyValue(
+                                    **translate_key_values(key, value)
+                                )
+                            )
+                        except Exception as error:
+                            logger.exception(error)
 
             collector_span_kwargs["kind"] = getattr(
                 CollectorSpan.SpanKind, sdk_span.kind.name
             )
 
-            collector_spans.append(CollectorSpan(**collector_span_kwargs))
+            sdk_resource_instrumentation_library_spans[
+                sdk_span.resource
+            ].spans.append(CollectorSpan(**collector_span_kwargs))
 
-        service_request = ExportTraceServiceRequest(
-            resource_spans=collector_spans
-        )
-        return service_request
+        resource_spans = []
+
+        for sdk_resource, instrumentation_library_spans in (
+            sdk_resource_instrumentation_library_spans.items()
+        ):
+
+            collector_resource = Resource()
+
+            for key, value in sdk_resource.attributes.items():
+
+                collector_resource.attributes.append(
+                    AttributeKeyValue(**translate_key_values(key, value))
+                )
+
+            resource_spans.append(
+                ResourceSpans(resource=collector_resource),
+                instrumentation_library_spans=[instrumentation_library_spans]
+            )
+
+        return ExportTraceServiceRequest(resource_spans)
 
     def shutdown(self):
         pass
