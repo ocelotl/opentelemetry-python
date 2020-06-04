@@ -49,58 +49,6 @@ class OTLPSpanExporter(SpanExporter):
         self._client = TraceServiceStub(insecure_channel(endpoint))
 
     def export(self, sdk_spans: Sequence[SDKSpan]) -> SpanExportResult:
-        # expo returns a generator that yields delay values which grow
-        # exponentially. Once delay is greater than max_value, the yielded
-        # value will remain constant.
-        # max_value is set to 900 (900 seconds is 15 minutes) to use the same
-        # value as used in the Go implementation.
-        for delay in expo(max_value=900):
-            try:
-                for _ in self._client.Export(
-                    self._generate_spans_requests(sdk_spans)
-                ):
-                    pass
-
-                return SpanExportResult.SUCESS
-
-            except RpcError as error:
-
-                if error.code() in [
-                    StatusCode.CANCELLED,
-                    StatusCode.DEADLINE_EXCEEDED,
-                    StatusCode.PERMISSION_DENIED,
-                    StatusCode.UNAUTHENTICATED,
-                    StatusCode.RESOURCE_EXHAUSTED,
-                    StatusCode.ABORTED,
-                    StatusCode.OUT_OF_RANGE,
-                    StatusCode.UNAVAILABLE,
-                    StatusCode.DATA_LOSS,
-                ]:
-
-                    retry_info_bin = dict(error.trailing_metadata()).get(
-                        "google.rpc.retryinfo-bin"
-                    )
-                    if retry_info_bin is not None:
-                        retry_info = RetryInfo()
-                        retry_info.ParseFromString(retry_info_bin)
-                        delay = (
-                            retry_info.retry_delay.seconds +
-                            retry_info.retry_delay.nanos / 1.0e9
-                        )
-
-                    sleep(delay)
-                    continue
-
-                if error.code() == StatusCode.OK:
-                    return SpanExportResult.SUCESS
-
-                return SpanExportResult.FAILURE
-
-            return SpanExportResult.SUCESS
-
-    def _generate_spans_requests(
-        self, sdk_spans: Sequence[SDKSpan]
-    ) -> ExportTraceServiceRequest:
 
         def translate_key_values(key, value):
             key_value = {"key": key}
@@ -244,7 +192,54 @@ class OTLPSpanExporter(SpanExporter):
                 instrumentation_library_spans=[instrumentation_library_spans]
             )
 
-        return ExportTraceServiceRequest(resource_spans)
+        # expo returns a generator that yields delay values which grow
+        # exponentially. Once delay is greater than max_value, the yielded
+        # value will remain constant.
+        # max_value is set to 900 (900 seconds is 15 minutes) to use the same
+        # value as used in the Go implementation.
+        for delay in expo(max_value=900):
+            try:
+                for _ in self._client.Export(
+                    ExportTraceServiceRequest(resource_spans)
+                ):
+                    pass
+
+                return SpanExportResult.SUCESS
+
+            except RpcError as error:
+
+                if error.code() in [
+                    StatusCode.CANCELLED,
+                    StatusCode.DEADLINE_EXCEEDED,
+                    StatusCode.PERMISSION_DENIED,
+                    StatusCode.UNAUTHENTICATED,
+                    StatusCode.RESOURCE_EXHAUSTED,
+                    StatusCode.ABORTED,
+                    StatusCode.OUT_OF_RANGE,
+                    StatusCode.UNAVAILABLE,
+                    StatusCode.DATA_LOSS,
+                ]:
+
+                    retry_info_bin = dict(error.trailing_metadata()).get(
+                        "google.rpc.retryinfo-bin"
+                    )
+                    if retry_info_bin is not None:
+                        retry_info = RetryInfo()
+                        retry_info.ParseFromString(retry_info_bin)
+                        delay = (
+                            retry_info.retry_delay.seconds +
+                            retry_info.retry_delay.nanos / 1.0e9
+                        )
+
+                    sleep(delay)
+                    continue
+
+                if error.code() == StatusCode.OK:
+                    return SpanExportResult.SUCESS
+
+                return SpanExportResult.FAILURE
+
+            return SpanExportResult.SUCESS
 
     def shutdown(self):
         pass

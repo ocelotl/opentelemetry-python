@@ -108,9 +108,10 @@ class TestRealServer(TestCase):
     def test_otlp_span_exporter(self):
 
         with self.tracer.start_as_current_span("a"):
-            with self.tracer.start_as_current_span("b"):
-                with self.tracer.start_as_current_span("c"):
-                    pass
+            pass
+            # with self.tracer.start_as_current_span("b"):
+            # with self.tracer.start_as_current_span("c"):
+            # pass
 
         set_trace
         True
