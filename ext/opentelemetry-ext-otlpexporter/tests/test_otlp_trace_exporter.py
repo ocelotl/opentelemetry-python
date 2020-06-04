@@ -20,12 +20,15 @@ from google.protobuf.duration_pb2 import Duration
 from concurrent.futures import ThreadPoolExecutor
 
 from unittest import TestCase
+from unittest.mock import Mock
 
+from opentelemetry.trace import SpanKind
 from opentelemetry.sdk.trace.export import SimpleExportSpanProcessor
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace import TracerProvider, Span
 from opentelemetry.ext.otlpexporter.trace_exporter import OTLPSpanExporter
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
+from opentelemetry.proto.resource.v1.resource_pb2 import Resource
 from opentelemetry.proto.collector.trace.v1.\
     trace_service_pb2 import (
         ExportTraceServiceRequest, ExportTraceServiceResponse
@@ -115,3 +118,37 @@ class TestRealServer(TestCase):
 
         set_trace
         True
+
+    def test_translate_spans(self):
+
+        exporter = OTLPSpanExporter()
+        exporter
+
+        Span(
+            "a",
+            Mock(**{"trace_state": {"a": "b", "c": "d"}}),
+            resource=Resource({"a": 1, "b": False}),
+            parent=Mock(**{"span_id": 12345}),
+            attributes={"a": 1, "b": True},
+            events=[
+                Mock(
+                    **{
+                        "name": "a",
+                        "timestamp": 1591240820506462784,
+                        "attributes": {"a": 1, "b": False}
+                    }
+                )
+            ],
+            links=[
+                Mock(
+                    **{
+                        "context.trace_id": 1,
+                        "context.span_id": 2,
+                        "attributes": {"a": 1, "b": False},
+                        "kind": SpanKind.INTERNAL
+                    }
+                )
+            ]
+        )
+
+        set_trace()

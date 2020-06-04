@@ -47,7 +47,10 @@ class OTLPSpanExporter(SpanExporter):
         super().__init__()
         self._client = TraceServiceStub(insecure_channel(endpoint))
 
-    def export(self, sdk_spans: Sequence[SDKSpan]) -> SpanExportResult:
+    @staticmethod
+    def _translate_spans(
+        sdk_spans: Sequence[SDKSpan]
+    ) -> ExportTraceServiceRequest:
 
         def translate_key_values(key, value):
             key_value = {"key": key}
@@ -195,6 +198,10 @@ class OTLPSpanExporter(SpanExporter):
                 )
             )
 
+        return ExportTraceServiceRequest(resource_spans=resource_spans)
+
+    def export(self, sdk_spans: Sequence[SDKSpan]) -> SpanExportResult:
+
         # expo returns a generator that yields delay values which grow
         # exponentially. Once delay is greater than max_value, the yielded
         # value will remain constant.
@@ -202,9 +209,7 @@ class OTLPSpanExporter(SpanExporter):
         # value as used in the Go implementation.
         for delay in expo(max_value=900):
             try:
-                for _ in self._client.Export(
-                    ExportTraceServiceRequest(resource_spans=resource_spans)
-                ):
+                for _ in self._client.Export(self._translate_spans(sdk_spans)):
                     pass
 
                 return SpanExportResult.SUCESS
