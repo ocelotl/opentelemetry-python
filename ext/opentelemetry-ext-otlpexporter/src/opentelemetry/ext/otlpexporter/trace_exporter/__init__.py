@@ -77,18 +77,12 @@ class OTLPSpanExporter(SpanExporter):
 
         for sdk_span in sdk_spans:
 
-            try:
-                if sdk_span.resource not in (
-                    sdk_resource_instrumentation_library_spans.keys()
-                ):
-                    sdk_resource_instrumentation_library_spans[
-                        sdk_span.resource
-                    ] = InstrumentationLibrarySpans()
-            except Exception as error:
-                error
-                from ipdb import set_trace
-                set_trace()
-                True
+            if sdk_span.resource not in (
+                sdk_resource_instrumentation_library_spans.keys()
+            ):
+                sdk_resource_instrumentation_library_spans[
+                    sdk_span.resource
+                ] = InstrumentationLibrarySpans()
 
             collector_span_kwargs = {}
 
@@ -186,15 +180,19 @@ class OTLPSpanExporter(SpanExporter):
 
             collector_resource = Resource()
 
-            for key, value in sdk_resource.attributes.items():
+            for key, value in sdk_resource.labels.items():
 
                 collector_resource.attributes.append(
                     AttributeKeyValue(**translate_key_values(key, value))
                 )
 
             resource_spans.append(
-                ResourceSpans(resource=collector_resource),
-                instrumentation_library_spans=[instrumentation_library_spans]
+                ResourceSpans(
+                    resource=collector_resource,
+                    instrumentation_library_spans=[
+                        instrumentation_library_spans
+                    ]
+                )
             )
 
         # expo returns a generator that yields delay values which grow
@@ -205,13 +203,14 @@ class OTLPSpanExporter(SpanExporter):
         for delay in expo(max_value=900):
             try:
                 for _ in self._client.Export(
-                    ExportTraceServiceRequest(resource_spans)
+                    ExportTraceServiceRequest(resource_spans=resource_spans)
                 ):
                     pass
 
                 return SpanExportResult.SUCESS
 
             except RpcError as error:
+                raise
 
                 if error.code() in [
                     StatusCode.CANCELLED,
