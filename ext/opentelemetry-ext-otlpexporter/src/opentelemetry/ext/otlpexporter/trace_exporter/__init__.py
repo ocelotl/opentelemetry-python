@@ -77,12 +77,18 @@ class OTLPSpanExporter(SpanExporter):
 
         for sdk_span in sdk_spans:
 
-            if sdk_span.resource not in (
-                sdk_resource_instrumentation_library_spans.keys()
-            ):
-                sdk_resource_instrumentation_library_spans[
-                    sdk_span.resource
-                ] = InstrumentationLibrarySpans()
+            try:
+                if sdk_span.resource not in (
+                    sdk_resource_instrumentation_library_spans.keys()
+                ):
+                    sdk_resource_instrumentation_library_spans[
+                        sdk_span.resource
+                    ] = InstrumentationLibrarySpans()
+            except Exception as error:
+                error
+                from ipdb import set_trace
+                set_trace()
+                True
 
             collector_span_kwargs = {}
 
