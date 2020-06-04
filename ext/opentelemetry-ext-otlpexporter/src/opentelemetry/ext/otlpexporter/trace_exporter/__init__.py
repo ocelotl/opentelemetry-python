@@ -217,7 +217,14 @@ class OTLPSpanExporter(SpanExporter):
         # value will remain constant.
         # max_value is set to 900 (900 seconds is 15 minutes) to use the same
         # value as used in the Go implementation.
-        for delay in expo(max_value=900):
+
+        max_value = 9000
+
+        for delay in expo(max_value=max_value):
+
+            if delay == max_value:
+                return SpanExportResult.FAILURE
+
             try:
                 response = self._client.Export(
                     self._translate_spans(sdk_spans)
@@ -227,7 +234,6 @@ class OTLPSpanExporter(SpanExporter):
                 return SpanExportResult.SUCCESS
 
             except RpcError as error:
-                raise
 
                 if error.code() in [
                     StatusCode.CANCELLED,
@@ -260,7 +266,8 @@ class OTLPSpanExporter(SpanExporter):
 
                 return SpanExportResult.FAILURE
 
-            return SpanExportResult.SUCESS
+        else:
+            return SpanExportResult.FAILURE
 
     def shutdown(self):
         pass

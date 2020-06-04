@@ -63,7 +63,7 @@ class TraceServiceServicerUNAVAILABLEDelay(TraceServiceServicer):
                 (
                     "google.rpc.retryinfo-bin",
                     RetryInfo(
-                        retry_delay=Duration(seconds=1)
+                        retry_delay=Duration(seconds=4)
                     ).SerializeToString(),
                 ),
             )
@@ -133,24 +133,33 @@ class TestRealServer(TestCase):
     def tearDown(self):
         self.server.stop(None)
 
-    def erver(self):
-        with insecure_channel("localhost:50051") as channel:
-            stub = TraceServiceStub(channel)
+    @patch("opentelemetry.ext.otlpexporter.trace_exporter.expo")
+    @patch("opentelemetry.ext.otlpexporter.trace_exporter.sleep")
+    def test_unavailable(self, mock_sleep, mock_expo):
 
-            try:
-                stub.Export.with_call(
-                    ExportTraceServiceRequest(
-                        resource_spans=[ResourceSpans()]
-                    ),
-                    metadata=(("random", "sdf"),)
-                )
-            except Exception as error:
-                error
-                True
+        mock_expo.configure_mock(**{"return_value": [1]})
+
+        add_TraceServiceServicer_to_server(
+            TraceServiceServicerUNAVAILABLE(), self.server
+        )
+        self.assertEqual(
+            self.exporter.export([self.span]), SpanExportResult.FAILURE
+        )
+        mock_sleep.assert_called_with(1)
 
     @patch("opentelemetry.ext.otlpexporter.trace_exporter.expo")
-    def test_unavailable(self, mock_expo):
-        pass
+    @patch("opentelemetry.ext.otlpexporter.trace_exporter.sleep")
+    def test_unavailable_delay(self, mock_sleep, mock_expo):
+
+        mock_expo.configure_mock(**{"return_value": [1]})
+
+        add_TraceServiceServicer_to_server(
+            TraceServiceServicerUNAVAILABLEDelay(), self.server
+        )
+        self.assertEqual(
+            self.exporter.export([self.span]), SpanExportResult.FAILURE
+        )
+        mock_sleep.assert_called_with(4)
 
     def test_success(self):
         add_TraceServiceServicer_to_server(
