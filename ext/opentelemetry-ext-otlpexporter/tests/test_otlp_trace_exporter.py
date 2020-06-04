@@ -21,6 +21,7 @@ from concurrent.futures import ThreadPoolExecutor
 from unittest import TestCase
 from unittest.mock import Mock, PropertyMock, patch
 
+from opentelemetry.sdk.trace.export import SpanExportResult
 from opentelemetry.proto.common.v1.common_pb2 import AttributeKeyValue
 from opentelemetry.trace import SpanKind
 from opentelemetry.sdk.trace.export import SimpleExportSpanProcessor
@@ -87,22 +88,6 @@ class TraceServiceServicerSUCCESS(TraceServiceServicer):
 
 class TestRealServer(TestCase):
 
-    def initialize_server(self, servicer):
-        tracer_provider = TracerProvider()
-        self.exporter = OTLPSpanExporter()
-        tracer_provider.add_span_processor(
-            SimpleExportSpanProcessor(self.exporter)
-        )
-        self.tracer = tracer_provider.get_tracer(__name__)
-
-        self.server = server(ThreadPoolExecutor(max_workers=10))
-
-        add_TraceServiceServicer_to_server(servicer(), self.server)
-
-        self.server.add_insecure_port("[::]:55678")
-
-        self.server.start()
-
     def setUp(self):
         tracer_provider = TracerProvider()
         self.exporter = OTLPSpanExporter()
@@ -164,14 +149,16 @@ class TestRealServer(TestCase):
                 True
 
     @patch("opentelemetry.ext.otlpexporter.trace_exporter.expo")
-    def test_unavailable_delay(self, mock_expo):
+    def test_unavailable(self, mock_expo):
         pass
 
     def test_success(self):
         add_TraceServiceServicer_to_server(
             TraceServiceServicerSUCCESS(), self.server
         )
-        self.exporter.export([self.span])
+        self.assertEqual(
+            self.exporter.export([self.span]), SpanExportResult.SUCCESS
+        )
 
     def test_translate_spans(self):
 
