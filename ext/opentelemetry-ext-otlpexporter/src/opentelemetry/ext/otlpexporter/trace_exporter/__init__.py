@@ -150,10 +150,10 @@ class OTLPSpanExporter(SpanExporter):
 
                     collector_span_link = CollectorSpan.Link(
                         trace_id=(
-                            sdk_span_link.context.trace_id.to_bytes(16, "big"),
+                            sdk_span_link.context.trace_id.to_bytes(16, "big")
                         ),
                         span_id=(
-                            sdk_span_link.context.span_id.to_bytes(8, "big"),
+                            sdk_span_link.context.span_id.to_bytes(8, "big")
                         )
                     )
 

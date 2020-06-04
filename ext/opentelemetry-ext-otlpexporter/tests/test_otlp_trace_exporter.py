@@ -20,7 +20,7 @@ from google.protobuf.duration_pb2 import Duration
 from concurrent.futures import ThreadPoolExecutor
 
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, PropertyMock
 
 from opentelemetry.trace import SpanKind
 from opentelemetry.sdk.trace.export import SimpleExportSpanProcessor
@@ -40,6 +40,10 @@ from opentelemetry.proto.collector.trace.v1.\
         TraceServiceServicer,
         TraceServiceStub
     )
+from opentelemetry.proto.trace.v1.trace_pb2 import (
+    Status, ResourceSpans, InstrumentationLibrarySpans
+)
+from opentelemetry.proto.resource.v1.resource_pb2 import Resource
 
 
 class MockTraceErrorServiceServicer(TraceServiceServicer):
@@ -124,21 +128,22 @@ class TestRealServer(TestCase):
         exporter = OTLPSpanExporter()
         exporter
 
+        event_mock = Mock(
+            **{
+                "timestamp": 1591240820506462784,
+                "attributes": {"a": 1, "b": False}
+            }
+        )
+
+        type(event_mock).name = PropertyMock(return_value="a")
+
         span = Span(
             "a",
             Mock(**{"trace_state": {"a": "b", "c": "d"}}),
             resource=Resource({"a": 1, "b": False}),
             parent=Mock(**{"span_id": 12345}),
             attributes={"a": 1, "b": True},
-            events=[
-                Mock(
-                    **{
-                        "name": "a",
-                        "timestamp": 1591240820506462784,
-                        "attributes": {"a": 1, "b": False}
-                    }
-                )
-            ],
+            events=[event_mock],
             links=[
                 Mock(
                     **{
@@ -151,8 +156,8 @@ class TestRealServer(TestCase):
             ]
         )
 
-        result = exporter.export([span])
-        result
+        expected = ResourceSpans(resource_spans=[])
 
+        result = exporter._translate_spans([span])
         set_trace()
-        True
+        result
