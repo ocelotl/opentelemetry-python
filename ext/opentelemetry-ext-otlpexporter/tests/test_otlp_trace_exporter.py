@@ -28,7 +28,7 @@ from opentelemetry.sdk.trace import TracerProvider, Span
 from opentelemetry.ext.otlpexporter.trace_exporter import OTLPSpanExporter
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
-from opentelemetry.proto.resource.v1.resource_pb2 import Resource
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.proto.collector.trace.v1.\
     trace_service_pb2 import (
         ExportTraceServiceRequest, ExportTraceServiceResponse
@@ -124,7 +124,7 @@ class TestRealServer(TestCase):
         exporter = OTLPSpanExporter()
         exporter
 
-        Span(
+        span = Span(
             "a",
             Mock(**{"trace_state": {"a": "b", "c": "d"}}),
             resource=Resource({"a": 1, "b": False}),
@@ -151,4 +151,8 @@ class TestRealServer(TestCase):
             ]
         )
 
+        result = exporter.export([span])
+        result
+
         set_trace()
+        True
