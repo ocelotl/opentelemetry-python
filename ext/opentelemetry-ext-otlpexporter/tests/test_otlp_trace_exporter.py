@@ -26,9 +26,8 @@ from opentelemetry.trace import SpanKind
 from opentelemetry.sdk.trace.export import SimpleExportSpanProcessor
 from opentelemetry.sdk.trace import TracerProvider, Span
 from opentelemetry.ext.otlpexporter.trace_exporter import OTLPSpanExporter
-from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
-from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.resources import Resource as SDKResource
 from opentelemetry.proto.collector.trace.v1.\
     trace_service_pb2 import (
         ExportTraceServiceRequest, ExportTraceServiceResponse
@@ -40,10 +39,10 @@ from opentelemetry.proto.collector.trace.v1.\
         TraceServiceServicer,
         TraceServiceStub
     )
-from opentelemetry.proto.trace.v1.trace_pb2 import (
-    Status, ResourceSpans, InstrumentationLibrarySpans
+from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
+from opentelemetry.proto.resource.v1.resource_pb2 import (
+    Resource as CollectorResource
 )
-from opentelemetry.proto.resource.v1.resource_pb2 import Resource
 
 
 class MockTraceErrorServiceServicer(TraceServiceServicer):
@@ -140,7 +139,7 @@ class TestRealServer(TestCase):
         span = Span(
             "a",
             Mock(**{"trace_state": {"a": "b", "c": "d"}}),
-            resource=Resource({"a": 1, "b": False}),
+            resource=SDKResource({"a": 1, "b": False}),
             parent=Mock(**{"span_id": 12345}),
             attributes={"a": 1, "b": True},
             events=[event_mock],
@@ -156,8 +155,15 @@ class TestRealServer(TestCase):
             ]
         )
 
-        expected = ResourceSpans(resource_spans=[])
+        expected = ExportTraceServiceRequest(
+            resource_spans=[
+                ResourceSpans(
+                    resource=CollectorResource(),
+                    instrumentation_library_spans=[]
+                ),
+            ]
+        )
 
-        result = exporter._translate_spans([span])
-        set_trace()
-        result
+        actual = exporter._translate_spans([span])
+
+        self.assertEqual(expected, actual)
