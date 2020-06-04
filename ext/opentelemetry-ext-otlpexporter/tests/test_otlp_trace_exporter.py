@@ -19,7 +19,7 @@ from google.protobuf.duration_pb2 import Duration
 from concurrent.futures import ThreadPoolExecutor
 
 from unittest import TestCase
-from unittest.mock import Mock, PropertyMock
+from unittest.mock import Mock, PropertyMock, patch
 
 from opentelemetry.proto.common.v1.common_pb2 import AttributeKeyValue
 from opentelemetry.trace import SpanKind
@@ -48,15 +48,13 @@ from opentelemetry.proto.resource.v1.resource_pb2 import (
 )
 
 
-class MockTraceErrorServiceServicer(TraceServiceServicer):
+class TraceServiceServicerUNAVAILABLEDelay(TraceServiceServicer):
     def Export(self, request, context):
-        context.set_details("var")
         context.set_code(StatusCode.UNAVAILABLE)
 
         context.send_initial_metadata(
             (
                 ("google.rpc.retryinfo-bin", RetryInfo().SerializeToString()),
-                ("retry", ""),
             )
         )
         context.set_trailing_metadata(
@@ -67,16 +65,29 @@ class MockTraceErrorServiceServicer(TraceServiceServicer):
                         retry_delay=Duration(seconds=1)
                     ).SerializeToString(),
                 ),
-                ("retry", "true"),
             )
         )
 
         return ExportTraceServiceResponse()
 
 
-class TestRealServer(TestCase):
-    def setUp(self):
+class TraceServiceServicerUNAVAILABLE(TraceServiceServicer):
+    def Export(self, request, context):
+        context.set_code(StatusCode.UNAVAILABLE)
 
+        return ExportTraceServiceResponse()
+
+
+class TraceServiceServicerSUCCESS(TraceServiceServicer):
+    def Export(self, request, context):
+        context.set_code(StatusCode.OK)
+
+        return ExportTraceServiceResponse()
+
+
+class TestRealServer(TestCase):
+
+    def initialize_server(self, servicer):
         tracer_provider = TracerProvider()
         self.exporter = OTLPSpanExporter()
         tracer_provider.add_span_processor(
@@ -86,11 +97,23 @@ class TestRealServer(TestCase):
 
         self.server = server(ThreadPoolExecutor(max_workers=10))
 
-        add_TraceServiceServicer_to_server(
-            MockTraceErrorServiceServicer(), self.server
-        )
+        add_TraceServiceServicer_to_server(servicer(), self.server)
 
-        self.server.add_insecure_port("[::]:50051")
+        self.server.add_insecure_port("[::]:55678")
+
+        self.server.start()
+
+    def setUp(self):
+        tracer_provider = TracerProvider()
+        self.exporter = OTLPSpanExporter()
+        tracer_provider.add_span_processor(
+            SimpleExportSpanProcessor(self.exporter)
+        )
+        self.tracer = tracer_provider.get_tracer(__name__)
+
+        self.server = server(ThreadPoolExecutor(max_workers=10))
+
+        self.server.add_insecure_port("[::]:55678")
 
         self.server.start()
 
@@ -125,7 +148,7 @@ class TestRealServer(TestCase):
     def tearDown(self):
         self.server.stop(None)
 
-    def test_server(self):
+    def erver(self):
         with insecure_channel("localhost:50051") as channel:
             stub = TraceServiceStub(channel)
 
@@ -140,10 +163,14 @@ class TestRealServer(TestCase):
                 error
                 True
 
-    def test_export(self):
-
+    @patch("opentelemetry.ext.otlpexporter.trace_exporter.expo")
+    def test_unavailable_delay(self, mock_expo):
         pass
 
+    def test_success(self):
+        add_TraceServiceServicer_to_server(
+            TraceServiceServicerSUCCESS(), self.server
+        )
         self.exporter.export([self.span])
 
     def test_translate_spans(self):

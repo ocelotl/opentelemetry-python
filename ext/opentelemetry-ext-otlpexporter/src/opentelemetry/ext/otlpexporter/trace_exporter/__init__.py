@@ -219,12 +219,15 @@ class OTLPSpanExporter(SpanExporter):
         # value as used in the Go implementation.
         for delay in expo(max_value=900):
             try:
-                for _ in self._client.Export(self._translate_spans(sdk_spans)):
-                    pass
+                response = self._client.Export(
+                    self._translate_spans(sdk_spans)
+                )
+                response
 
-                return SpanExportResult.SUCESS
+                return SpanExportResult.SUCCESS
 
             except RpcError as error:
+                raise
 
                 if error.code() in [
                     StatusCode.CANCELLED,
