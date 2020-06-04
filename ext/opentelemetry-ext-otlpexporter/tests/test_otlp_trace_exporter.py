@@ -123,9 +123,6 @@ class TestRealServer(TestCase):
 
     def test_translate_spans(self):
 
-        exporter = OTLPSpanExporter()
-        exporter
-
         event_mock = Mock(
             **{
                 "timestamp": 1591240820506462784,
@@ -218,4 +215,4 @@ class TestRealServer(TestCase):
             ]
         )
 
-        self.assertEqual(expected, exporter._translate_spans([span]))
+        self.assertEqual(expected, OTLPSpanExporter()._translate_spans([span]))
