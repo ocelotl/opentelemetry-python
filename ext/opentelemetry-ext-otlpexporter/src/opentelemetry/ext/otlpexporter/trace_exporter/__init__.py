@@ -21,7 +21,6 @@ from typing import Sequence
 from backoff import expo
 from grpc import StatusCode, insecure_channel, RpcError
 from google.rpc.error_details_pb2 import RetryInfo
-from google.protobuf.timestamp_pb2 import Timestamp
 
 from opentelemetry.sdk.trace import Span as SDKSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
@@ -243,41 +242,3 @@ class OTLPSpanExporter(SpanExporter):
 
     def shutdown(self):
         pass
-
-
-def add_proto_attribute_value(pb_attributes, key, value):
-    """Sets string, int, boolean or float value on protobuf
-        span, link or annotation attributes.
-
-    Args:
-        pb_attributes: protobuf Span's attributes property.
-        key: attribute key to set.
-        value: attribute value
-    """
-
-    if isinstance(value, bool):
-        pb_attributes.attribute_map[key].bool_value = value
-    elif isinstance(value, int):
-        pb_attributes.attribute_map[key].int_value = value
-    elif isinstance(value, str):
-        pb_attributes.attribute_map[key].string_value.value = value
-    elif isinstance(value, float):
-        pb_attributes.attribute_map[key].double_value = value
-    else:
-        pb_attributes.attribute_map[key].string_value.value = str(value)
-
-
-def proto_timestamp_from_time_ns(time_ns):
-    """Converts datetime to protobuf timestamp.
-
-    Args:
-        time_ns: Time in nanoseconds
-
-    Returns:
-        Returns protobuf timestamp.
-    """
-    ts = Timestamp()
-    if time_ns is not None:
-        # pylint: disable=no-member
-        ts.FromNanoseconds(time_ns)
-    return ts
