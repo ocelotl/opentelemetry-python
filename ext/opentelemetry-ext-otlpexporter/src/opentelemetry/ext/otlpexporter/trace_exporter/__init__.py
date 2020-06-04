@@ -225,7 +225,6 @@ class OTLPSpanExporter(SpanExporter):
                 return SpanExportResult.SUCESS
 
             except RpcError as error:
-                raise
 
                 if error.code() in [
                     StatusCode.CANCELLED,

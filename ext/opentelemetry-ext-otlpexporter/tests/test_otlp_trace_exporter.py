@@ -71,8 +71,7 @@ class MockTraceErrorServiceServicer(TraceServiceServicer):
             )
         )
 
-        response = ExportTraceServiceResponse()
-        return response
+        return ExportTraceServiceResponse()
 
 
 class TestRealServer(TestCase):
@@ -95,6 +94,34 @@ class TestRealServer(TestCase):
 
         self.server.start()
 
+        event_mock = Mock(
+            **{
+                "timestamp": 1591240820506462784,
+                "attributes": {"a": 1, "b": False}
+            }
+        )
+
+        type(event_mock).name = PropertyMock(return_value="a")
+
+        self.span = Span(
+            "a",
+            Mock(**{"trace_state": {"a": "b", "c": "d"}}),
+            resource=SDKResource({"a": 1, "b": False}),
+            parent=Mock(**{"span_id": 12345}),
+            attributes={"a": 1, "b": True},
+            events=[event_mock],
+            links=[
+                Mock(
+                    **{
+                        "context.trace_id": 1,
+                        "context.span_id": 2,
+                        "attributes": {"a": 1, "b": False},
+                        "kind": SpanKind.INTERNAL
+                    }
+                )
+            ]
+        )
+
     def tearDown(self):
         self.server.stop(None)
 
@@ -113,43 +140,13 @@ class TestRealServer(TestCase):
                 error
                 True
 
-    def test_otlp_span_exporter(self):
+    def test_export(self):
 
-        with self.tracer.start_as_current_span("a"):
-            pass
-            # with self.tracer.start_as_current_span("b"):
-            # with self.tracer.start_as_current_span("c"):
-            # pass
+        pass
+
+        self.exporter.export([self.span])
 
     def test_translate_spans(self):
-
-        event_mock = Mock(
-            **{
-                "timestamp": 1591240820506462784,
-                "attributes": {"a": 1, "b": False}
-            }
-        )
-
-        type(event_mock).name = PropertyMock(return_value="a")
-
-        span = Span(
-            "a",
-            Mock(**{"trace_state": {"a": "b", "c": "d"}}),
-            resource=SDKResource({"a": 1, "b": False}),
-            parent=Mock(**{"span_id": 12345}),
-            attributes={"a": 1, "b": True},
-            events=[event_mock],
-            links=[
-                Mock(
-                    **{
-                        "context.trace_id": 1,
-                        "context.span_id": 2,
-                        "attributes": {"a": 1, "b": False},
-                        "kind": SpanKind.INTERNAL
-                    }
-                )
-            ]
-        )
 
         expected = ExportTraceServiceRequest(
             resource_spans=[
@@ -215,4 +212,4 @@ class TestRealServer(TestCase):
             ]
         )
 
-        self.assertEqual(expected, OTLPSpanExporter()._translate_spans([span]))
+        self.assertEqual(expected, self.exporter._translate_spans([self.span]))
