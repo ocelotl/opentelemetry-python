@@ -55,7 +55,10 @@ class OTLPSpanExporter(SpanExporter):
         def translate_key_values(key, value):
             key_value = {"key": key}
 
-            if isinstance(value, str):
+            if isinstance(value, bool):
+                key_value["bool_value"] = value
+
+            elif isinstance(value, str):
                 key_value["string_value"] = value
 
             elif isinstance(value, int):
@@ -63,9 +66,6 @@ class OTLPSpanExporter(SpanExporter):
 
             elif isinstance(value, float):
                 key_value["double_value"] = value
-
-            elif isinstance(value, bool):
-                key_value["bool_value"] = value
 
             else:
                 raise Exception(
@@ -114,6 +114,7 @@ class OTLPSpanExporter(SpanExporter):
                 collector_span_kwargs["attributes"] = []
 
                 for key, value in sdk_span.attributes.items():
+
                     try:
                         collector_span_kwargs["attributes"].append(
                             AttributeKeyValue(
@@ -143,6 +144,10 @@ class OTLPSpanExporter(SpanExporter):
                         except Exception as error:
                             logger.exception(error)
 
+                    collector_span_kwargs["events"].append(
+                        collector_span_event
+                    )
+
             if sdk_span.links:
                 collector_span_kwargs["links"] = []
 
@@ -167,6 +172,8 @@ class OTLPSpanExporter(SpanExporter):
                         except Exception as error:
                             logger.exception(error)
 
+                    collector_span_kwargs["links"].append(collector_span_link)
+
             collector_span_kwargs["kind"] = getattr(
                 CollectorSpan.SpanKind, sdk_span.kind.name
             )
@@ -185,9 +192,12 @@ class OTLPSpanExporter(SpanExporter):
 
             for key, value in sdk_resource.labels.items():
 
-                collector_resource.attributes.append(
-                    AttributeKeyValue(**translate_key_values(key, value))
-                )
+                try:
+                    collector_resource.attributes.append(
+                        AttributeKeyValue(**translate_key_values(key, value))
+                    )
+                except Exception as error:
+                    logger.exception(error)
 
             resource_spans.append(
                 ResourceSpans(

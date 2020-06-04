@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ipdb import set_trace
 from grpc import server, insecure_channel, StatusCode
 from google.rpc.error_details_pb2 import RetryInfo
 
@@ -22,10 +21,12 @@ from concurrent.futures import ThreadPoolExecutor
 from unittest import TestCase
 from unittest.mock import Mock, PropertyMock
 
+from opentelemetry.proto.common.v1.common_pb2 import AttributeKeyValue
 from opentelemetry.trace import SpanKind
 from opentelemetry.sdk.trace.export import SimpleExportSpanProcessor
 from opentelemetry.sdk.trace import TracerProvider, Span
 from opentelemetry.ext.otlpexporter.trace_exporter import OTLPSpanExporter
+from opentelemetry.proto.trace.v1.trace_pb2 import Span as CollectorSpan
 
 from opentelemetry.sdk.resources import Resource as SDKResource
 from opentelemetry.proto.collector.trace.v1.\
@@ -39,7 +40,9 @@ from opentelemetry.proto.collector.trace.v1.\
         TraceServiceServicer,
         TraceServiceStub
     )
-from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
+from opentelemetry.proto.trace.v1.trace_pb2 import (
+    ResourceSpans, InstrumentationLibrarySpans
+)
 from opentelemetry.proto.resource.v1.resource_pb2 import (
     Resource as CollectorResource
 )
@@ -107,7 +110,6 @@ class TestRealServer(TestCase):
                     metadata=(("random", "sdf"),)
                 )
             except Exception as error:
-                set_trace
                 error
                 True
 
@@ -118,9 +120,6 @@ class TestRealServer(TestCase):
             # with self.tracer.start_as_current_span("b"):
             # with self.tracer.start_as_current_span("c"):
             # pass
-
-        set_trace
-        True
 
     def test_translate_spans(self):
 
@@ -158,12 +157,65 @@ class TestRealServer(TestCase):
         expected = ExportTraceServiceRequest(
             resource_spans=[
                 ResourceSpans(
-                    resource=CollectorResource(),
-                    instrumentation_library_spans=[]
+                    resource=CollectorResource(
+                        attributes=[
+                            AttributeKeyValue(key="a", int_value=1),
+                            AttributeKeyValue(key="b", bool_value=False)
+                        ]
+                    ),
+                    instrumentation_library_spans=[
+                        InstrumentationLibrarySpans(
+                            spans=[
+                                CollectorSpan(
+                                    trace_state="a=b,c=d",
+                                    parent_span_id=(
+                                        b"\000\000\000\000\000\00009"
+                                    ),
+                                    kind=CollectorSpan.SpanKind.INTERNAL,
+                                    attributes=[
+                                        AttributeKeyValue(
+                                            key="a", int_value=1
+                                        ),
+                                        AttributeKeyValue(
+                                            key="b", bool_value=True
+                                        )
+                                    ],
+                                    events=[
+                                        CollectorSpan.Event(
+                                            name="a",
+                                            time_unix_nano=1591240820506462784,
+                                            attributes=[
+                                                AttributeKeyValue(
+                                                    key="a", int_value=1
+                                                ),
+                                                AttributeKeyValue(
+                                                    key="b", int_value=False
+                                                ),
+                                            ]
+                                        )
+                                    ],
+                                    links=[
+                                        CollectorSpan.Link(
+                                            trace_id=int.to_bytes(
+                                                1, 16, "big"
+                                            ),
+                                            span_id=int.to_bytes(2, 8, "big"),
+                                            attributes=[
+                                                AttributeKeyValue(
+                                                    key="a", int_value=1
+                                                ),
+                                                AttributeKeyValue(
+                                                    key="b", bool_value=False
+                                                )
+                                            ]
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    ]
                 ),
             ]
         )
 
-        actual = exporter._translate_spans([span])
-
-        self.assertEqual(expected, actual)
+        self.assertEqual(expected, exporter._translate_spans([span]))
