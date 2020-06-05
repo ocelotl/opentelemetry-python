@@ -20,3 +20,8 @@ exclude =
   ext/opentelemetry-ext-jaeger/build/*
   docs/examples/opentelemetry-example-app/src/opentelemetry_example_app/grpc/gen/
   docs/examples/opentelemetry-example-app/build/*
+  opentelemetry-proto/src/opentelemetry/src/collector/
+  opentelemetry-proto/src/opentelemetry/src/common/
+  opentelemetry-proto/src/opentelemetry/src/metrics/
+  opentelemetry-proto/src/opentelemetry/src/resource/
+  opentelemetry-proto/src/opentelemetry/src/trace/

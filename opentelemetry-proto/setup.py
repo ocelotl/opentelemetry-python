@@ -18,7 +18,7 @@ import setuptools
 
 BASE_DIR = os.path.dirname(__file__)
 VERSION_FILENAME = os.path.join(
-    BASE_DIR, "tato", "opentelemetry", "tato", "version.py"
+    BASE_DIR, "src", "opentelemetry", "src", "version.py"
 )
 PACKAGE_INFO = {}
 with open(VERSION_FILENAME) as f:
