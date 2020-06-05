@@ -12,50 +12,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from grpc import server, StatusCode
-from google.rpc.error_details_pb2 import RetryInfo
-
-from google.protobuf.duration_pb2 import Duration
 from concurrent.futures import ThreadPoolExecutor
-
 from unittest import TestCase
 from unittest.mock import Mock, PropertyMock, patch
 
-from opentelemetry.sdk.trace.export import SpanExportResult
-from opentelemetry.proto.common.v1.common_pb2 import AttributeKeyValue
-from opentelemetry.trace import SpanKind
-from opentelemetry.sdk.trace.export import SimpleExportSpanProcessor
-from opentelemetry.sdk.trace import TracerProvider, Span
+from google.protobuf.duration_pb2 import Duration
+from google.rpc.error_details_pb2 import RetryInfo
+from grpc import StatusCode, server
+
 from opentelemetry.ext.otlpexporter.trace_exporter import OTLPSpanExporter
-from opentelemetry.proto.trace.v1.trace_pb2 import Span as CollectorSpan
-
-from opentelemetry.sdk.resources import Resource as SDKResource
-from opentelemetry.proto.collector.trace.v1.\
-    trace_service_pb2 import (
-        ExportTraceServiceRequest, ExportTraceServiceResponse
-    )
-
-from opentelemetry.proto.collector.trace.v1.\
-    trace_service_pb2_grpc import (
-        add_TraceServiceServicer_to_server,
-        TraceServiceServicer,
-    )
-from opentelemetry.proto.trace.v1.trace_pb2 import (
-    ResourceSpans, InstrumentationLibrarySpans
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+    ExportTraceServiceRequest,
+    ExportTraceServiceResponse,
 )
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2_grpc import (
+    TraceServiceServicer,
+    add_TraceServiceServicer_to_server,
+)
+from opentelemetry.proto.common.v1.common_pb2 import AttributeKeyValue
 from opentelemetry.proto.resource.v1.resource_pb2 import (
-    Resource as CollectorResource
+    Resource as CollectorResource,
 )
+from opentelemetry.proto.trace.v1.trace_pb2 import (
+    InstrumentationLibrarySpans,
+    ResourceSpans,
+)
+from opentelemetry.proto.trace.v1.trace_pb2 import Span as CollectorSpan
+from opentelemetry.sdk.resources import Resource as SDKResource
+from opentelemetry.sdk.trace import Span, TracerProvider
+from opentelemetry.sdk.trace.export import (
+    SimpleExportSpanProcessor,
+    SpanExportResult,
+)
+from opentelemetry.trace import SpanKind
 
 
 class TraceServiceServicerUNAVAILABLEDelay(TraceServiceServicer):
+    # pylint: disable=invalid-name,unused-argument,no-self-use
     def Export(self, request, context):
         context.set_code(StatusCode.UNAVAILABLE)
 
         context.send_initial_metadata(
-            (
-                ("google.rpc.retryinfo-bin", RetryInfo().SerializeToString()),
-            )
+            (("google.rpc.retryinfo-bin", RetryInfo().SerializeToString()),)
         )
         context.set_trailing_metadata(
             (
@@ -72,6 +70,7 @@ class TraceServiceServicerUNAVAILABLEDelay(TraceServiceServicer):
 
 
 class TraceServiceServicerUNAVAILABLE(TraceServiceServicer):
+    # pylint: disable=invalid-name,unused-argument,no-self-use
     def Export(self, request, context):
         context.set_code(StatusCode.UNAVAILABLE)
 
@@ -79,6 +78,7 @@ class TraceServiceServicerUNAVAILABLE(TraceServiceServicer):
 
 
 class TraceServiceServicerSUCCESS(TraceServiceServicer):
+    # pylint: disable=invalid-name,unused-argument,no-self-use
     def Export(self, request, context):
         context.set_code(StatusCode.OK)
 
@@ -86,7 +86,6 @@ class TraceServiceServicerSUCCESS(TraceServiceServicer):
 
 
 class TestRealServer(TestCase):
-
     def setUp(self):
         tracer_provider = TracerProvider()
         self.exporter = OTLPSpanExporter()
@@ -104,7 +103,7 @@ class TestRealServer(TestCase):
         event_mock = Mock(
             **{
                 "timestamp": 1591240820506462784,
-                "attributes": {"a": 1, "b": False}
+                "attributes": {"a": 1, "b": False},
             }
         )
 
@@ -123,10 +122,10 @@ class TestRealServer(TestCase):
                         "context.trace_id": 1,
                         "context.span_id": 2,
                         "attributes": {"a": 1, "b": False},
-                        "kind": SpanKind.INTERNAL
+                        "kind": SpanKind.INTERNAL,
                     }
                 )
-            ]
+            ],
         )
 
     def tearDown(self):
@@ -176,7 +175,7 @@ class TestRealServer(TestCase):
                     resource=CollectorResource(
                         attributes=[
                             AttributeKeyValue(key="a", int_value=1),
-                            AttributeKeyValue(key="b", bool_value=False)
+                            AttributeKeyValue(key="b", bool_value=False),
                         ]
                     ),
                     instrumentation_library_spans=[
@@ -194,7 +193,7 @@ class TestRealServer(TestCase):
                                         ),
                                         AttributeKeyValue(
                                             key="b", bool_value=True
-                                        )
+                                        ),
                                     ],
                                     events=[
                                         CollectorSpan.Event(
@@ -207,7 +206,7 @@ class TestRealServer(TestCase):
                                                 AttributeKeyValue(
                                                     key="b", int_value=False
                                                 ),
-                                            ]
+                                            ],
                                         )
                                     ],
                                     links=[
@@ -222,16 +221,17 @@ class TestRealServer(TestCase):
                                                 ),
                                                 AttributeKeyValue(
                                                     key="b", bool_value=False
-                                                )
-                                            ]
+                                                ),
+                                            ],
                                         )
-                                    ]
+                                    ],
                                 )
                             ]
                         )
-                    ]
+                    ],
                 ),
             ]
         )
 
+        # pylint: disable=protected-access
         self.assertEqual(expected, self.exporter._translate_spans([self.span]))
