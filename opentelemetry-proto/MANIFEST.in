@@ -1,4 +1,4 @@
-graft src
+graft gen
 graft tests
 global-exclude *.pyc
 global-exclude *.pyo

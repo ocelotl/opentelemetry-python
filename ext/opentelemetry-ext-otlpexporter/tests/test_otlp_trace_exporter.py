@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from grpc import server, insecure_channel, StatusCode
+from grpc import server, StatusCode
 from google.rpc.error_details_pb2 import RetryInfo
 
 from google.protobuf.duration_pb2 import Duration
@@ -39,7 +39,6 @@ from opentelemetry.proto.collector.trace.v1.\
     trace_service_pb2_grpc import (
         add_TraceServiceServicer_to_server,
         TraceServiceServicer,
-        TraceServiceStub
     )
 from opentelemetry.proto.trace.v1.trace_pb2 import (
     ResourceSpans, InstrumentationLibrarySpans
