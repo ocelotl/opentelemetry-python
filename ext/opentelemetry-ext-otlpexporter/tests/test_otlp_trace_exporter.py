@@ -20,7 +20,9 @@ from google.protobuf.duration_pb2 import Duration
 from google.rpc.error_details_pb2 import RetryInfo
 from grpc import StatusCode, server
 
-from opentelemetry.ext.otlpexporter.trace_exporter import OTLPSpanExporter
+from opentelemetry.ext.otlpexporter.trace_exporter import (
+    OTLPSpanExporter, LightStepSpanExporter
+)
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
     ExportTraceServiceResponse,
@@ -83,6 +85,53 @@ class TraceServiceServicerSUCCESS(TraceServiceServicer):
         context.set_code(StatusCode.OK)
 
         return ExportTraceServiceResponse()
+
+
+class TestLightStepExporter(TestCase):
+
+    def setUp(self):
+        tracer_provider = TracerProvider(
+            resource=SDKResource(
+                {
+                    "service.name": "lightstep",
+                    "service.version": "lightstep",
+                    "library.language": "python",
+                    "library.version": "1.2.3",
+                }
+            ),
+        )
+        self.exporter = LightStepSpanExporter()
+        tracer_provider.add_span_processor(
+            SimpleExportSpanProcessor(self.exporter)
+        )
+        self.tracer = tracer_provider.get_tracer(__name__)
+
+        event_mock = Mock(
+            **{
+                "timestamp": 1591240820506462784,
+                "attributes": {"a": 1, "b": False},
+            }
+        )
+
+        type(event_mock).name = PropertyMock(return_value="a")
+
+        self.span = Span(
+            "a",
+            Mock(**{"trace_state": {"a": "b", "c": "d"}}),
+            resource=SDKResource(
+                {
+                    "service.name": "lightstep",
+                    "service.version": "lightstep",
+                    "library.language": "python",
+                    "library.version": "1.2.3",
+                }
+            ),
+        )
+
+    def test_lightstep_exporter(self):
+
+        with self.tracer.start_span("Charles"):
+            pass
 
 
 class TestRealServer(TestCase):

@@ -20,7 +20,13 @@ from typing import Sequence
 
 from backoff import expo
 from google.rpc.error_details_pb2 import RetryInfo
-from grpc import RpcError, StatusCode, insecure_channel
+from grpc import (
+    RpcError,
+    StatusCode,
+    insecure_channel,
+    secure_channel,
+    ssl_channel_credentials
+)
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
@@ -55,6 +61,7 @@ class OTLPSpanExporter(SpanExporter):
     def _translate_spans(
         sdk_spans: Sequence[SDKSpan],
     ) -> ExportTraceServiceRequest:
+
         def translate_key_values(key, value):
             key_value = {"key": key}
 
@@ -89,6 +96,16 @@ class OTLPSpanExporter(SpanExporter):
                 ] = InstrumentationLibrarySpans()
 
             collector_span_kwargs = {}
+
+            collector_span_kwargs["name"] = sdk_span.name
+            collector_span_kwargs["start_time_unix_nano"] = sdk_span.start_time
+            collector_span_kwargs["end_time_unix_nano"] = sdk_span.end_time
+            collector_span_kwargs["span_id"] = (
+                sdk_span.context.span_id.to_bytes(8, "big")
+            )
+            collector_span_kwargs["trace_id"] = (
+                sdk_span.context.trace_id.to_bytes(16, "big")
+            )
 
             if sdk_span.status is not None:
                 collector_span_kwargs["status"] = Status(
@@ -216,6 +233,12 @@ class OTLPSpanExporter(SpanExporter):
         return ExportTraceServiceRequest(resource_spans=resource_spans)
 
     def export(self, spans: Sequence[SDKSpan]) -> SpanExportResult:
+
+        from pathlib import Path
+        from os.path import join
+        with open(join(Path.home(), "token_file"), "r") as token_file:
+            token = token_file.read()
+
         sdk_spans = spans
 
         # expo returns a generator that yields delay values which grow
@@ -232,11 +255,23 @@ class OTLPSpanExporter(SpanExporter):
                 return SpanExportResult.FAILURE
 
             try:
-                self._client.Export(self._translate_spans(sdk_spans))
+                self._client.Export(
+                    request=self._translate_spans(sdk_spans),
+                    metadata=(
+                        (
+                            "lightstep-access-token",
+                            (
+                                token[:-1]
+                            )
+                        ),
+                    )
+                )
 
                 return SpanExportResult.SUCCESS
 
             except RpcError as error:
+
+                raise
 
                 if error.code() in [
                     StatusCode.CANCELLED,
@@ -273,3 +308,11 @@ class OTLPSpanExporter(SpanExporter):
 
     def shutdown(self):
         pass
+
+
+class LightStepSpanExporter(OTLPSpanExporter):
+    def __init__(self, endpoint="ingest.lightstep.com:443"):
+        super().__init__()
+        self._client = TraceServiceStub(
+            secure_channel(endpoint, ssl_channel_credentials())
+        )
