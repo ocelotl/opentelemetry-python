@@ -388,6 +388,12 @@ class Span(trace_api.Span):
         set_status_on_exception: bool = True,
     ) -> None:
 
+        # FIXME The specification says that implementations should not provide
+        # access to a Span's attributes besides its SpanContext.
+
+        # FIXME The specification says that implementations must not allow
+        # callers to create Spans directly.
+
         self.name = name
         self.context = context
         self.parent = parent
@@ -551,7 +557,13 @@ class Span(trace_api.Span):
                     logger.warning("Byte attribute could not be decoded.")
                     return
             with self._lock:
+                # FIXME The specification says that attributes SHOULD preserve
+                # the order in which they are set.
                 self.attributes[key] = value
+
+            # FIXME The specification says that Null attributes that have been
+            # previously set results in the attribute being cleared and the key
+            # being dropped from the attribute set.
 
     @staticmethod
     def _filter_attribute_values(attributes: types.Attributes):
@@ -632,6 +644,9 @@ class Span(trace_api.Span):
                 if self.status is None:
                     self.status = Status(canonical_code=StatusCanonicalCode.OK)
 
+                # FIXME The specification says callers MUST NOT be able to
+                # set its Attributes, Links and Events after the end time
+                # has been set.
                 self._end_time = (
                     end_time if end_time is not None else time_ns()
                 )
@@ -895,6 +910,11 @@ class TracerProvider(trace_api.TracerProvider):
 
         The span processors are invoked in the same order they are registered.
         """
+        # The specification says that implementations MUST NOT require users to
+        # repeatedly obtain a Tracer again with the same name and version to
+        # pick up configuration changes. This could, for example, be
+        # implemented by storing mutable configuration in the TracerProvider,
+        # as this implementation does with the span processors, for example.
 
         # no lock here because add_span_processor is thread safe for both
         # SynchronousMultiSpanProcessor and ConcurrentMultiSpanProcessor.

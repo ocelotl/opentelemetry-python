@@ -241,8 +241,15 @@ class Tracer(abc.ABC):
     and controlling spans' lifecycles.
     """
 
+    # FIXME The specification says that the Tracer SHOULD provide methods
+    # to get the currently active Span.
+
     # Constant used to represent the current span being used as a parent.
     # This is the default behavior when creating spans.
+
+    # FIXME Is this misleading? The specification says the Tracer must
+    # delegate to the Context to get the currently active Span and to
+    # mark a given Span as active.
     CURRENT_SPAN = DefaultSpan(INVALID_SPAN_CONTEXT)
 
     @abc.abstractmethod
@@ -435,6 +442,14 @@ def set_tracer_provider(tracer_provider: TracerProvider) -> None:
     This can only be done once, a warning will be logged if any furter attempt
     is made.
     """
+
+    # The specification says that some applications may want to have or use
+    # multiple TracerProvider instances, implementations SHOULD allow creating
+    # an arbitrary number of TracerProvider instances. This implementation
+    # fulfills this requirements by making it possible to simply instantiate
+    # TracerProvider instances if necessary, but still making it impossible to
+    # set the global TracerProvider only once.
+
     global _TRACER_PROVIDER  # pylint: disable=global-statement
 
     if _TRACER_PROVIDER is not None:

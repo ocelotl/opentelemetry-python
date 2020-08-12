@@ -170,6 +170,9 @@ class SpanContext:
         is_remote: True if propagated from a remote parent.
     """
 
+    # FIXME The specification says that instances of this class are immutable.
+    # Maybe the attributes of this class should be properties?
+
     def __init__(
         self,
         trace_id: int,
@@ -208,6 +211,11 @@ class SpanContext:
         Returns:
             True if the `SpanContext` is valid, false otherwise.
         """
+        # FIXME the specification defines 16-byte and 8-byte lengths for
+        # trace_id and span_id respectively, but this is not being checked for
+        # here. The specification defines the behavior described below for this
+        # method, but is the concern above valid?
+
         return (
             self.trace_id != INVALID_TRACE_ID
             and self.span_id != INVALID_SPAN_ID
