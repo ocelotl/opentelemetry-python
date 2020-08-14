@@ -100,8 +100,7 @@ from opentracing import (
 )
 
 from opentelemetry import propagators
-from opentelemetry.context import Context, attach, detach, get_value, set_value
-from opentelemetry.correlationcontext import get_correlation, set_correlation
+from opentelemetry.context import attach, detach, get_value, set_value
 from opentelemetry.instrumentation.opentracing_shim import util
 from opentelemetry.instrumentation.opentracing_shim.version import __version__
 from opentelemetry.trace import INVALID_SPAN_CONTEXT, DefaultSpan, Link
@@ -148,8 +147,7 @@ class SpanContextShim(SpanContext):
 
     def __init__(self, otel_context: OtelSpanContext):
         self._otel_context = otel_context
-        # Context is being used here since it must be immutable.
-        self._baggage = Context()
+        self._baggage = {}
 
     def unwrap(self) -> OtelSpanContext:
         """Returns the wrapped :class:`opentelemetry.trace.SpanContext`
@@ -163,7 +161,7 @@ class SpanContextShim(SpanContext):
         return self._otel_context
 
     @property
-    def baggage(self) -> Context:
+    def baggage(self):
         """Returns the ``baggage`` associated with this object"""
 
         return self._baggage
@@ -290,9 +288,7 @@ class SpanShim(Span):
             value: A tag value.
         """
         # pylint: disable=protected-access
-        self._context._baggage = set_correlation(
-            key, value, context=self._context._baggage
-        )
+        self.context._baggage[key] = value
 
     def get_baggage_item(self, key: str) -> Optional[object]:
         """Retrieves value of the baggage item with the given key.
@@ -303,7 +299,7 @@ class SpanShim(Span):
             Returns this :class:`SpanShim` instance to allow call chaining.
         """
         # pylint: disable=protected-access
-        return get_correlation(key, context=self._context._baggage)
+        return self.context._baggage[key]
 
 
 class ScopeShim(Scope):
@@ -352,7 +348,9 @@ class ScopeShim(Scope):
     # TODO: Change type of `manager` argument to `opentracing.ScopeManager`? We
     # need to get rid of `manager.tracer` for this.
     @classmethod
-    def from_context_manager(cls, manager: "ScopeManagerShim", span_cm):
+    def from_context_manager(
+        cls, manager: "ScopeManagerShim", span_cm, span: "SpanShim" = None
+    ):
         """Constructs a :class:`ScopeShim` from an OpenTelemetry
         `opentelemetry.trace.Span` context
         manager.
@@ -375,10 +373,14 @@ class ScopeShim(Scope):
                 :class:`ScopeShim`.
             span_cm: A context manager as returned by
                 :meth:`opentelemetry.trace.Tracer.use_span`.
+            span_shim: The :class:`SpanShim` that holds context with or without
+                baggage.
         """
 
         otel_span = span_cm.__enter__()
         span_context = SpanContextShim(otel_span.get_context())
+        if span.context._baggage:
+            span_context._baggage = span.context._baggage
         span = SpanShim(manager.tracer, span_context, otel_span)
         return cls(manager, span, span_cm)
 
@@ -454,7 +456,7 @@ class ScopeManagerShim(ScopeManager):
         span_cm = self._tracer.unwrap().use_span(
             span.unwrap(), end_on_exit=finish_on_close
         )
-        return ScopeShim.from_context_manager(self, span_cm=span_cm)
+        return ScopeShim.from_context_manager(self, span_cm=span_cm, span=span)
 
     @property
     def active(self) -> "ScopeShim":
@@ -541,7 +543,7 @@ class TracerShim(Tracer):
     def start_active_span(
         self,
         operation_name: str,
-        child_of: Union[SpanShim, SpanContextShim] = None,
+        child_of: Union[SpanShim, SpanContextShim]=None,
         references: list = None,
         tags: Attributes = None,
         start_time: float = None,
@@ -592,7 +594,7 @@ class TracerShim(Tracer):
     def start_span(
         self,
         operation_name: str = None,
-        child_of: Union[SpanShim, SpanContextShim] = None,
+        child_of: Union[SpanShim, SpanContextShim]=None,
         references: list = None,
         tags: Attributes = None,
         start_time: float = None,
@@ -652,6 +654,12 @@ class TracerShim(Tracer):
         )
 
         context = SpanContextShim(span.get_context())
+
+        if self.active_span is not None:
+
+            for key, value in self.active_span.context.baggage.items():
+                context.baggage[key] = value
+
         return SpanShim(self, context, span)
 
     def inject(self, span_context, format: object, carrier: object):
