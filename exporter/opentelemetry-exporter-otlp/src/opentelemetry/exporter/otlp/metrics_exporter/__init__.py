@@ -16,6 +16,7 @@
 
 import logging
 from typing import List, Sequence, Type, TypeVar
+from time import time_ns
 
 # pylint: disable=duplicate-code
 from opentelemetry.exporter.otlp.exporter import (
@@ -85,6 +86,8 @@ def _get_data_points(
                     data_point_class(
                         labels=string_key_values,
                         value=view_data.aggregator.current,
+                        start_time_unix_nano=time_ns(),
+                        time_unix_nano=time_ns(),
                     )
                 )
                 break
