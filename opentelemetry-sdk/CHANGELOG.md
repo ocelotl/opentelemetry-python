@@ -10,7 +10,10 @@
   ([#998](https://github.com/open-telemetry/opentelemetry-python/pull/998))
 - Samplers to accept parent Context
   ([#1267](https://github.com/open-telemetry/opentelemetry-python/pull/1267))
-- Updating status codes to adhere to spec ([#1282](https://github.com/open-telemetry/opentelemetry-python/pull/1282))
+- Updating status codes to adhere to spec
+  ([#1282](https://github.com/open-telemetry/opentelemetry-python/pull/1282))
+- Add debug Controller and set initial checkpoint timestamp in aggregators
+  ([#1237](https://github.com/open-telemetry/opentelemetry-python/pull/1237))
 
 ## Version 0.14b0
 
