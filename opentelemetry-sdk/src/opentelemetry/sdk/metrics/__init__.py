@@ -23,7 +23,6 @@ from opentelemetry.sdk.metrics.export import (
     MetricsExporter,
 )
 from opentelemetry.sdk.metrics.export.aggregate import Aggregator
-from opentelemetry.sdk.metrics.export.controller import PushController
 from opentelemetry.sdk.metrics.export.processor import Processor
 from opentelemetry.sdk.metrics.view import (
     ViewData,
@@ -585,7 +584,6 @@ class MeterProvider(metrics_api.MeterProvider):
             exporter = ConsoleMetricsExporter()
         self._exporters.add(exporter)
         # TODO: Controller type configurable?
-        self._controllers.append(PushController(meter, exporter, interval))
 
     def shutdown(self) -> None:
         for controller in self._controllers:

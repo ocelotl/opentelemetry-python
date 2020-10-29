@@ -78,7 +78,7 @@ import psutil
 
 from opentelemetry import metrics
 from opentelemetry.sdk.metrics.export import MetricsExporter
-from opentelemetry.sdk.metrics.export.controller import PushController
+from opentelemetry.test.controller import DebugController
 from opentelemetry.sdk.util import get_dict_as_key
 
 
@@ -90,11 +90,12 @@ class SystemMetrics:
         interval: int = 30,
         labels: typing.Optional[typing.Dict[str, str]] = None,
         config: typing.Optional[typing.Dict[str, typing.List[str]]] = None,
+        meter=None,
     ):
         self._labels = {} if labels is None else labels
-        self.meter = metrics.get_meter(__name__)
-        self.controller = PushController(
-            meter=self.meter, exporter=exporter, interval=interval
+        self.meter = meter
+        self.controller = DebugController(
+            self.meter, exporter=exporter, interval=interval
         )
         self._python_implementation = python_implementation().lower()
         if config is None:
