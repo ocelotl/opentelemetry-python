@@ -18,6 +18,9 @@ from typing import Sequence, Tuple
 from pkg_resources import iter_entry_points
 
 from opentelemetry import trace
+from opentelemetry.instrumentation.auto_instrumentation import (
+    AutoInstrumentationConfigurator
+)
 from opentelemetry.configuration import Configuration
 from opentelemetry.sdk.metrics.export import MetricsExporter
 from opentelemetry.sdk.resources import Resource
@@ -150,19 +153,16 @@ def import_ids_generator(ids_generator_name: str) -> trace.IdsGenerator:
     raise RuntimeError("{0} is not an IdsGenerator".format(ids_generator_name))
 
 
-def initialize_components():
-    exporter_names = get_exporter_names()
-    trace_exporters, metric_exporters = import_exporters(exporter_names)
-    ids_generator_name = get_ids_generator()
-    ids_generator = import_ids_generator(ids_generator_name)
-    init_tracing(trace_exporters, ids_generator)
-
-    # We don't support automatic initialization for metric yet but have added
-    # some boilerplate in order to make sure current implementation does not
-    # lock us out of supporting metrics later without major surgery.
-    init_metrics(metric_exporters)
-
-
-class Configurator:
+class Configurator(AutoInstrumentationConfigurator):
     def configure(self):
-        initialize_components()
+        trace_exporters, metric_exporters = import_exporters(
+            get_exporter_names()
+        )
+        ids_generator = import_ids_generator(get_ids_generator())
+        init_tracing(trace_exporters, ids_generator)
+
+        # We don't support automatic initialization for metric yet but have
+        # added some boilerplate in order to make sure current implementation
+        # does not lock us out of supporting metrics later without major
+        # surgery.
+        init_metrics(metric_exporters)

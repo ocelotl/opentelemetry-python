@@ -22,38 +22,26 @@ from pkg_resources import iter_entry_points
 logger = getLogger(__file__)
 
 
-def auto_instrument():
-    for entry_point in iter_entry_points("opentelemetry_instrumentor"):
-        try:
-            entry_point.load()().instrument()  # type: ignore
-            logger.debug("Instrumented %s", entry_point.name)
-        except Exception as exc:  # pylint: disable=broad-except
-            logger.exception("Instrumenting of %s failed", entry_point.name)
-            raise exc
-
-
-def initialize_components():
-    configured = None
-    for entry_point in iter_entry_points("opentelemetry_configure"):
-        if configured is not None:
-            logger.warning(
-                "Configuration of %s not loaded, %s already loaded",
-                entry_point.name,
-                configured,
-            )
-            continue
-        try:
-            entry_point.load()().configure()  # type: ignore
-            configured = entry_point.name
-        except Exception as exc:  # pylint: disable=broad-except
-            logger.exception("Configuration of %s failed", entry_point.name)
-            raise exc
-
-
 def initialize():
     try:
-        initialize_components()
-        auto_instrument()
+        for entry_point in iter_entry_points(
+            "opentelemetry_auto_instrumentation_configurator"
+        ):
+            try:
+                entry_point.load()().configure()  # type: ignore
+                logger.debug("Instrumented %s", entry_point.name)
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.exception("Configuration of %s failed", entry_point.name)
+                raise exc
+
+        for entry_point in iter_entry_points("opentelemetry_instrumentor"):
+            try:
+                entry_point.load()().instrument()  # type: ignore
+                logger.debug("Instrumented %s", entry_point.name)
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.exception("Instrumenting of %s failed", entry_point.name)
+                raise exc
+
     except Exception:  # pylint: disable=broad-except
         logger.exception("Failed to auto initialize opentelemetry")
 

@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import argparse
+from abc import ABC, abstractmethod
 from logging import getLogger
 from os import environ, execl, getcwd
 from os.path import abspath, dirname, pathsep
@@ -116,3 +117,12 @@ def run() -> None:
 
     executable = which(args.command)
     execl(executable, executable, *args.command_args)
+
+
+class AutoInstrumentationConfigurator(ABC):
+
+    @abstractmethod
+    def configure(self):
+        """
+        Performs configuration for auto instrumentation.
+        """
