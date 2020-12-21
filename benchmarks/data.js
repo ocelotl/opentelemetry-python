@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608593328459,
+  "lastUpdate": 1608593332156,
   "repoUrl": "https://github.com/ocelotl/opentelemetry-python",
   "entries": {
     "OpenTelemetry Python Benchmarks - Python 3.8 - core": [
@@ -78,6 +78,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000048885056388747515",
             "extra": "mean: 69.63994734869523 usec\nrounds: 5337"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "aboten@lightstep.com",
+            "name": "alrex",
+            "username": "codeboten"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6f2b5ceefa87f443bf574eac7debe2b0e996e59d",
+          "message": "Deleting unused file (#1492)",
+          "timestamp": "2020-12-20T08:47:13-08:00",
+          "tree_id": "87105ad8d7516d10a729ab4afa1ab5d7ce66a2d7",
+          "url": "https://github.com/ocelotl/opentelemetry-python/commit/6f2b5ceefa87f443bf574eac7debe2b0e996e59d"
+        },
+        "date": 1608593328247,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "opentelemetry-sdk/tests/performance/benchmarks/trace/test_benchmark_trace.py::test_simple_start_span",
+            "value": 20473.279220529497,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005083764524971905",
+            "extra": "mean: 48.8441538469936 usec\nrounds: 1651"
+          },
+          {
+            "name": "opentelemetry-sdk/tests/performance/benchmarks/trace/test_benchmark_trace.py::test_simple_start_as_current_span",
+            "value": 14136.618445343607,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004629961645030119",
+            "extra": "mean: 70.73827477669423 usec\nrounds: 4702"
           }
         ]
       }
