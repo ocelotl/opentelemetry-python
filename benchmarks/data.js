@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608593348391,
+  "lastUpdate": 1608593370171,
   "repoUrl": "https://github.com/ocelotl/opentelemetry-python",
   "entries": {
     "OpenTelemetry Python Benchmarks - Python 3.8 - core": [
@@ -388,6 +388,46 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000070268452300366",
             "extra": "mean: 5.137886082558376 usec\nrounds: 120482"
+          }
+        ]
+      }
+    ],
+    "OpenTelemetry Python Benchmarks - Python 3.9 - core": [
+      {
+        "commit": {
+          "author": {
+            "email": "aboten@lightstep.com",
+            "name": "alrex",
+            "username": "codeboten"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6f2b5ceefa87f443bf574eac7debe2b0e996e59d",
+          "message": "Deleting unused file (#1492)",
+          "timestamp": "2020-12-20T08:47:13-08:00",
+          "tree_id": "87105ad8d7516d10a729ab4afa1ab5d7ce66a2d7",
+          "url": "https://github.com/ocelotl/opentelemetry-python/commit/6f2b5ceefa87f443bf574eac7debe2b0e996e59d"
+        },
+        "date": 1608593369153,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "opentelemetry-sdk/tests/performance/benchmarks/trace/test_benchmark_trace.py::test_simple_start_span",
+            "value": 26257.418292819675,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001197463471654213",
+            "extra": "mean: 38.08447536037688 usec\nrounds: 4647"
+          },
+          {
+            "name": "opentelemetry-sdk/tests/performance/benchmarks/trace/test_benchmark_trace.py::test_simple_start_as_current_span",
+            "value": 19852.10710891054,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000212240958624459",
+            "extra": "mean: 50.37248663398325 usec\nrounds: 7519"
           }
         ]
       }
