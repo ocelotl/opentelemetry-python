@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608593370171,
+  "lastUpdate": 1610126785852,
   "repoUrl": "https://github.com/ocelotl/opentelemetry-python",
   "entries": {
     "OpenTelemetry Python Benchmarks - Python 3.8 - core": [
@@ -428,6 +428,46 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000212240958624459",
             "extra": "mean: 50.37248663398325 usec\nrounds: 7519"
+          }
+        ]
+      }
+    ],
+    "OpenTelemetry Python Benchmarks - Python 3.7 - exporter": [
+      {
+        "commit": {
+          "author": {
+            "email": "srikanth.chekuri92@gmail.com",
+            "name": "Srikanth Chekuri",
+            "username": "lonewolf3739"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cd39fc17b21baf68eddc4ddd0acfe2e80df59eae",
+          "message": "Update Jaeger exporter status code (#1488)",
+          "timestamp": "2021-01-07T08:05:29-08:00",
+          "tree_id": "2d2eb6aea5add7398b0ba85fe8a38da6ff809abb",
+          "url": "https://github.com/ocelotl/opentelemetry-python/commit/cd39fc17b21baf68eddc4ddd0acfe2e80df59eae"
+        },
+        "date": 1610126784585,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "exporter/opentelemetry-exporter-otlp/tests/performance/benchmarks/test_benchmark_trace_exporter.py::test_simple_span_processor",
+            "value": 3503.953410145122,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011945845800870066",
+            "extra": "mean: 285.3919224795239 usec\nrounds: 258"
+          },
+          {
+            "name": "exporter/opentelemetry-exporter-otlp/tests/performance/benchmarks/test_benchmark_trace_exporter.py::test_batch_span_processor",
+            "value": 4306.200494845973,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000816898277275694",
+            "extra": "mean: 232.22327924509904 usec\nrounds: 5300"
           }
         ]
       }
