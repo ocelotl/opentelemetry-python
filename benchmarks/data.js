@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610126855201,
+  "lastUpdate": 1610126865408,
   "repoUrl": "https://github.com/ocelotl/opentelemetry-python",
   "entries": {
     "OpenTelemetry Python Benchmarks - Python 3.8 - core": [
@@ -386,6 +386,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00007736741309881968",
             "extra": "mean: 76.90851047395684 usec\nrounds: 5824"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "srikanth.chekuri92@gmail.com",
+            "name": "Srikanth Chekuri",
+            "username": "lonewolf3739"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cd39fc17b21baf68eddc4ddd0acfe2e80df59eae",
+          "message": "Update Jaeger exporter status code (#1488)",
+          "timestamp": "2021-01-07T08:05:29-08:00",
+          "tree_id": "2d2eb6aea5add7398b0ba85fe8a38da6ff809abb",
+          "url": "https://github.com/ocelotl/opentelemetry-python/commit/cd39fc17b21baf68eddc4ddd0acfe2e80df59eae"
+        },
+        "date": 1610126863896,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "opentelemetry-sdk/tests/performance/benchmarks/trace/test_benchmark_trace.py::test_simple_start_span",
+            "value": 14515.187488353433,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00007998722132790936",
+            "extra": "mean: 68.89335744387533 usec\nrounds: 1424"
+          },
+          {
+            "name": "opentelemetry-sdk/tests/performance/benchmarks/trace/test_benchmark_trace.py::test_simple_start_as_current_span",
+            "value": 10503.648636075546,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00005770221059559956",
+            "extra": "mean: 95.20501252921076 usec\nrounds: 5507"
           }
         ]
       }
