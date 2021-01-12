@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610491154990,
+  "lastUpdate": 1610491159356,
   "repoUrl": "https://github.com/ocelotl/opentelemetry-python",
   "entries": {
     "OpenTelemetry Python Benchmarks - Python 3.8 - core": [
@@ -1464,6 +1464,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000851292571509006",
             "extra": "mean: 267.7685953872652 usec\nrounds: 4639"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "srikanth.chekuri92@gmail.com",
+            "name": "Srikanth Chekuri",
+            "username": "lonewolf3739"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "db74594d93b7e42d26ed2061b7672d1ad823f30c",
+          "message": "Update default port for OTLP exporter to 4317 (#1516)",
+          "timestamp": "2021-01-12T12:14:49-08:00",
+          "tree_id": "319abf2aeb7c5ad6e78c5bf358e34232b37ca479",
+          "url": "https://github.com/ocelotl/opentelemetry-python/commit/db74594d93b7e42d26ed2061b7672d1ad823f30c"
+        },
+        "date": 1610491155095,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "exporter/opentelemetry-exporter-otlp/tests/performance/benchmarks/test_benchmark_trace_exporter.py::test_simple_span_processor",
+            "value": 2367.044701784305,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001106089791669764",
+            "extra": "mean: 422.4677291671715 usec\nrounds: 96"
+          },
+          {
+            "name": "exporter/opentelemetry-exporter-otlp/tests/performance/benchmarks/test_benchmark_trace_exporter.py::test_batch_span_processor",
+            "value": 3277.7778339248043,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0009083172611522555",
+            "extra": "mean: 305.0847405367319 usec\nrounds: 4174"
           }
         ]
       }
