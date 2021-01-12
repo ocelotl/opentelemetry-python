@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610491143660,
+  "lastUpdate": 1610491147616,
   "repoUrl": "https://github.com/ocelotl/opentelemetry-python",
   "entries": {
     "OpenTelemetry Python Benchmarks - Python 3.8 - core": [
@@ -1078,6 +1078,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0008374012105789777",
             "extra": "mean: 234.33200254196282 usec\nrounds: 6294"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "srikanth.chekuri92@gmail.com",
+            "name": "Srikanth Chekuri",
+            "username": "lonewolf3739"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "db74594d93b7e42d26ed2061b7672d1ad823f30c",
+          "message": "Update default port for OTLP exporter to 4317 (#1516)",
+          "timestamp": "2021-01-12T12:14:49-08:00",
+          "tree_id": "319abf2aeb7c5ad6e78c5bf358e34232b37ca479",
+          "url": "https://github.com/ocelotl/opentelemetry-python/commit/db74594d93b7e42d26ed2061b7672d1ad823f30c"
+        },
+        "date": 1610491143122,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "exporter/opentelemetry-exporter-otlp/tests/performance/benchmarks/test_benchmark_trace_exporter.py::test_simple_span_processor",
+            "value": 2994.368510916777,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001026916733555992",
+            "extra": "mean: 333.9602311319501 usec\nrounds: 212"
+          },
+          {
+            "name": "exporter/opentelemetry-exporter-otlp/tests/performance/benchmarks/test_benchmark_trace_exporter.py::test_batch_span_processor",
+            "value": 4134.004001232704,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0008614687963039268",
+            "extra": "mean: 241.89623418405344 usec\nrounds: 5406"
           }
         ]
       }
