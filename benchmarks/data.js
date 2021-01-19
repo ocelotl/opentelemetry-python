@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611071483653,
+  "lastUpdate": 1611071487873,
   "repoUrl": "https://github.com/ocelotl/opentelemetry-python",
   "entries": {
     "OpenTelemetry Python Benchmarks - Python 3.8 - core": [
@@ -458,6 +458,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000018914825810211757",
             "extra": "mean: 66.27902954987161 usec\nrounds: 5110"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "srikanth.chekuri92@gmail.com",
+            "name": "Srikanth Chekuri",
+            "username": "lonewolf3739"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9a1f594b751289635906a856684b59b3d4a425a5",
+          "message": "Add support for OTEL_TRACE_SAMPLER and OTEL_TRACE_SAMPLER_ARG env variables (#1496)",
+          "timestamp": "2021-01-18T21:08:45-08:00",
+          "tree_id": "0aa9a54738cf435e660cb7d9b8fc9d4a424593c4",
+          "url": "https://github.com/ocelotl/opentelemetry-python/commit/9a1f594b751289635906a856684b59b3d4a425a5"
+        },
+        "date": 1611071479965,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "opentelemetry-sdk/tests/performance/benchmarks/trace/test_benchmark_trace.py::test_simple_start_span",
+            "value": 23062.104265125767,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000014275970748995436",
+            "extra": "mean: 43.36117764900525 usec\nrounds: 1897"
+          },
+          {
+            "name": "opentelemetry-sdk/tests/performance/benchmarks/trace/test_benchmark_trace.py::test_simple_start_as_current_span",
+            "value": 15505.585798366748,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000013959926412386532",
+            "extra": "mean: 64.49288746674331 usec\nrounds: 5625"
           }
         ]
       }
