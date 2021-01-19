@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611071459758,
+  "lastUpdate": 1611071466441,
   "repoUrl": "https://github.com/ocelotl/opentelemetry-python",
   "entries": {
     "OpenTelemetry Python Benchmarks - Python 3.8 - core": [
@@ -1456,6 +1456,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0008135641905968822",
             "extra": "mean: 247.20555514066908 usec\nrounds: 5087"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "srikanth.chekuri92@gmail.com",
+            "name": "Srikanth Chekuri",
+            "username": "lonewolf3739"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9a1f594b751289635906a856684b59b3d4a425a5",
+          "message": "Add support for OTEL_TRACE_SAMPLER and OTEL_TRACE_SAMPLER_ARG env variables (#1496)",
+          "timestamp": "2021-01-18T21:08:45-08:00",
+          "tree_id": "0aa9a54738cf435e660cb7d9b8fc9d4a424593c4",
+          "url": "https://github.com/ocelotl/opentelemetry-python/commit/9a1f594b751289635906a856684b59b3d4a425a5"
+        },
+        "date": 1611071460135,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "exporter/opentelemetry-exporter-otlp/tests/performance/benchmarks/test_benchmark_trace_exporter.py::test_simple_span_processor",
+            "value": 2668.990033348909,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000035035169949512483",
+            "extra": "mean: 374.6735609743931 usec\nrounds: 205"
+          },
+          {
+            "name": "exporter/opentelemetry-exporter-otlp/tests/performance/benchmarks/test_benchmark_trace_exporter.py::test_batch_span_processor",
+            "value": 3116.559431037327,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0010227575648587856",
+            "extra": "mean: 320.86665508161235 usec\nrounds: 4546"
           }
         ]
       }
