@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611071506474,
+  "lastUpdate": 1611071620523,
   "repoUrl": "https://github.com/ocelotl/opentelemetry-python",
   "entries": {
     "OpenTelemetry Python Benchmarks - Python 3.8 - core": [
@@ -1262,6 +1262,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003792770440071969",
             "extra": "mean: 5.295086208651667 usec\nrounds: 129871"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "srikanth.chekuri92@gmail.com",
+            "name": "Srikanth Chekuri",
+            "username": "lonewolf3739"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9a1f594b751289635906a856684b59b3d4a425a5",
+          "message": "Add support for OTEL_TRACE_SAMPLER and OTEL_TRACE_SAMPLER_ARG env variables (#1496)",
+          "timestamp": "2021-01-18T21:08:45-08:00",
+          "tree_id": "0aa9a54738cf435e660cb7d9b8fc9d4a424593c4",
+          "url": "https://github.com/ocelotl/opentelemetry-python/commit/9a1f594b751289635906a856684b59b3d4a425a5"
+        },
+        "date": 1611071619082,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "opentelemetry-sdk/tests/performance/benchmarks/trace/test_benchmark_trace.py::test_simple_start_span",
+            "value": 189861.9770417906,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000021930271750723265",
+            "extra": "mean: 5.2669840248207755 usec\nrounds: 131579"
+          },
+          {
+            "name": "opentelemetry-sdk/tests/performance/benchmarks/trace/test_benchmark_trace.py::test_simple_start_as_current_span",
+            "value": 125047.83027581418,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000026668947086377435",
+            "extra": "mean: 7.996940033220333 usec\nrounds: 185186"
           }
         ]
       }
