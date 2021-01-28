@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611852833872,
+  "lastUpdate": 1611852837958,
   "repoUrl": "https://github.com/ocelotl/opentelemetry-python",
   "entries": {
     "OpenTelemetry Python Benchmarks - Python 3.8 - core": [
@@ -1336,6 +1336,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000021048203656461856",
             "extra": "mean: 64.56763317819194 usec\nrounds: 5365"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ewan.higgs@gmail.com",
+            "name": "Ewan Higgs",
+            "username": "ehiggs"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c026c0f6a53adae1af6cf36fb4bb830a31c6ffc9",
+          "message": "1542. Allow missing carrier headers to continue without raising AttributeError (#1545)",
+          "timestamp": "2021-01-27T08:31:32-08:00",
+          "tree_id": "cd2a50fa811d6310e1d6bf9b75512412d2a30766",
+          "url": "https://github.com/ocelotl/opentelemetry-python/commit/c026c0f6a53adae1af6cf36fb4bb830a31c6ffc9"
+        },
+        "date": 1611852836065,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "opentelemetry-sdk/tests/performance/benchmarks/trace/test_benchmark_trace.py::test_simple_start_span",
+            "value": 21762.082671338678,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000612430068875916",
+            "extra": "mean: 45.951484290473275 usec\nrounds: 1846"
+          },
+          {
+            "name": "opentelemetry-sdk/tests/performance/benchmarks/trace/test_benchmark_trace.py::test_simple_start_as_current_span",
+            "value": 14469.299413221734,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005225464108558875",
+            "extra": "mean: 69.11184649936966 usec\nrounds: 5342"
           }
         ]
       }
