@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611866056792,
+  "lastUpdate": 1611866072815,
   "repoUrl": "https://github.com/ocelotl/opentelemetry-python",
   "entries": {
     "OpenTelemetry Python Benchmarks - Python 3.8 - core": [
@@ -2022,6 +2022,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000749539243703077",
             "extra": "mean: 6.755613502815414 usec\nrounds: 196079"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "srikanth.chekuri92@gmail.com",
+            "name": "Srikanth Chekuri",
+            "username": "lonewolf3739"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "18761d78e30a4293abd65a897129b57fbf0c0a15",
+          "message": "Update Resource merge key conflict precedence (#1544)",
+          "timestamp": "2021-01-28T09:20:50-08:00",
+          "tree_id": "aa5e34bdc6bcc45b3961ba96d824d9cefdeb6a26",
+          "url": "https://github.com/ocelotl/opentelemetry-python/commit/18761d78e30a4293abd65a897129b57fbf0c0a15"
+        },
+        "date": 1611866071828,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "opentelemetry-sdk/tests/performance/benchmarks/trace/test_benchmark_trace.py::test_simple_start_span",
+            "value": 224155.83383838457,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00004924254225046582",
+            "extra": "mean: 4.461182128862173 usec\nrounds: 158731"
+          },
+          {
+            "name": "opentelemetry-sdk/tests/performance/benchmarks/trace/test_benchmark_trace.py::test_simple_start_as_current_span",
+            "value": 152906.94597621035,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001078363234316995",
+            "extra": "mean: 6.539925270337833 usec\nrounds: 98040"
           }
         ]
       }
