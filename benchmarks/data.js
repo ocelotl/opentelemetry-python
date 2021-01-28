@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611852846627,
+  "lastUpdate": 1611852859849,
   "repoUrl": "https://github.com/ocelotl/opentelemetry-python",
   "entries": {
     "OpenTelemetry Python Benchmarks - Python 3.8 - core": [
@@ -1068,6 +1068,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000002487260267892662",
             "extra": "mean: 46.35234163749202 usec\nrounds: 6864"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ewan.higgs@gmail.com",
+            "name": "Ewan Higgs",
+            "username": "ehiggs"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c026c0f6a53adae1af6cf36fb4bb830a31c6ffc9",
+          "message": "1542. Allow missing carrier headers to continue without raising AttributeError (#1545)",
+          "timestamp": "2021-01-27T08:31:32-08:00",
+          "tree_id": "cd2a50fa811d6310e1d6bf9b75512412d2a30766",
+          "url": "https://github.com/ocelotl/opentelemetry-python/commit/c026c0f6a53adae1af6cf36fb4bb830a31c6ffc9"
+        },
+        "date": 1611852858333,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "opentelemetry-sdk/tests/performance/benchmarks/trace/test_benchmark_trace.py::test_simple_start_span",
+            "value": 17966.699704133836,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00004147319005282877",
+            "extra": "mean: 55.65852474118643 usec\nrounds: 4143"
+          },
+          {
+            "name": "opentelemetry-sdk/tests/performance/benchmarks/trace/test_benchmark_trace.py::test_simple_start_as_current_span",
+            "value": 12294.001810951324,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000611927499555225",
+            "extra": "mean: 81.34047931481628 usec\nrounds: 7300"
           }
         ]
       }
