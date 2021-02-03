@@ -1,8 +1,8 @@
 OpenTelemetry Django Instrumentation Example
 ============================================
 
-This shows how to use ``opentelemetry-instrumentation-django`` to automatically instrument a
-Django app.
+This shows how to use ``opentelemetry-instrumentation-django`` to automatically
+instrument a Django app.
 
 For more user convenience, a Django app is already provided in this directory.
 
