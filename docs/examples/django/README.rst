@@ -39,12 +39,15 @@ Set these environment variables first:
 #. ``export DJANGO_SETTINGS_MODULE=instrumentation_example.settings``
 
 The way to achieve OpenTelemetry instrumentation for your Django app is to use
-an ``opentelemetry.instrumentation.django.DjangoInstrumentor`` to instrument the app.
+an ``opentelemetry.instrumentation.django.DjangoInstrumentor`` to instrument
+the app.
 
-Clone the ``opentelemetry-python`` repository and go to ``opentelemetry-python/docs/examples/django``.
+Clone the ``opentelemetry-python`` repository and go to
+``opentelemetry-python/docs/examples/django``.
 
-Once there, open the ``manage.py`` file. The call to ``DjangoInstrumentor().instrument()``
-in ``main`` is all that is needed to make the app be instrumented.
+Once there, open the ``manage.py`` file. The call to
+``DjangoInstrumentor().instrument()`` in ``main`` is all that is needed to make
+the app be instrumented.
 
 Run the Django app with ``python manage.py runserver``.
 
