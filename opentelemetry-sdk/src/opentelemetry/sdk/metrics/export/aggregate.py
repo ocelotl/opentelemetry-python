@@ -18,7 +18,7 @@ import threading
 from collections import OrderedDict, namedtuple
 from math import inf
 
-from opentelemetry.util import time_ns
+from opentelemetry.util.providers import time_ns
 
 logger = logging.getLogger(__name__)
 

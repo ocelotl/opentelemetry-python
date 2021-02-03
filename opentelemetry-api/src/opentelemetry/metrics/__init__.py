@@ -40,7 +40,7 @@ from typing import (
     Union,
 )
 
-from opentelemetry.util import _load_meter_provider
+from opentelemetry.util.providers import _load_meter_provider
 
 logger = getLogger(__name__)
 ValueT = TypeVar("ValueT", int, float)

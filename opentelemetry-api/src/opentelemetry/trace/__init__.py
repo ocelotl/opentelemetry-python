@@ -101,7 +101,8 @@ from opentelemetry.trace.span import (
     format_trace_id,
 )
 from opentelemetry.trace.status import Status
-from opentelemetry.util import _load_trace_provider, types
+from opentelemetry.util.providers import _load_trace_provider
+from opentelemetry.util.types import Attributes
 
 logger = getLogger(__name__)
 
@@ -116,7 +117,7 @@ class LinkBase(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def attributes(self) -> types.Attributes:
+    def attributes(self) -> Attributes:
         pass
 
 
@@ -129,13 +130,13 @@ class Link(LinkBase):
     """
 
     def __init__(
-        self, context: "SpanContext", attributes: types.Attributes = None,
+        self, context: "SpanContext", attributes: Attributes = None,
     ) -> None:
         super().__init__(context)
         self._attributes = attributes
 
     @property
-    def attributes(self) -> types.Attributes:
+    def attributes(self) -> Attributes:
         return self._attributes
 
 
@@ -230,7 +231,7 @@ class Tracer(abc.ABC):
         name: str,
         context: typing.Optional[Context] = None,
         kind: SpanKind = SpanKind.INTERNAL,
-        attributes: types.Attributes = None,
+        attributes: Attributes = None,
         links: typing.Sequence[Link] = (),
         start_time: typing.Optional[int] = None,
         record_exception: bool = True,
@@ -285,7 +286,7 @@ class Tracer(abc.ABC):
         name: str,
         context: typing.Optional[Context] = None,
         kind: SpanKind = SpanKind.INTERNAL,
-        attributes: types.Attributes = None,
+        attributes: Attributes = None,
         links: typing.Sequence[Link] = (),
         start_time: typing.Optional[int] = None,
         record_exception: bool = True,
@@ -379,7 +380,7 @@ class DefaultTracer(Tracer):
         name: str,
         context: typing.Optional[Context] = None,
         kind: SpanKind = SpanKind.INTERNAL,
-        attributes: types.Attributes = None,
+        attributes: Attributes = None,
         links: typing.Sequence[Link] = (),
         start_time: typing.Optional[int] = None,
         record_exception: bool = True,
@@ -394,7 +395,7 @@ class DefaultTracer(Tracer):
         name: str,
         context: typing.Optional[Context] = None,
         kind: SpanKind = SpanKind.INTERNAL,
-        attributes: types.Attributes = None,
+        attributes: Attributes = None,
         links: typing.Sequence[Link] = (),
         start_time: typing.Optional[int] = None,
         record_exception: bool = True,
