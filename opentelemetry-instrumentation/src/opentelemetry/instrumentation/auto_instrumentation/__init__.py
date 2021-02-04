@@ -106,6 +106,7 @@ def load_config_from_cli_args(args):
 
 
 def run() -> None:
+    print("run in")
     args = parse_args()
     load_config_from_cli_args(args)
 
@@ -131,7 +132,18 @@ def run() -> None:
 
     python_path.insert(0, filedir_path)
 
+    print(python_path)
+
     environ["PYTHONPATH"] = pathsep.join(python_path)
 
     executable = which(args.command)
+    print("run almost out")
     execl(executable, executable, *args.command_args)
+    # execl("/bin/bash", executable, *args.command_args)
+    # execl("/bin/bash", "/bin/bash", *args.command_args)
+    # execl(executable, "/", *args.command_args)
+    # execl(executable, "manage.py", "runserver")
+    # execl("/bin/bash", "manage.py", "runserver")
+
+    # execl(executable, *args.command_args)
+    print("run out")

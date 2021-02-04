@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+print("start of sitecustomize")
 import sys
 from logging import getLogger
 from os import environ, path
@@ -54,8 +55,9 @@ def _load_instrumentors():
             entry_point.load()().instrument()  # type: ignore
             logger.debug("Instrumented %s", entry_point.name)
         except Exception as exc:  # pylint: disable=broad-except
-            logger.exception("Instrumenting of %s failed", entry_point.name)
-            raise exc
+            pass
+            # logger.exception("Instrumenting of %s failed", entry_point.name)
+            # raise exc
 
 
 def _load_configurators():
@@ -78,11 +80,18 @@ def _load_configurators():
 
 def initialize():
     try:
+        print("load_distros_in")
         _load_distros()
+        print("load_distros_out")
+        print("load_configurators_in")
         _load_configurators()
+        print("load_configurators_out")
+        print("load_instrumentors_in")
         _load_instrumentors()
+        print("load_instrumentors_out")
     except Exception:  # pylint: disable=broad-except
-        logger.exception("Failed to auto initialize opentelemetry")
+        # logger.exception("Failed to auto initialize opentelemetry")
+        raise
 
 
 if (
@@ -91,11 +100,13 @@ if (
     and "worker" in sys.argv[1:]
 ):
     from celery.signals import worker_process_init  # pylint:disable=E0401
+    worker_process_init
 
-    @worker_process_init.connect(weak=False)
     def init_celery(*args, **kwargs):
-        initialize()
+        # initialize()
+        pass
 
 
 else:
+    print("before initialize")
     initialize()

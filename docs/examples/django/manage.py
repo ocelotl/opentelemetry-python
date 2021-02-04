@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+##########3#!/usr/bin/env python
 # Copyright The OpenTelemetry Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +17,7 @@
 import os
 import sys
 
-from opentelemetry.instrumentation.django import DjangoInstrumentor
+# from opentelemetry.instrumentation.django import DjangoInstrumentor
 
 
 def main():
@@ -26,7 +26,7 @@ def main():
     )
 
     # This call is what makes the Django application be instrumented
-    DjangoInstrumentor().instrument()
+    # DjangoInstrumentor().instrument()
 
     try:
         from django.core.management import execute_from_command_line
