@@ -96,11 +96,9 @@ if (
     and "worker" in sys.argv[1:]
 ):
     from celery.signals import worker_process_init  # pylint:disable=E0401
-    worker_process_init
 
     def init_celery(*args, **kwargs):
-        # initialize()
-        pass
+        initialize()
 
 
 else:
