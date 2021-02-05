@@ -97,6 +97,7 @@ if (
 ):
     from celery.signals import worker_process_init  # pylint:disable=E0401
 
+    @worker_process_init.connect(weak=False)
     def init_celery(*args, **kwargs):
         initialize()
 
