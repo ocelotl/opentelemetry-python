@@ -134,16 +134,4 @@ def run() -> None:
     environ["PYTHONPATH"] = pathsep.join(python_path)
 
     executable = which(args.command)
-    # execl(executable, "", *args.command_args)
     execl(executable, executable, *args.command_args)
-    # execl("/bin/bash", executable, *args.command_args)
-    # execl("/bin/bash", "/bin/bash", *args.command_args)
-    # execl(executable, "/", *args.command_args)
-    # execl(executable, "{} -S".format(executable), "manage.py", "runserver")
-    # execl("{} -S".format(executable), executable, "manage.py", "runserver")
-    # execl("/bin/bash", "manage.py", "runserver")
-    # execl(executable, "-S", executable, *args.command_args)
-    # execl(executable, executable, "-S", *args.command_args)
-    # execl(executable, "-S", executable, "-S", *args.command_args)
-
-    # execl(executable, *args.command_args)
