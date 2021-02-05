@@ -107,6 +107,6 @@ else:
 print(environ["PYTHONPATH"])
 
 print()
-environ["PYTHONPATH"] = sub(r"{}{}?".format(dirname(abspath(__file__)), pathsep), "", environ["PYTHONPATH"])
+# environ["PYTHONPATH"] = sub(r"{}{}?".format(dirname(abspath(__file__)), pathsep), "", environ["PYTHONPATH"])
 print()
 print(environ["PYTHONPATH"])
