@@ -14,9 +14,11 @@
 
 print("start of sitecustomize")
 import sys
+from re import sub
 from logging import getLogger
-from os import environ, path
+from os import environ, path, pathsep
 
+from os.path import dirname, abspath
 from pkg_resources import iter_entry_points
 
 from opentelemetry.environment_variables import (
@@ -80,15 +82,9 @@ def _load_configurators():
 
 def initialize():
     try:
-        print("load_distros_in")
         _load_distros()
-        print("load_distros_out")
-        print("load_configurators_in")
         _load_configurators()
-        print("load_configurators_out")
-        print("load_instrumentors_in")
         _load_instrumentors()
-        print("load_instrumentors_out")
     except Exception:  # pylint: disable=broad-except
         # logger.exception("Failed to auto initialize opentelemetry")
         raise
@@ -108,5 +104,11 @@ if (
 
 
 else:
-    print("before initialize")
     initialize()
+
+print(environ["PYTHONPATH"])
+
+print()
+environ["PYTHONPATH"] = sub(r"{}{}?".format(dirname(abspath(__file__)), pathsep), "", environ["PYTHONPATH"])
+print()
+print(environ["PYTHONPATH"])
