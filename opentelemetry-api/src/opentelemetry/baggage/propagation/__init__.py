@@ -29,11 +29,11 @@ class W3CBaggagePropagator(textmap.TextMapPropagator):
     _MAX_PAIRS = 180
     _BAGGAGE_HEADER_NAME = "baggage"
 
-    def extract(
+    def _extract(
         self,
         carrier: textmap.CarrierT,
+        getter: textmap.Getter[textmap.CarrierT],
         context: typing.Optional[Context] = None,
-        getter: textmap.Getter = textmap.default_getter,
     ) -> Context:
         """Extract Baggage from the carrier.
 
@@ -71,11 +71,11 @@ class W3CBaggagePropagator(textmap.TextMapPropagator):
 
         return context
 
-    def inject(
+    def _inject(
         self,
         carrier: textmap.CarrierT,
+        setter: textmap.Setter[textmap.CarrierT],
         context: typing.Optional[Context] = None,
-        setter: textmap.Setter = textmap.default_setter,
     ) -> None:
         """Injects Baggage into the carrier.
 

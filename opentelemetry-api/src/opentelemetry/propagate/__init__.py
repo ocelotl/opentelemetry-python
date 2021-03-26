@@ -81,10 +81,30 @@ from opentelemetry.propagators import composite, textmap
 logger = getLogger(__name__)
 
 
+@typing.overload
 def extract(
     carrier: textmap.CarrierT,
+    getter: textmap.DefaultGetter = textmap.default_getter,
     context: typing.Optional[Context] = None,
-    getter: textmap.Getter = textmap.default_getter,
+) -> Context:
+    ...
+
+
+@typing.overload
+def extract(
+    carrier: textmap.CarrierT,
+    getter: textmap.Getter[textmap.CarrierT],
+    context: typing.Optional[Context] = None,
+) -> Context:
+    ...
+
+
+def extract(
+    carrier: textmap.CarrierT,
+    getter: typing.Union[
+        textmap.Getter[textmap.CarrierT], textmap.DefaultGetter
+    ] = textmap.default_getter,
+    context: typing.Optional[Context] = None,
 ) -> Context:
     """Uses the configured propagator to extract a Context from the carrier.
 
@@ -99,13 +119,35 @@ def extract(
         context: an optional Context to use. Defaults to current
             context if not set.
     """
-    return get_global_textmap().extract(carrier, context, getter=getter)
+    return get_global_textmap().extract(  # type: ignore
+        carrier, getter=getter, context=context
+    )
+
+
+@typing.overload
+def inject(
+    carrier: typing.MutableMapping[str, textmap.CarrierValT],
+    setter: textmap.DefaultSetter = textmap.default_setter,
+    context: typing.Optional[Context] = None,
+) -> None:
+    ...
+
+
+@typing.overload
+def inject(
+    carrier: textmap.CarrierT,
+    setter: textmap.Setter[textmap.CarrierT],
+    context: typing.Optional[Context] = None,
+) -> None:
+    ...
 
 
 def inject(
     carrier: textmap.CarrierT,
+    setter: typing.Union[
+        textmap.Setter[textmap.CarrierT], textmap.DefaultSetter
+    ] = textmap.default_setter,
     context: typing.Optional[Context] = None,
-    setter: textmap.Setter = textmap.default_setter,
 ) -> None:
     """Uses the configured propagator to inject a Context into the carrier.
 
@@ -118,7 +160,9 @@ def inject(
         setter: An optional `Setter` object that can set values
             on the carrier.
     """
-    get_global_textmap().inject(carrier, context=context, setter=setter)
+    get_global_textmap().inject(  # type: ignore
+        carrier, setter=setter, context=context,
+    )
 
 
 try:

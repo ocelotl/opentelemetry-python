@@ -22,8 +22,6 @@ from opentelemetry.propagators.textmap import (
     Getter,
     Setter,
     TextMapPropagator,
-    default_getter,
-    default_setter,
 )
 from opentelemetry.trace import format_span_id, format_trace_id
 
@@ -44,11 +42,11 @@ class B3Format(TextMapPropagator):
     _trace_id_regex = re_compile(r"[\da-fA-F]{16}|[\da-fA-F]{32}")
     _span_id_regex = re_compile(r"[\da-fA-F]{16}")
 
-    def extract(
+    def _extract(
         self,
         carrier: CarrierT,
+        getter: Getter[CarrierT],
         context: typing.Optional[Context] = None,
-        getter: Getter = default_getter,
     ) -> Context:
         trace_id = format_trace_id(trace.INVALID_TRACE_ID)
         span_id = format_span_id(trace.INVALID_SPAN_ID)
@@ -74,7 +72,7 @@ class B3Format(TextMapPropagator):
             elif len(fields) == 4:
                 trace_id, span_id, sampled, _ = fields
             else:
-                return trace.set_span_in_context(trace.INVALID_SPAN)
+                return trace.set_span_in_context(trace.INVALID_SPAN, context)
         else:
             trace_id = (
                 _extract_first_element(getter.get(carrier, self.TRACE_ID_KEY))
@@ -124,14 +122,15 @@ class B3Format(TextMapPropagator):
                     trace_flags=trace.TraceFlags(options),
                     trace_state=trace.TraceState(),
                 )
-            )
+            ),
+            context,
         )
 
-    def inject(
+    def _inject(
         self,
         carrier: CarrierT,
+        setter: Setter[CarrierT],
         context: typing.Optional[Context] = None,
-        setter: Setter = default_setter,
     ) -> None:
         span = trace.get_current_span(context=context)
 

@@ -21,8 +21,6 @@ from opentelemetry.propagators.textmap import (
     Getter,
     Setter,
     TextMapPropagator,
-    default_getter,
-    default_setter,
 )
 
 
@@ -33,19 +31,19 @@ class NOOPTextMapPropagator(TextMapPropagator):
     a SpanContext will always be present.
     """
 
-    def extract(
+    def _extract(
         self,
         carrier: CarrierT,
+        getter: Getter[CarrierT],
         context: typing.Optional[Context] = None,
-        getter: Getter = default_getter,
     ) -> Context:
         return get_current()
 
-    def inject(
+    def _inject(
         self,
         carrier: CarrierT,
+        setter: Setter[CarrierT],
         context: typing.Optional[Context] = None,
-        setter: Setter = default_setter,
     ) -> None:
         return None
 
@@ -60,11 +58,11 @@ class MockTextMapPropagator(TextMapPropagator):
     TRACE_ID_KEY = "mock-traceid"
     SPAN_ID_KEY = "mock-spanid"
 
-    def extract(
+    def _extract(
         self,
         carrier: CarrierT,
+        getter: Getter[CarrierT],
         context: typing.Optional[Context] = None,
-        getter: Getter = default_getter,
     ) -> Context:
         trace_id_list = getter.get(carrier, self.TRACE_ID_KEY)
         span_id_list = getter.get(carrier, self.SPAN_ID_KEY)
@@ -79,14 +77,15 @@ class MockTextMapPropagator(TextMapPropagator):
                     span_id=int(span_id_list[0]),
                     is_remote=True,
                 )
-            )
+            ),
+            context,
         )
 
-    def inject(
+    def _inject(
         self,
         carrier: CarrierT,
+        setter: Setter[CarrierT],
         context: typing.Optional[Context] = None,
-        setter: Setter = default_setter,
     ) -> None:
         span = trace.get_current_span(context)
         setter.set(

@@ -33,11 +33,11 @@ class TraceContextTextMapPropagator(textmap.TextMapPropagator):
     )
     _TRACEPARENT_HEADER_FORMAT_RE = re.compile(_TRACEPARENT_HEADER_FORMAT)
 
-    def extract(
+    def _extract(
         self,
         carrier: textmap.CarrierT,
+        getter: textmap.Getter[textmap.CarrierT],
         context: typing.Optional[Context] = None,
-        getter: textmap.Getter = textmap.default_getter,
     ) -> Context:
         """Extracts SpanContext from the carrier.
 
@@ -83,11 +83,11 @@ class TraceContextTextMapPropagator(textmap.TextMapPropagator):
             trace.NonRecordingSpan(span_context), context
         )
 
-    def inject(
+    def _inject(
         self,
         carrier: textmap.CarrierT,
+        setter: textmap.Setter[textmap.CarrierT],
         context: typing.Optional[Context] = None,
-        setter: textmap.Setter = textmap.default_setter,
     ) -> None:
         """Injects SpanContext into the carrier.
 
