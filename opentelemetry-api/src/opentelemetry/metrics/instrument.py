@@ -80,16 +80,9 @@ class Asynchronous(Instrument):
         self, name, callback, *args, unit="", description="", **kwargs
     ):
         super().__init__(name, *args, unit=unit, description="", **kwargs)
-        with self._lock:
-
-            if not isinstance(callback, GeneratorType):
-                _logger.error("callback must be a generator")
-
-            else:
-                super().__init__(
-                    name, unit=unit, description=description, *args, **kwargs
-                )
-                self._callback = callback
+        if not isinstance(callback, GeneratorType):
+            _logger.error("callback must be a generator")
+        self._callback = callback
 
     @property
     def callback(self):

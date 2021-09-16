@@ -17,41 +17,9 @@ from logging import WARNING
 from unittest import TestCase
 from unittest.mock import Mock
 
-from opentelemetry.metrics import Meter
+from opentelemetry.metrics import Meter, _DefaultMeterProvider
 
 # FIXME Test that the meter methods can be called concurrently safely.
-
-
-class ChildMeter(Meter):
-    def create_counter(self, name, unit="", description=""):
-        super().create_counter(name, unit=unit, description=description)
-
-    def create_up_down_counter(self, name, unit="", description=""):
-        super().create_up_down_counter(
-            name, unit=unit, description=description
-        )
-
-    def create_observable_counter(
-        self, name, callback, unit="", description=""
-    ):
-        super().create_observable_counter(
-            name, callback, unit=unit, description=description
-        )
-
-    def create_histogram(self, name, unit="", description=""):
-        super().create_histogram(name, unit=unit, description=description)
-
-    def create_observable_gauge(self, name, callback, unit="", description=""):
-        super().create_observable_gauge(
-            name, callback, unit=unit, description=description
-        )
-
-    def create_observable_up_down_counter(
-        self, name, callback, unit="", description=""
-    ):
-        super().create_observable_up_down_counter(
-            name, callback, unit=unit, description=description
-        )
 
 
 class TestMeter(TestCase):
@@ -112,7 +80,7 @@ class TestMeter(TestCase):
         registered under the same Meter using the same name.
         """
 
-        meter = ChildMeter("name")
+        meter = _DefaultMeterProvider().get_meter("name")
 
         meter.create_counter("name")
 
@@ -140,16 +108,22 @@ class TestMeter(TestCase):
         under different meters.
         """
 
-        meter_0 = ChildMeter("meter_0")
-        meter_1 = ChildMeter("meter_1")
+        def mock_generator():
+            yield Mock()
+
+        meter_provider = _DefaultMeterProvider()
+        meter_0 = meter_provider.get_meter("meter_0")
+        meter_1 = meter_provider.get_meter("meter_1")
 
         meter_0.create_counter("counter")
         meter_0.create_up_down_counter("up_down_counter")
-        meter_0.create_observable_counter("observable_counter", Mock())
+        meter_0.create_observable_counter(
+            "observable_counter", mock_generator()
+        )
         meter_0.create_histogram("histogram")
-        meter_0.create_observable_gauge("observable_gauge", Mock())
+        meter_0.create_observable_gauge("observable_gauge", mock_generator())
         meter_0.create_observable_up_down_counter(
-            "observable_up_down_counter", Mock()
+            "observable_up_down_counter", mock_generator()
         )
 
         with self.assertRaises(AssertionError):
@@ -162,7 +136,9 @@ class TestMeter(TestCase):
 
         with self.assertRaises(AssertionError):
             with self.assertLogs(level=WARNING):
-                meter_1.create_observable_counter("observable_counter", Mock())
+                meter_1.create_observable_counter(
+                    "observable_counter", mock_generator()
+                )
 
         with self.assertRaises(AssertionError):
             with self.assertLogs(level=WARNING):
@@ -170,10 +146,12 @@ class TestMeter(TestCase):
 
         with self.assertRaises(AssertionError):
             with self.assertLogs(level=WARNING):
-                meter_1.create_observable_gauge("observable_gauge", Mock())
+                meter_1.create_observable_gauge(
+                    "observable_gauge", mock_generator()
+                )
 
         with self.assertRaises(AssertionError):
             with self.assertLogs(level=WARNING):
                 meter_1.create_observable_up_down_counter(
-                    "observable_up_down_counter", Mock()
+                    "observable_up_down_counter", mock_generator()
                 )

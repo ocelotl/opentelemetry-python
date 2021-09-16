@@ -25,7 +25,7 @@ to generate metrics.
 from abc import ABC, abstractmethod
 from logging import getLogger
 from os import environ
-from threading import RLock
+from threading import Lock
 from typing import Optional, cast
 
 from opentelemetry.environment_variables import OTEL_PYTHON_METER_PROVIDER
@@ -51,7 +51,19 @@ _logger = getLogger(__name__)
 class MeterProvider(ABC):
     def __init__(self):
         super().__init__()
-        self._lock = RLock()
+        self._lock = Lock()
+
+    @staticmethod
+    def _validate_meter_name(name: str) -> bool:
+        """Check if a meter name is valid
+
+        Returns: if the name is valid
+        """
+
+        if name is None or name == "":
+            _logger.warning("Invalid name: %s", name)
+            return False
+        return True
 
     @abstractmethod
     def get_meter(
@@ -60,8 +72,7 @@ class MeterProvider(ABC):
         version=None,
         schema_url=None,
     ) -> "Meter":
-        if name is None or name == "":
-            _logger.warning("Invalid name: %s", name)
+        pass
 
 
 class _DefaultMeterProvider(MeterProvider):
@@ -71,14 +82,8 @@ class _DefaultMeterProvider(MeterProvider):
         version=None,
         schema_url=None,
     ) -> "Meter":
-        with self._lock:
-            super().get_meter(name, version=version, schema_url=schema_url)
-            # This is done in order to make it possible to store configuration
-            # in the meter provider and make it automatically accessible for
-            # any meter even after it changes.
-            meter = _DefaultMeter(name, version=version, schema_url=schema_url)
-            meter._meter_provider = self  # pylint: disable=protected-access
-            return meter
+        self._validate_meter_name(name)
+        return _DefaultMeter(name, version=version, schema_url=schema_url)
 
 
 class ProxyMeterProvider(MeterProvider):
@@ -99,75 +104,59 @@ class ProxyMeterProvider(MeterProvider):
 class Meter(ABC):
     def __init__(self, name, version=None, schema_url=None):
         super().__init__()
-        self._lock = RLock()
+        self._lock = Lock()
         self._name = name
         self._version = version
         self._schema_url = schema_url
         self._instrument_names = set()
         self._meter_provider = None
 
-    @property
-    def name(self):
-        with self._lock:
-            return self._name
+    def _secure_instrument_name(self, name):
+        """Secure the instrument name on this meter.
 
-    @property
-    def version(self):
-        with self._lock:
-            return self._version
+        Logs an error if the instrument name has already been used on this meter.
 
-    @property
-    def schema_url(self):
+        Returns: whether the instrument name was successfully secured
+        """
+        name = name.lower()
         with self._lock:
-            return self._schema_url
-
-    def _check_instrument_name(self, name):
-        with self._lock:
-            name = name.lower()
-
             if name in self._instrument_names:
                 _logger.error("Instrument name %s has been used already", name)
-
-            else:
-                self._instrument_names.add(name)
+                return False
+            self._instrument_names.add(name)
+        return True
 
     @abstractmethod
     def create_counter(self, name, unit="", description="") -> Counter:
-        with self._lock:
-            self._check_instrument_name(name)
+        pass
 
     @abstractmethod
     def create_up_down_counter(
         self, name, unit="", description=""
     ) -> UpDownCounter:
-        with self._lock:
-            self._check_instrument_name(name)
+        pass
 
     @abstractmethod
     def create_observable_counter(
         self, name, callback, unit="", description=""
     ) -> ObservableCounter:
-        with self._lock:
-            self._check_instrument_name(name)
+        pass
 
     @abstractmethod
     def create_histogram(self, name, unit="", description="") -> Histogram:
-        with self._lock:
-            self._check_instrument_name(name)
+        pass
 
     @abstractmethod
     def create_observable_gauge(
         self, name, callback, unit="", description=""
     ) -> ObservableGauge:
-        with self._lock:
-            self._check_instrument_name(name)
+        pass
 
     @abstractmethod
     def create_observable_up_down_counter(
         self, name, callback, unit="", description=""
     ) -> ObservableUpDownCounter:
-        with self._lock:
-            self._check_instrument_name(name)
+        pass
 
 
 class ProxyMeter(Meter):
@@ -195,100 +184,80 @@ class ProxyMeter(Meter):
                     self._version,
                 )
                 return self._real_meter
-            return self._noop_meter
+
+        return self._noop_meter
 
     def create_counter(self, *args, **kwargs) -> Counter:
-        with self._lock:
-            return self._meter.create_counter(*args, **kwargs)
+        return self._meter.create_counter(*args, **kwargs)
 
     def create_up_down_counter(self, *args, **kwargs) -> UpDownCounter:
-        with self._lock:
-            return self._meter.create_up_down_counter(*args, **kwargs)
+        return self._meter.create_up_down_counter(*args, **kwargs)
 
     def create_observable_counter(self, *args, **kwargs) -> ObservableCounter:
-        with self._lock:
-            return self._meter.create_observable_counter(*args, **kwargs)
+        return self._meter.create_observable_counter(*args, **kwargs)
 
     def create_histogram(self, *args, **kwargs) -> Histogram:
-        with self._lock:
-            return self._meter.create_histogram(*args, **kwargs)
+        return self._meter.create_histogram(*args, **kwargs)
 
     def create_observable_gauge(self, *args, **kwargs) -> ObservableGauge:
-        with self._lock:
-            return self._meter.create_observable_gauge(*args, **kwargs)
+        return self._meter.create_observable_gauge(*args, **kwargs)
 
     def create_observable_up_down_counter(
         self, *args, **kwargs
     ) -> ObservableUpDownCounter:
-        with self._lock:
-            return self._meter.create_observable_up_down_counter(
-                *args, **kwargs
-            )
+        return self._meter.create_observable_up_down_counter(*args, **kwargs)
 
 
 class _DefaultMeter(Meter):
+    def __init__(self, name, version=None, schema_url=None):
+        super().__init__(name, version=version, schema_url=schema_url)
+
     def create_counter(self, name, unit="", description="") -> Counter:
-        with self._lock:
-            super().create_counter(name, unit=unit, description=description)
-            return DefaultCounter(name, unit=unit, description=description)
+        self._secure_instrument_name(name)
+        return DefaultCounter(name, unit=unit, description=description)
 
     def create_up_down_counter(
         self, name, unit="", description=""
     ) -> UpDownCounter:
-        with self._lock:
-            super().create_up_down_counter(
-                name, unit=unit, description=description
-            )
-            return DefaultUpDownCounter(
-                name, unit=unit, description=description
-            )
+        self._secure_instrument_name(name)
+        return DefaultUpDownCounter(name, unit=unit, description=description)
 
     def create_observable_counter(
         self, name, callback, unit="", description=""
     ) -> ObservableCounter:
-        with self._lock:
-            super().create_observable_counter(
-                name, callback, unit=unit, description=description
-            )
-            return DefaultObservableCounter(
-                name,
-                callback,
-                unit=unit,
-                description=description,
-            )
+        self._secure_instrument_name(name)
+        return DefaultObservableCounter(
+            name,
+            callback,
+            unit=unit,
+            description=description,
+        )
 
     def create_histogram(self, name, unit="", description="") -> Histogram:
-        with self._lock:
-            super().create_histogram(name, unit=unit, description=description)
-            return DefaultHistogram(name, unit=unit, description=description)
+        self._secure_instrument_name(name)
+        return DefaultHistogram(name, unit=unit, description=description)
 
     def create_observable_gauge(
         self, name, callback, unit="", description=""
     ) -> ObservableGauge:
-        with self._lock:
-            super().create_observable_gauge(
-                name, callback, unit=unit, description=description
-            )
-            return DefaultObservableGauge(
-                name,
-                callback,
-                unit=unit,
-                description=description,
-            )
+        self._secure_instrument_name(name)
+        return DefaultObservableGauge(
+            name,
+            callback,
+            unit=unit,
+            description=description,
+        )
 
     def create_observable_up_down_counter(
         self, name, callback, unit="", description=""
     ) -> ObservableUpDownCounter:
-        with self._lock:
-            super().create_observable_up_down_counter(
-                name, callback, unit=unit, description=description
-            )
-            return DefaultObservableUpDownCounter(
-                name,
-                callback,
-                unit=unit,
-                description=description,
-            )
+        self._secure_instrument_name(name)
+        return DefaultObservableUpDownCounter(
+            name,
+            callback,
+            unit=unit,
+            description=description,
+        )
 
 
 _METER_PROVIDER = None
