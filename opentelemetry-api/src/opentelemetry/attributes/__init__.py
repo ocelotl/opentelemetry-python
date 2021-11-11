@@ -20,6 +20,7 @@ from collections.abc import MutableMapping
 from typing import Optional, Sequence, Union
 
 from opentelemetry.util import types
+from opentelemetry._safety import _safe_function
 
 # bytes are accepted as a user supplied value for attributes but
 # decoded to strings internally.
@@ -130,6 +131,7 @@ class BoundedAttributes(MutableMapping):
     added.
     """
 
+    @_safe_function(None)
     def __init__(
         self,
         maxlen: Optional[int] = None,
@@ -152,14 +154,17 @@ class BoundedAttributes(MutableMapping):
                 self[key] = value
         self._immutable = immutable
 
+    @_safe_function("")
     def __repr__(self):
         return (
             f"{type(self).__name__}({dict(self._dict)}, maxlen={self.maxlen})"
         )
 
+    @_safe_function(None)
     def __getitem__(self, key):
         return self._dict[key]
 
+    @_safe_function(None)
     def __setitem__(self, key, value):
         if getattr(self, "_immutable", False):
             raise TypeError
@@ -193,5 +198,6 @@ class BoundedAttributes(MutableMapping):
     def __len__(self):
         return len(self._dict)
 
+    @_safe_function()
     def copy(self):
         return self._dict.copy()
