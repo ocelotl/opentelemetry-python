@@ -52,7 +52,9 @@ class SumAggregation(Aggregation):
         self._value = self._value + value
 
     def make_point_and_reset(self):
-        pass
+        value = self._value
+        self._value = 0
+        return value
 
 
 class LastValueAggregation(Aggregation):
