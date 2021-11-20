@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from opentelemetry.sdk._metrics.temporality import Temporality
+
 class MetricReader:
 
-    def __init__(self, temporality=)
+    def __init__(self, temporality=Temporality.CUMULATIVE):
+
+        self._shutdown = False
