@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Add exponential histogram
+  ([#2964](https://github.com/open-telemetry/opentelemetry-python/pull/2964))
+
 ## Version 1.14.0/0.35b0 (2022-11-04)
 
 - Add logarithm and exponent mappings
