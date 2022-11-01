@@ -60,6 +60,7 @@ from opentelemetry.sdk.metrics.export import (
     ResourceMetrics,
     ScopeMetrics,
     Sum,
+    ExponentialHistogram
 )
 
 _logger = getLogger(__name__)
@@ -266,7 +267,32 @@ class OTLPMetricExporter(
                                 metric.data.is_monotonic
                             )
                             pb2_metric.sum.data_points.append(pt)
+
+                    elif isinstance(metric.data, ExponentialHistogram):
+                        for data_point in metric.data.data_points:
+                            pt = pb2.ExponentialHistogramDataPoint(
+                                attributes=self._translate_attributes(
+                                    data_point.attributes
+                                ),
+                                time_unix_nano=data_point.time_unix_nano,
+                                start_time_unix_nano=(
+                                    data_point.start_time_unix_nano
+                                ),
+                                count=data_point.count,
+                                sum=data_point.sum,
+                                positive=data_point.positive,
+                                negative=data_point.negative,
+                                flags=data_point.flags,
+                                max=data_point.max,
+                                min=data_point.min,
+                            )
+                            pb2_metric.histogram.aggregation_temporality = (
+                                metric.data.aggregation_temporality
+                            )
+                            pb2_metric.histogram.data_points.append(pt)
+
                     else:
+                        [data_point for data_point in metric.data.data_points]
                         _logger.warning(
                             "unsupported data type %s",
                             metric.data.__class__.__name__,

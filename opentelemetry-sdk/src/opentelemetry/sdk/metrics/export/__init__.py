@@ -37,6 +37,8 @@ from opentelemetry.sdk.metrics._internal.point import (  # noqa: F401
     ResourceMetrics,
     ScopeMetrics,
     Sum,
+    ExponentialHistogram,
+    ExponentialHistogramDataPoint
 )
 
 __all__ = []
