@@ -947,10 +947,7 @@ class DefaultAggregation(Aggregation):
             )
 
         if isinstance(instrument, Histogram):
-            # return _ExplicitBucketHistogramAggregation(
-            #     attributes, start_time_unix_nano
-            # )
-            return _ExponentialBucketHistogramAggregation(
+            return _ExplicitBucketHistogramAggregation(
                 attributes, start_time_unix_nano
             )
 

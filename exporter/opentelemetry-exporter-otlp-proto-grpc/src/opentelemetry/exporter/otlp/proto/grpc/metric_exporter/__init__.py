@@ -280,16 +280,24 @@ class OTLPMetricExporter(
                                 ),
                                 count=data_point.count,
                                 sum=data_point.sum,
-                                positive=data_point.positive,
-                                negative=data_point.negative,
+                                positive=pb2.ExponentialHistogramDataPoint.Buckets(
+                                    offset=data_point.positive.offset(),
+                                    bucket_counts=data_point.positive.bucket_counts
+                                ),
+                                negative=pb2.ExponentialHistogramDataPoint.Buckets(
+                                    offset=data_point.negative.offset(),
+                                    bucket_counts=data_point.negative.bucket_counts
+                                ),
+                                # positive=data_point.positive,
+                                # negative=data_point.negative,
                                 flags=data_point.flags,
                                 max=data_point.max,
                                 min=data_point.min,
                             )
-                            pb2_metric.histogram.aggregation_temporality = (
+                            pb2_metric.exponential_histogram.aggregation_temporality = (
                                 metric.data.aggregation_temporality
                             )
-                            pb2_metric.histogram.data_points.append(pt)
+                            pb2_metric.exponential_histogram.data_points.append(pt)
 
                     else:
                         [data_point for data_point in metric.data.data_points]
