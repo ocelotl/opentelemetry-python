@@ -38,6 +38,7 @@ from opentelemetry.sdk.metrics._internal.aggregation import (
 from opentelemetry.sdk.metrics._internal.export import AggregationTemporality
 from opentelemetry.sdk.metrics._internal.measurement import Measurement
 from opentelemetry.sdk.metrics._internal.point import (
+    ExponentialHistogram,
     Gauge,
     Histogram,
     Metric,
@@ -45,7 +46,6 @@ from opentelemetry.sdk.metrics._internal.point import (
     ResourceMetrics,
     ScopeMetrics,
     Sum,
-    ExponentialHistogram
 )
 from opentelemetry.sdk.metrics._internal.sdk_configuration import (
     SdkConfiguration,
@@ -196,7 +196,7 @@ class MetricReaderStorage:
 
                     elif isinstance(
                         view_instrument_match._aggregation,
-                        _ExponentialBucketHistogramAggregation
+                        _ExponentialBucketHistogramAggregation,
                     ):
                         data = ExponentialHistogram(
                             data_points=view_instrument_match.collect(

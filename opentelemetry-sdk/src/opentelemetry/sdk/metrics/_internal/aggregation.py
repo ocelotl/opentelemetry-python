@@ -18,7 +18,7 @@ from enum import IntEnum
 from logging import getLogger
 from math import inf
 from threading import Lock
-from typing import Generic, List, Optional, Sequence, TypeVar, Tuple, Union
+from typing import Generic, List, Optional, Sequence, Tuple, TypeVar, Union
 
 from opentelemetry.metrics import (
     Asynchronous,
@@ -31,21 +31,21 @@ from opentelemetry.metrics import (
     Synchronous,
     UpDownCounter,
 )
+from opentelemetry.sdk.metrics._internal.exponential_histogram.buckets import (
+    Buckets,
+)
 from opentelemetry.sdk.metrics._internal.exponential_histogram.mapping.exponent_mapping import (
     ExponentMapping,
 )
 from opentelemetry.sdk.metrics._internal.exponential_histogram.mapping.logarithm_mapping import (
     LogarithmMapping,
 )
-from opentelemetry.sdk.metrics._internal.exponential_histogram.buckets import (
-    Buckets,
-)
+from opentelemetry.sdk.metrics._internal.measurement import Measurement
+from opentelemetry.sdk.metrics._internal.point import Buckets as BucketsPoint
 from opentelemetry.sdk.metrics._internal.point import (
     ExponentialHistogramDataPoint,
+    Gauge,
 )
-from opentelemetry.sdk.metrics._internal.point import Buckets as BucketsPoint
-from opentelemetry.sdk.metrics._internal.measurement import Measurement
-from opentelemetry.sdk.metrics._internal.point import Gauge
 from opentelemetry.sdk.metrics._internal.point import (
     Histogram as HistogramPoint,
 )

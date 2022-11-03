@@ -60,7 +60,7 @@ from opentelemetry.sdk.metrics.export import (
     ResourceMetrics,
     ScopeMetrics,
     Sum,
-    ExponentialHistogram
+    ExponentialHistogram,
 )
 
 _logger = getLogger(__name__)
@@ -282,11 +282,11 @@ class OTLPMetricExporter(
                                 sum=data_point.sum,
                                 positive=pb2.ExponentialHistogramDataPoint.Buckets(
                                     offset=data_point.positive.offset(),
-                                    bucket_counts=data_point.positive.bucket_counts
+                                    bucket_counts=data_point.positive.bucket_counts,
                                 ),
                                 negative=pb2.ExponentialHistogramDataPoint.Buckets(
                                     offset=data_point.negative.offset(),
-                                    bucket_counts=data_point.negative.bucket_counts
+                                    bucket_counts=data_point.negative.bucket_counts,
                                 ),
                                 # positive=data_point.positive,
                                 # negative=data_point.negative,
@@ -297,7 +297,9 @@ class OTLPMetricExporter(
                             pb2_metric.exponential_histogram.aggregation_temporality = (
                                 metric.data.aggregation_temporality
                             )
-                            pb2_metric.exponential_histogram.data_points.append(pt)
+                            pb2_metric.exponential_histogram.data_points.append(
+                                pt
+                            )
 
                     else:
                         [data_point for data_point in metric.data.data_points]

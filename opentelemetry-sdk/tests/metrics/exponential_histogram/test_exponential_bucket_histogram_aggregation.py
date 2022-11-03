@@ -20,7 +20,7 @@ from typing import Sequence
 from unittest import TestCase
 from unittest.mock import Mock
 
-from opentelemetry.sdk.metrics._internal.exponential_histogram.aggregation import (
+from opentelemetry.sdk.metrics._internal.aggregation import (
     _ExponentialBucketHistogramAggregation,
 )
 from opentelemetry.sdk.metrics._internal.exponential_histogram.buckets import (
