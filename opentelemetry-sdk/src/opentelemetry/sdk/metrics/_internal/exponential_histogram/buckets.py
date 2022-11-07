@@ -15,16 +15,15 @@
 from abc import ABC, abstractmethod
 
 
-class BucketsBacking(ABC):
+class Backing(ABC):
     @abstractmethod
     def size(self) -> int:
         """
-        Returns the physical size of the backing array, which is
-        >= buckets.Len() the number allocated.
+        Returns the physical size of
         """
 
     @abstractmethod
-    def grow_to(
+    def grow(
         self, new_size: int, old_positive_limit: int, new_positive_limit: int
     ) -> None:
         """
@@ -63,7 +62,7 @@ class BucketsBacking(ABC):
         """
 
 
-class BucketsVarWidth(BucketsBacking):
+class VariableWidthBacking(Backing):
     def __init__(self):
 
         self._counts = [0]
@@ -75,16 +74,13 @@ class BucketsVarWidth(BucketsBacking):
         """
         return len(self._counts)
 
-    def grow_to(
+    def grow(
         self, new_size: int, old_positive_limit: int, new_positive_limit: int
     ) -> None:
         """
         Grows the backing array into a new size and copies old entries into
         their correct new positions.
         """
-        # FIXME this follows Go implementation maybe too closely. Since we
-        # don't need to request memory for a larger list, maybe this can be
-        # implemented in a more pythonical way.
         tmp = [0] * new_size
         tmp[new_positive_limit:] = self._counts[old_positive_limit:]
         tmp[0:old_positive_limit] = self._counts[0:old_positive_limit]
@@ -132,7 +128,7 @@ class BucketsVarWidth(BucketsBacking):
 
 class Buckets:
     def __init__(self):
-        self._backing = BucketsVarWidth()
+        self._backing = VariableWidthBacking()
 
         # The term "index" refers to the number of the
         # histogram bucket used to determine its boundaries.

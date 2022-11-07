@@ -364,13 +364,15 @@ class _ExplicitBucketHistogramAggregation(_Aggregation[HistogramPoint]):
 
 # pylint: disable=protected-access
 class _ExponentialBucketHistogramAggregation(_Aggregation[HistogramPoint]):
-    # min_max_size is the smallest reasonable configuration, which is small
-    # enough to contain the entire normal floating point range at min
-    # scale.
+    # _min_max_size and _max_max_size are the smallest and largest values
+    # the max_size parameter may have, respectively.
+
+    # _min_max_size is is the smallest reasonable value which is small enough
+    # to contain the entire normal floating point range at the minimum scale.
     _min_max_size = 2
 
-    # max_max_size is an arbitrary limit meant to limit accidental use of
-    # giant histograms.
+    # _max_max_size is an arbitrary limit meant to limit accidental creation of
+    # giant exponential bucket histograms.
     _max_max_size = 16384
 
     def __init__(
@@ -384,9 +386,8 @@ class _ExponentialBucketHistogramAggregation(_Aggregation[HistogramPoint]):
         max_size: int = 160,
     ):
         super().__init__(attributes)
-        # maxSize is the maximum capacity of the positive and negative ranges.
-        # it is set by Init(), preserved by Copy and Move.)
-
+        # max_size is the maximum capacity of the positive and negative
+        # buckets.
         if max_size < self._min_max_size:
             raise Exception("size {max_size} is smaller than {min_max_size}")
 
@@ -395,32 +396,32 @@ class _ExponentialBucketHistogramAggregation(_Aggregation[HistogramPoint]):
 
         self._max_size = max_size
 
-        # _sum is the sum of all calls to aggregate reflected in the
-        # aggregator.
+        # _sum is the sum of all the values aggregated by this aggregator.
         self._sum = 0
 
-        # count is incremented by 1 per call to aggregate.
+        # _count is the count of all calls to aggregate.
         self._count = 0
 
-        # zero_count is incremented by 1 when the measured value is exactly 0.
+        # _zero_count is the count of all the calls to aggregate when the value
+        # to be aggregated is exactly 0.
         self._zero_count = 0
 
-        # _min is set when count > 0
-        self._min = 0
+        # _min is the smallest value aggregated by this aggregator.
+        self._min = inf
 
-        # _max is set when count > 0
-        self._max = 0
+        # _max is the smallest value aggregated by this aggregator.
+        self._max = -inf
 
-        # _positive holds the positive values
+        # _positive holds the positive values.
         self._positive = Buckets()
 
-        # _negative holds the negative values by their absolute value
+        # _negative holds the negative values by their absolute value.
         self._negative = Buckets()
 
-        # _mapping corresponds to the current scale, is shared by both positive
-        # and negative ranges.
-
+        # _mapping corresponds to the current scale, is shared by both the
+        # positive and negative buckets.
         self._mapping = LogarithmMapping(LogarithmMapping._max_scale)
+
         self._instrument_temporality = AggregationTemporality.DELTA
         self._start_time_unix_nano = start_time_unix_nano
 
@@ -763,7 +764,7 @@ class _ExponentialBucketHistogramAggregation(_Aggregation[HistogramPoint]):
             new_size = self._max_size
 
         new_positive_limit = new_size - bias
-        buckets._backing.grow_to(
+        buckets._backing.grow(
             new_size, old_positive_limit, new_positive_limit
         )
 

@@ -302,7 +302,6 @@ class OTLPMetricExporter(
                             )
 
                     else:
-                        [data_point for data_point in metric.data.data_points]
                         _logger.warning(
                             "unsupported data type %s",
                             metric.data.__class__.__name__,
