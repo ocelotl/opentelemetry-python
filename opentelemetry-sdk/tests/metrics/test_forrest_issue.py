@@ -48,3 +48,6 @@ def test_forrest_issue():
         counter.add(1)
 
         exporter.export(reader.get_metrics_data())
+
+    counter.add(1.1)
+    exporter.export(reader.get_metrics_data())
