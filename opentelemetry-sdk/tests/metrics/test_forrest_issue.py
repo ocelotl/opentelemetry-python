@@ -15,7 +15,7 @@
 from opentelemetry.metrics import get_meter_provider, set_meter_provider
 from opentelemetry.sdk.metrics import Counter, MeterProvider
 from opentelemetry.sdk.metrics.export import (
-    ConsoleMetricExporter, InMemoryMetricReader
+    ConsoleMetricExporter, InMemoryMetricReader, AggregationTemporality
 )
 from opentelemetry.sdk.metrics.view import SumAggregation
 
@@ -29,7 +29,9 @@ def test_forrest_issue():
 
     # The PeriodicExportingMetricReader takes the preferred aggregation
     # from the passed in exporter
-    reader = InMemoryMetricReader()
+    reader = InMemoryMetricReader(
+        preferred_temporality={Counter: AggregationTemporality.DELTA}
+    )
 
     # Every x amount of time MetricReaderStorage.collect is called.
 
@@ -44,10 +46,13 @@ def test_forrest_issue():
     # in which it's value would be determined by a cumulative sum.
     # In this example, the counter is configured with the LastValueAggregation,
     # which will only hold the most recent value.
-    for _ in range(3):
-        counter.add(1)
+    for x in [2, 3, 9]:
+        counter.add(x)
 
         exporter.export(reader.get_metrics_data())
 
-    counter.add(1.1)
+    counter.add(10.7)
+    exporter.export(reader.get_metrics_data())
+
+    counter.add(18)
     exporter.export(reader.get_metrics_data())
