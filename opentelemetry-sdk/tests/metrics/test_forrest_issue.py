@@ -40,7 +40,7 @@ def test_forrest_issue():
         export_interval_millis=5_000,
     )
 
-    set_trace()
+    # Every x amount of time MetricReaderStorage.collect is called.
 
     provider = MeterProvider(metric_readers=[reader])
     set_meter_provider(provider)
@@ -55,4 +55,6 @@ def test_forrest_issue():
     # which will only hold the most recent value.
     for x in range(10):
         counter.add(x)
-        time.sleep(2.0)
+        time.sleep(0)
+
+    set_trace()

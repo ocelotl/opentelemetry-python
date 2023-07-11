@@ -317,12 +317,17 @@ class MetricReader(ABC):
         detailing the individual errors that caused this function to fail.
         """
         if self._collect is None:
+            _logger.warning(
+                "Cannot call collect on a MetricReader until it is registered on a MeterProvider"
+            )
             return
 
-        self._receive_metrics(
-            self._collect(self, timeout_millis=timeout_millis),
-            timeout_millis=timeout_millis,
-        )
+        data = self._collect(self, timeout_millis=timeout_millis)
+
+        from ipdb import set_trace
+        set_trace()
+
+        self._receive_metrics(data, timeout_millis=timeout_millis)
 
     @final
     def _set_collect_callback(
