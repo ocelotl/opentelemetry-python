@@ -22,18 +22,13 @@ from opentelemetry.sdk.metrics.view import SumAggregation
 
 def test_forrest_issue():
 
-    # Use console exporter for the example
     exporter = ConsoleMetricExporter(
         preferred_aggregation={Counter: SumAggregation()}
     )
 
-    # The PeriodicExportingMetricReader takes the preferred aggregation
-    # from the passed in exporter
     reader = InMemoryMetricReader(
         preferred_temporality={Counter: AggregationTemporality.DELTA}
     )
-
-    # Every x amount of time MetricReaderStorage.collect is called.
 
     provider = MeterProvider(metric_readers=[reader])
     set_meter_provider(provider)
@@ -42,10 +37,6 @@ def test_forrest_issue():
 
     counter = meter.create_counter("my-counter")
 
-    # A counter normally would have an aggregation type of SumAggregation,
-    # in which it's value would be determined by a cumulative sum.
-    # In this example, the counter is configured with the LastValueAggregation,
-    # which will only hold the most recent value.
     for x in [2, 3, 9]:
         counter.add(x)
 
@@ -55,4 +46,9 @@ def test_forrest_issue():
     exporter.export(reader.get_metrics_data())
 
     counter.add(18)
+    exporter.export(reader.get_metrics_data())
+
+    counter.add(21)
+    counter.add(22)
+
     exporter.export(reader.get_metrics_data())
