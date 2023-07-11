@@ -317,9 +317,6 @@ class MetricReader(ABC):
         detailing the individual errors that caused this function to fail.
         """
         if self._collect is None:
-            _logger.warning(
-                "Cannot call collect on a MetricReader until it is registered on a MeterProvider"
-            )
             return
 
         self._receive_metrics(
