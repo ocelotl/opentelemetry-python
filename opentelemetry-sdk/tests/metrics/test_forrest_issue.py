@@ -12,33 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
-from ipdb import set_trace
-
 from opentelemetry.metrics import get_meter_provider, set_meter_provider
 from opentelemetry.sdk.metrics import Counter, MeterProvider
 from opentelemetry.sdk.metrics.export import (
-    ConsoleMetricExporter,
-    PeriodicExportingMetricReader,
+    ConsoleMetricExporter, InMemoryMetricReader
 )
-from opentelemetry.sdk.metrics.view import LastValueAggregation
+from opentelemetry.sdk.metrics.view import SumAggregation
 
 
 def test_forrest_issue():
 
-    aggregation_last_value = {Counter: LastValueAggregation()}
-
     # Use console exporter for the example
     exporter = ConsoleMetricExporter(
-        preferred_aggregation=aggregation_last_value,
+        preferred_aggregation={Counter: SumAggregation()}
     )
 
     # The PeriodicExportingMetricReader takes the preferred aggregation
     # from the passed in exporter
-    reader = PeriodicExportingMetricReader(
-        exporter,
-        export_interval_millis=5_000,
-    )
+    reader = InMemoryMetricReader()
 
     # Every x amount of time MetricReaderStorage.collect is called.
 
@@ -53,8 +44,7 @@ def test_forrest_issue():
     # in which it's value would be determined by a cumulative sum.
     # In this example, the counter is configured with the LastValueAggregation,
     # which will only hold the most recent value.
-    for x in range(10):
-        counter.add(x)
-        time.sleep(0)
+    for _ in range(3):
+        counter.add(1)
 
-    set_trace()
+        exporter.export(reader.get_metrics_data())

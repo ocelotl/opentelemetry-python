@@ -324,9 +324,6 @@ class MetricReader(ABC):
 
         data = self._collect(self, timeout_millis=timeout_millis)
 
-        from ipdb import set_trace
-        set_trace()
-
         self._receive_metrics(data, timeout_millis=timeout_millis)
 
     @final

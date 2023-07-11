@@ -132,10 +132,6 @@ class MetricReaderStorage:
         # streams produced by the SDK, but we still align the output timestamps
         # for a single instrument.
 
-        print("MetricReaderStorage.collect")
-
-        from ipdb import set_trace
-
         collection_start_nanos = time_ns()
 
         with self._lock:
@@ -156,7 +152,6 @@ class MetricReaderStorage:
 
                 for view_instrument_match in view_instrument_matches:
 
-                    set_trace()
                     if isinstance(
                         # pylint: disable=protected-access
                         view_instrument_match._aggregation,
