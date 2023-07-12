@@ -12,10 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from time import sleep
 from opentelemetry.metrics import get_meter_provider, set_meter_provider
 from opentelemetry.sdk.metrics import Counter, MeterProvider
 from opentelemetry.sdk.metrics.export import (
-    ConsoleMetricExporter, InMemoryMetricReader, AggregationTemporality
+    ConsoleMetricExporter,
+    PeriodicExportingMetricReader,
+    AggregationTemporality
 )
 from opentelemetry.sdk.metrics.view import SumAggregation
 
@@ -23,11 +26,12 @@ from opentelemetry.sdk.metrics.view import SumAggregation
 def test_forrest_issue():
 
     exporter = ConsoleMetricExporter(
-        preferred_aggregation={Counter: SumAggregation()}
+        preferred_aggregation={Counter: SumAggregation()},
+        preferred_temporality={Counter: AggregationTemporality.DELTA}
     )
 
-    reader = InMemoryMetricReader(
-        preferred_temporality={Counter: AggregationTemporality.DELTA}
+    reader = PeriodicExportingMetricReader(
+        exporter, export_interval_millis=15000
     )
 
     provider = MeterProvider(metric_readers=[reader])
@@ -38,17 +42,12 @@ def test_forrest_issue():
     counter = meter.create_counter("my-counter")
 
     for x in [2, 3, 9]:
+        sleep(60)
         counter.add(x)
 
-        exporter.export(reader.get_metrics_data())
-
     counter.add(10.7)
-    exporter.export(reader.get_metrics_data())
 
     counter.add(18)
-    exporter.export(reader.get_metrics_data())
 
     counter.add(21)
     counter.add(22)
-
-    exporter.export(reader.get_metrics_data())
