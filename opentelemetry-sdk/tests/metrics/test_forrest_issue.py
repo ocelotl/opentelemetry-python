@@ -41,7 +41,7 @@ def test_forrest_issue():
     )
 
     reader = PeriodicExportingMetricReader(
-        exporter, export_interval_millis=1000
+        exporter, export_interval_millis=5000
     )
 
     provider = MeterProvider(metric_readers=[reader])
@@ -55,4 +55,4 @@ def test_forrest_issue():
 
     )
 
-    sleep(5)
+    sleep(25)
