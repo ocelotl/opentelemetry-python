@@ -40,6 +40,7 @@ class _ViewInstrumentMatch:
         instrument: Instrument,
         instrument_class_aggregation: Dict[type, Aggregation],
     ):
+        self._zero_time = time_ns()
         self._start_time_unix_nano = time_ns()
         self._view = view
         self._instrument = instrument

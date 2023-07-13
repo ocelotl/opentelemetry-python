@@ -13,7 +13,10 @@
 # limitations under the License.
 
 from time import sleep
-from opentelemetry.metrics import get_meter_provider, set_meter_provider
+from itertools import count
+from opentelemetry.metrics import (
+    get_meter_provider, set_meter_provider, Observation
+)
 from opentelemetry.sdk.metrics import Counter, MeterProvider
 from opentelemetry.sdk.metrics.export import (
     ConsoleMetricExporter,
@@ -21,6 +24,13 @@ from opentelemetry.sdk.metrics.export import (
     AggregationTemporality
 )
 from opentelemetry.sdk.metrics.view import SumAggregation
+
+network_bytes_generator = count(start=8, step=8)
+
+
+def network_bytes_counter_callback(callback_options):
+
+    yield Observation(next(network_bytes_generator))
 
 
 def test_forrest_issue():
@@ -31,7 +41,7 @@ def test_forrest_issue():
     )
 
     reader = PeriodicExportingMetricReader(
-        exporter, export_interval_millis=15000
+        exporter, export_interval_millis=1000
     )
 
     provider = MeterProvider(metric_readers=[reader])
@@ -39,15 +49,10 @@ def test_forrest_issue():
 
     meter = get_meter_provider().get_meter("preferred-aggregation", "0.1.2")
 
-    counter = meter.create_counter("my-counter")
+    meter.create_observable_counter(
+        "network_bytes_counter",
+        [network_bytes_counter_callback]
 
-    for x in [2, 3, 9]:
-        sleep(60)
-        counter.add(x)
+    )
 
-    counter.add(10.7)
-
-    counter.add(18)
-
-    counter.add(21)
-    counter.add(22)
+    sleep(5)
