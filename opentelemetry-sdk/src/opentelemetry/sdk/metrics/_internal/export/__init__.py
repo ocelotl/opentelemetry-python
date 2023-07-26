@@ -322,9 +322,10 @@ class MetricReader(ABC):
             )
             return
 
-        data = self._collect(self, timeout_millis=timeout_millis)
-
-        self._receive_metrics(data, timeout_millis=timeout_millis)
+        self._receive_metrics(
+            self._collect(self, timeout_millis=timeout_millis),
+            timeout_millis=timeout_millis,
+        )
 
     @final
     def _set_collect_callback(

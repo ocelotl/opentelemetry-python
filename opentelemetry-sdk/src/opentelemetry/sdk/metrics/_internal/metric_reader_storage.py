@@ -14,7 +14,7 @@
 
 from logging import getLogger
 from threading import RLock
-from time import time
+from time import time_ns
 from typing import Dict, List
 
 from opentelemetry.metrics import (
@@ -132,7 +132,7 @@ class MetricReaderStorage:
         # streams produced by the SDK, but we still align the output timestamps
         # for a single instrument.
 
-        collection_start_nanos = int(time())
+        collection_start_nanos = time_ns()
 
         with self._lock:
 
@@ -160,7 +160,7 @@ class MetricReaderStorage:
                         data = Sum(
                             aggregation_temporality=aggregation_temporality,
                             data_points=view_instrument_match.collect(
-                                aggregation_temporality, collection_start_nanos - view_instrument_match._zero_time_unix_nano
+                                aggregation_temporality, collection_start_nanos
                             ),
                             is_monotonic=isinstance(
                                 instrument, (Counter, ObservableCounter)
@@ -173,7 +173,7 @@ class MetricReaderStorage:
                     ):
                         data = Gauge(
                             data_points=view_instrument_match.collect(
-                                aggregation_temporality, collection_start_nanos - view_instrument_match._zero_time_unix_nano
+                                aggregation_temporality, collection_start_nanos
                             )
                         )
                     elif isinstance(
@@ -183,7 +183,7 @@ class MetricReaderStorage:
                     ):
                         data = Histogram(
                             data_points=view_instrument_match.collect(
-                                aggregation_temporality, collection_start_nanos - view_instrument_match._zero_time_unix_nano
+                                aggregation_temporality, collection_start_nanos
                             ),
                             aggregation_temporality=aggregation_temporality,
                         )
@@ -201,7 +201,7 @@ class MetricReaderStorage:
                     ):
                         data = ExponentialHistogram(
                             data_points=view_instrument_match.collect(
-                                aggregation_temporality, collection_start_nanos - view_instrument_match._zero_time_unix_nano
+                                aggregation_temporality, collection_start_nanos
                             ),
                             aggregation_temporality=aggregation_temporality,
                         )

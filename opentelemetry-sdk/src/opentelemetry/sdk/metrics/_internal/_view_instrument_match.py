@@ -15,7 +15,7 @@
 
 from logging import getLogger
 from threading import Lock
-from time import time
+from time import time_ns
 from typing import Dict, List, Sequence
 
 from opentelemetry.metrics import Instrument
@@ -40,8 +40,7 @@ class _ViewInstrumentMatch:
         instrument: Instrument,
         instrument_class_aggregation: Dict[type, Aggregation],
     ):
-        self._start_time_unix_nano = 0
-        self._zero_time_unix_nano = int(time())
+        self._start_time_unix_nano = time_ns()
         self._view = view
         self._instrument = instrument
         self._attributes_aggregation: Dict[frozenset, _Aggregation] = {}
