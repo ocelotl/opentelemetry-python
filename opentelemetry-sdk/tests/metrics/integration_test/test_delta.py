@@ -34,14 +34,8 @@ from opentelemetry.test.globals_test import reset_metrics_globals
 
 network_bytes_generator = count(start=8, step=8)
 
-counter = 0
-
 
 def observable_counter_callback(callback_options):
-
-    global counter
-
-    counter += 1
 
     yield Observation(next(network_bytes_generator))
 
