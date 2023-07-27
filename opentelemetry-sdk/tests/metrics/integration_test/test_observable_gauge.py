@@ -28,12 +28,13 @@ from opentelemetry.sdk.metrics.export import (
 )
 from opentelemetry.test.globals_test import reset_metrics_globals
 
-network_bytes_generator = count(start=8, step=8)
+
+eight_step_generator = count(start=8, step=8)
 
 
 def observable_gauge_callback(callback_options):
 
-    yield Observation(next(network_bytes_generator))
+    yield Observation(next(eight_step_generator))
 
 
 class TestDelta(TestCase):
@@ -64,3 +65,51 @@ class TestDelta(TestCase):
         sleep(1)
 
         provider.shutdown()
+
+    def test_observable_gauge_multiple(self):
+
+        even_generator = count(start=2, step=2)
+        odd_generator = count(start=1, step=2)
+
+        def even_callback(callback_options):
+            yield Observation(next(even_generator))
+
+        def odd_callback(callback_options):
+            yield Observation(next(odd_generator))
+
+        def setUp(self):
+            reset_metrics_globals()
+
+        def tearDown(self):
+            reset_metrics_globals()
+
+        exporter = ConsoleMetricExporter()
+
+        reader_even = PeriodicExportingMetricReader(
+            exporter, export_interval_millis=50
+        )
+        reader_odd = PeriodicExportingMetricReader(
+            exporter, export_interval_millis=100
+        )
+
+        provider_even = MeterProvider(metric_readers=[reader_even])
+        provider_odd = MeterProvider(metric_readers=[reader_odd])
+
+        meter_even = provider_even.get_meter(
+            "meter_even", "0.1.2"
+        )
+        meter_odd = provider_odd.get_meter(
+            "meter_odd", "0.1.2"
+        )
+
+        meter_even.create_observable_gauge(
+            "even_observable_gauge", [even_callback]
+        )
+        meter_odd.create_observable_gauge(
+            "odd_observable_gauge", [odd_callback]
+        )
+
+        sleep(1)
+
+        provider_even.shutdown()
+        provider_odd.shutdown()
