@@ -25,8 +25,5 @@ Werkzeug==3.0.3
 wrapt==1.15.0
 zipp==3.17.0
 -e opentelemetry-semantic-conventions
--e opentelemetry-proto
--e exporter/opentelemetry-exporter-otlp-proto-common
--e exporter/opentelemetry-exporter-otlp-proto-grpc
 -e opentelemetry-api
 -e opentelemetry-sdk
