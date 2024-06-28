@@ -27,6 +27,7 @@ from unittest import mock
 from unittest.mock import Mock, patch
 
 from opentelemetry import trace as trace_api
+from opentelemetry.attributes import BoundedAttributes
 from opentelemetry.context import Context
 from opentelemetry.sdk import resources, trace
 from opentelemetry.sdk.environment_variables import (
@@ -635,6 +636,15 @@ class TestReadableSpan(unittest.TestCase):
         span = trace.ReadableSpan("test", events=events)
         self.assertEqual(span.events, tuple(events))
 
+    def test_event_dropped_attributes(self):
+        event1 = trace.Event(
+            "foo1", BoundedAttributes(0, attributes={"bar1": "baz1"})
+        )
+        self.assertEqual(event1.dropped_attributes, 1)
+
+        event2 = trace.Event("foo2", {"bar2": "baz2"})
+        self.assertEqual(event2.dropped_attributes, 0)
+
 
 class DummyError(Exception):
     pass
@@ -944,13 +954,28 @@ class TestSpan(unittest.TestCase):
             root.add_link(None)
             self.assertEqual(len(root.links), 0)
 
+        with self.tracer.start_as_current_span(
+            "root", links=[trace_api.Link(other_context), None]
+        ) as root:
+            self.assertEqual(len(root.links), 0)
+
     def test_add_link_with_invalid_span_context_with_attributes(self):
         invalid_context = trace_api.INVALID_SPAN_CONTEXT
 
         with self.tracer.start_as_current_span("root") as root:
+            root.add_link(invalid_context)
             root.add_link(invalid_context, {"name": "neighbor"})
             self.assertEqual(len(root.links), 1)
             self.assertEqual(root.links[0].attributes, {"name": "neighbor"})
+
+        with self.tracer.start_as_current_span(
+            "root",
+            links=[
+                trace_api.Link(invalid_context, {"name": "neighbor"}),
+                trace_api.Link(invalid_context),
+            ],
+        ) as root:
+            self.assertEqual(len(root.links), 1)
 
     def test_add_link_with_invalid_span_context_with_tracestate(self):
         invalid_context = trace.SpanContext(
@@ -962,8 +987,18 @@ class TestSpan(unittest.TestCase):
 
         with self.tracer.start_as_current_span("root") as root:
             root.add_link(invalid_context)
+            root.add_link(trace_api.INVALID_SPAN_CONTEXT)
             self.assertEqual(len(root.links), 1)
             self.assertEqual(root.links[0].context.trace_state, "foo=bar")
+
+        with self.tracer.start_as_current_span(
+            "root",
+            links=[
+                trace_api.Link(invalid_context),
+                trace_api.Link(trace_api.INVALID_SPAN_CONTEXT),
+            ],
+        ) as root:
+            self.assertEqual(len(root.links), 1)
 
     def test_update_name(self):
         with self.tracer.start_as_current_span("root") as root:
@@ -1837,7 +1872,7 @@ class TestSpanLimits(unittest.TestCase):
         self.assertEqual(1, span.dropped_links)
         self.assertEqual(2, span.dropped_attributes)
         self.assertEqual(3, span.dropped_events)
-        self.assertEqual(2, span.events[0].attributes.dropped)
+        self.assertEqual(2, span.events[0].dropped_attributes)
         self.assertEqual(2, span.links[0].attributes.dropped)
 
     def _test_span_limits(
