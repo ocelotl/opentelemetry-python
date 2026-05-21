@@ -5,10 +5,36 @@
 
 from __future__ import annotations
 
+from os import environ
 import logging
 from collections.abc import Collection
 from typing import TYPE_CHECKING
 
+from opentelemetry.sdk.environment_variables import (
+    OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION,
+    OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE,
+)
+from opentelemetry.sdk.metrics.export import (
+    AggregationTemporality,
+    Gauge,
+    MetricExporter,
+    MetricsData,
+    Sum,
+)
+from opentelemetry.sdk.metrics import (
+    Counter,
+    Exemplar,
+    Histogram,
+    ObservableCounter,
+    ObservableGauge,
+    ObservableUpDownCounter,
+    UpDownCounter,
+)
+from opentelemetry.sdk.metrics.view import (
+    Aggregation,
+    ExplicitBucketHistogramAggregation,
+    ExponentialBucketHistogramAggregation,
+)
 from opentelemetry.exporter.otlp.json.common._internal import (
     _encode_attributes,
     _encode_instrumentation_scope,
@@ -268,3 +294,110 @@ def _encode_exemplars(
         json_exemplars.append(json_exemplar)
 
     return json_exemplars
+
+
+class OTLPMetricExporterMixin:
+    def _common_configuration(
+        self,
+        preferred_temporality: dict[type, AggregationTemporality]
+        | None = None,
+        preferred_aggregation: dict[type, Aggregation] | None = None,
+    ) -> None:
+        MetricExporter.__init__(
+            self,
+            preferred_temporality=self._get_temporality(preferred_temporality),
+            preferred_aggregation=self._get_aggregation(preferred_aggregation),
+        )
+
+    def _get_temporality(
+        self, preferred_temporality: dict[type, AggregationTemporality]
+    ) -> dict[type, AggregationTemporality]:
+        otel_exporter_otlp_metrics_temporality_preference = (
+            environ.get(
+                OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE,
+                "CUMULATIVE",
+            )
+            .upper()
+            .strip()
+        )
+
+        if otel_exporter_otlp_metrics_temporality_preference == "DELTA":
+            instrument_class_temporality = {
+                Counter: AggregationTemporality.DELTA,
+                UpDownCounter: AggregationTemporality.CUMULATIVE,
+                Histogram: AggregationTemporality.DELTA,
+                ObservableCounter: AggregationTemporality.DELTA,
+                ObservableUpDownCounter: AggregationTemporality.CUMULATIVE,
+                ObservableGauge: AggregationTemporality.CUMULATIVE,
+            }
+
+        elif otel_exporter_otlp_metrics_temporality_preference == "LOWMEMORY":
+            instrument_class_temporality = {
+                Counter: AggregationTemporality.DELTA,
+                UpDownCounter: AggregationTemporality.CUMULATIVE,
+                Histogram: AggregationTemporality.DELTA,
+                ObservableCounter: AggregationTemporality.CUMULATIVE,
+                ObservableUpDownCounter: AggregationTemporality.CUMULATIVE,
+                ObservableGauge: AggregationTemporality.CUMULATIVE,
+            }
+
+        else:
+            if otel_exporter_otlp_metrics_temporality_preference != (
+                "CUMULATIVE"
+            ):
+                _logger.warning(
+                    "Unrecognized OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE"
+                    " value found: "
+                    "%s, "
+                    "using CUMULATIVE",
+                    otel_exporter_otlp_metrics_temporality_preference,
+                )
+            instrument_class_temporality = {
+                Counter: AggregationTemporality.CUMULATIVE,
+                UpDownCounter: AggregationTemporality.CUMULATIVE,
+                Histogram: AggregationTemporality.CUMULATIVE,
+                ObservableCounter: AggregationTemporality.CUMULATIVE,
+                ObservableUpDownCounter: AggregationTemporality.CUMULATIVE,
+                ObservableGauge: AggregationTemporality.CUMULATIVE,
+            }
+
+        instrument_class_temporality.update(preferred_temporality or {})
+
+        return instrument_class_temporality
+
+    def _get_aggregation(
+        self,
+        preferred_aggregation: dict[type, Aggregation],
+    ) -> dict[type, Aggregation]:
+        otel_exporter_otlp_metrics_default_histogram_aggregation = environ.get(
+            OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION,
+            "explicit_bucket_histogram",
+        )
+
+        if otel_exporter_otlp_metrics_default_histogram_aggregation == (
+            "base2_exponential_bucket_histogram"
+        ):
+            instrument_class_aggregation = {
+                Histogram: ExponentialBucketHistogramAggregation(),
+            }
+
+        else:
+            if otel_exporter_otlp_metrics_default_histogram_aggregation != (
+                "explicit_bucket_histogram"
+            ):
+                _logger.warning(
+                    (
+                        "Invalid value for %s: %s, using explicit bucket "
+                        "histogram aggregation"
+                    ),
+                    OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION,
+                    otel_exporter_otlp_metrics_default_histogram_aggregation,
+                )
+
+            instrument_class_aggregation = {
+                Histogram: ExplicitBucketHistogramAggregation(),
+            }
+
+        instrument_class_aggregation.update(preferred_aggregation or {})
+
+        return instrument_class_aggregation

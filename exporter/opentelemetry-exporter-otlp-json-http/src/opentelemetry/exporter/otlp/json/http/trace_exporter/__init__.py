@@ -16,17 +16,17 @@ from urllib.parse import urlparse
 import requests
 from requests.exceptions import ConnectionError
 
-from opentelemetry.exporter.otlp.proto.common._exporter_metrics import (
+from opentelemetry.exporter.otlp.json._common._exporter_metrics import (
     create_exporter_metrics,
 )
-from opentelemetry.exporter.otlp.proto.common.trace_encoder import (
+from opentelemetry.exporter.otlp.json.common.trace_encoder import (
     encode_spans,
 )
-from opentelemetry.exporter.otlp.proto.http import (
+from opentelemetry.exporter.otlp.json.http import (
     _OTLP_HTTP_HEADERS,
     Compression,
 )
-from opentelemetry.exporter.otlp.proto.http._common import (
+from opentelemetry.exporter.otlp.json.http._common import (
     _is_retryable,
     _load_session_from_envvar,
 )

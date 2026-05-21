@@ -8,55 +8,44 @@ import os
 import random
 import threading
 import zlib
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from io import BytesIO
 from os import environ
 from time import time
-from typing import (  # noqa: F401
-    Any,
-    Optional,
-)
 from urllib.parse import urlparse
 
 import requests
 from requests.exceptions import ConnectionError
 from typing_extensions import deprecated
 
-from opentelemetry.exporter.otlp.proto.common._exporter_metrics import (
+from opentelemetry.exporter.otlp.json._common._exporter_metrics import (
     create_exporter_metrics,
 )
-from opentelemetry.exporter.otlp.proto.common._internal import (
-    _get_resource_data,
-)
-from opentelemetry.exporter.otlp.proto.common._internal.metrics_encoder import (
+from opentelemetry.exporter.otlp.json.common._internal.metrics_encoder import (
     OTLPMetricExporterMixin,
+    encode_metrics
 )
-from opentelemetry.exporter.otlp.proto.common.metrics_encoder import (
-    encode_metrics,
-)
-from opentelemetry.exporter.otlp.proto.http import (
+from opentelemetry.exporter.otlp.json.http import (
     _OTLP_HTTP_HEADERS,
     Compression,
 )
-from opentelemetry.exporter.otlp.proto.http._common import (
+from opentelemetry.exporter.otlp.json.http._common import (
     _is_retryable,
     _load_session_from_envvar,
 )
 from opentelemetry.metrics import MeterProvider
-from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import (  # noqa: F401
-    ExportMetricsServiceRequest,
+from opentelemetry.proto_json.collector.metrics.v1.metrics_service import (
+    ExportMetricsServiceRequest
 )
-from opentelemetry.proto.common.v1.common_pb2 import (  # noqa: F401
-    AnyValue,
-    ArrayValue,
-    InstrumentationScope,
-    KeyValue,
-    KeyValueList,
-)
-from opentelemetry.proto.metrics.v1 import metrics_pb2 as pb2
-from opentelemetry.proto.resource.v1.resource_pb2 import Resource  # noqa: F401
-from opentelemetry.proto.resource.v1.resource_pb2 import (
-    Resource as PB2Resource,
+from opentelemetry.proto._json.metrics.v1.metrics import (
+    Gauge,
+    Metric,
+    Summary,
+    ResourceMetrics,
+    ScopeMetrics,
+    Sum,
+    Histogram,
+    ExponentialHistogram
 )
 from opentelemetry.sdk.environment_variables import (
     _OTEL_PYTHON_EXPORTER_OTLP_HTTP_METRICS_CREDENTIAL_PROVIDER,
@@ -77,18 +66,12 @@ from opentelemetry.sdk.environment_variables import (
     OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED,
 )
 from opentelemetry.sdk.metrics._internal.aggregation import Aggregation
-from opentelemetry.sdk.metrics.export import (  # noqa: F401
+from opentelemetry.sdk.metrics.export import (
     AggregationTemporality,
-    Gauge,
     MetricExporter,
     MetricExportResult,
     MetricsData,
-    Sum,
 )
-from opentelemetry.sdk.metrics.export import (  # noqa: F401
-    Histogram as HistogramType,
-)
-from opentelemetry.sdk.resources import Resource as SDKResource
 from opentelemetry.semconv._incubating.attributes.otel_attributes import (
     OtelComponentTypeValues,
 )
@@ -423,7 +406,7 @@ def _split_metrics_data(
 
     batch_size: int = 0
     # Stores split metrics data as editable references
-    # used to write batched pb2 objects for export when finalized
+    # used to write batched objects for export when finalized
     split_resource_metrics = []
 
     for resource_metrics in metrics_data.resource_metrics:
@@ -483,7 +466,7 @@ def _split_metrics_data(
 
                     if batch_size >= max_export_batch_size:
                         yield ExportMetricsServiceRequest(
-                            resource_metrics=_get_split_resource_metrics_pb2(
+                            resource_metrics=_get_split_resource_metrics(
                                 split_resource_metrics
                             )
                         )
@@ -549,16 +532,16 @@ def _split_metrics_data(
 
     if batch_size > 0:
         yield ExportMetricsServiceRequest(
-            resource_metrics=_get_split_resource_metrics_pb2(
+            resource_metrics=_get_split_resource_metrics(
                 split_resource_metrics
             )
         )
 
 
-def _get_split_resource_metrics_pb2(
+def _get_split_resource_metrics(
     split_resource_metrics: list[dict],
-) -> list[pb2.ResourceMetrics]:
-    """Helper that returns a list of pb2.ResourceMetrics objects based on split_resource_metrics.
+) -> list[ResourceMetrics]:
+    """Helper that returns a list of ResourceMetrics objects based on split_resource_metrics.
     Example input:
 
     ```python
@@ -602,18 +585,18 @@ def _get_split_resource_metrics_pb2(
             ScopeMetrics, Metrics, and data points.
 
     Returns:
-        List[pb2.ResourceMetrics]: A list of pb2.ResourceMetrics objects containing
-            pb2.ScopeMetrics, pb2.Metrics, and data points
+        List[ResourceMetrics]: A list of ResourceMetrics objects containing
+            ScopeMetrics, Metrics, and data points
     """
     split_resource_metrics_pb = []
     for resource_metrics in split_resource_metrics:
-        new_resource_metrics = pb2.ResourceMetrics(
+        new_resource_metrics = ResourceMetrics(
             resource=resource_metrics.get("resource"),
             scope_metrics=[],
             schema_url=resource_metrics.get("schema_url") or "",
         )
         for scope_metrics in resource_metrics.get("scope_metrics", []):
-            new_scope_metrics = pb2.ScopeMetrics(
+            new_scope_metrics = ScopeMetrics(
                 scope=scope_metrics.get("scope"),
                 metrics=[],
                 schema_url=scope_metrics.get("schema_url") or "",
@@ -624,11 +607,11 @@ def _get_split_resource_metrics_pb2(
                 data_points = []
 
                 if "sum" in metric:
-                    new_metric = pb2.Metric(
+                    new_metric = Metric(
                         name=metric.get("name"),
                         description=metric.get("description"),
                         unit=metric.get("unit"),
-                        sum=pb2.Sum(
+                        sum=Sum(
                             data_points=[],
                             aggregation_temporality=metric.get("sum").get(
                                 "aggregation_temporality"
@@ -638,11 +621,11 @@ def _get_split_resource_metrics_pb2(
                     )
                     data_points = metric.get("sum").get("data_points")
                 elif "histogram" in metric:
-                    new_metric = pb2.Metric(
+                    new_metric = Metric(
                         name=metric.get("name"),
                         description=metric.get("description"),
                         unit=metric.get("unit"),
-                        histogram=pb2.Histogram(
+                        histogram=Histogram(
                             data_points=[],
                             aggregation_temporality=metric.get(
                                 "histogram"
@@ -651,11 +634,11 @@ def _get_split_resource_metrics_pb2(
                     )
                     data_points = metric.get("histogram").get("data_points")
                 elif "exponential_histogram" in metric:
-                    new_metric = pb2.Metric(
+                    new_metric = Metric(
                         name=metric.get("name"),
                         description=metric.get("description"),
                         unit=metric.get("unit"),
-                        exponential_histogram=pb2.ExponentialHistogram(
+                        exponential_histogram=ExponentialHistogram(
                             data_points=[],
                             aggregation_temporality=metric.get(
                                 "exponential_histogram"
@@ -666,21 +649,21 @@ def _get_split_resource_metrics_pb2(
                         "data_points"
                     )
                 elif "gauge" in metric:
-                    new_metric = pb2.Metric(
+                    new_metric = Metric(
                         name=metric.get("name"),
                         description=metric.get("description"),
                         unit=metric.get("unit"),
-                        gauge=pb2.Gauge(
+                        gauge=Gauge(
                             data_points=[],
                         ),
                     )
                     data_points = metric.get("gauge").get("data_points")
                 elif "summary" in metric:
-                    new_metric = pb2.Metric(
+                    new_metric = Metric(
                         name=metric.get("name"),
                         description=metric.get("description"),
                         unit=metric.get("unit"),
-                        summary=pb2.Summary(
+                        summary=Summary(
                             data_points=[],
                         ),
                     )
@@ -716,12 +699,6 @@ def _get_split_resource_metrics_pb2(
 @deprecated(
     "Use one of the encoders from opentelemetry-exporter-otlp-proto-common instead. Deprecated since version 1.18.0.",
 )
-def get_resource_data(
-    sdk_resource_scope_data: dict[SDKResource, Any],  # ResourceDataT?
-    resource_class: Callable[..., PB2Resource],
-    name: str,
-) -> list[PB2Resource]:
-    return _get_resource_data(sdk_resource_scope_data, resource_class, name)
 
 
 def _compression_from_env() -> Compression:
