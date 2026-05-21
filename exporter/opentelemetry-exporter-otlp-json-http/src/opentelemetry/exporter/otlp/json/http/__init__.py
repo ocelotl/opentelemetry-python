@@ -32,7 +32,7 @@ You can configure the exporter with the following environment variables:
 .. code:: python
 
     from opentelemetry import trace
-    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.exporter.otlp.json.http.trace_exporter import OTLPSpanExporter
     from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -64,7 +64,7 @@ import enum
 from .version import __version__
 
 _OTLP_HTTP_HEADERS = {
-    "Content-Type": "application/x-protobuf",
+    "Content-Type": "application/json",
     "User-Agent": "OTel-OTLP-Exporter-Python/" + __version__,
 }
 

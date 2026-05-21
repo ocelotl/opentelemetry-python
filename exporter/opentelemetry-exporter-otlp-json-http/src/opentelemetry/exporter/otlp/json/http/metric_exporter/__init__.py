@@ -37,7 +37,7 @@ from opentelemetry.metrics import MeterProvider
 from opentelemetry.proto_json.collector.metrics.v1.metrics_service import (
     ExportMetricsServiceRequest
 )
-from opentelemetry.proto._json.metrics.v1.metrics import (
+from opentelemetry.proto_json.metrics.v1.metrics import (
     Gauge,
     Metric,
     Summary,
