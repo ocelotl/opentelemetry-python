@@ -43,8 +43,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from opentelemetry.sdk.trace import ReadableSpan
-from opentelemetry.trace import Link, SpanKind
-from opentelemetry.trace.span import SpanContext, Status
+from opentelemetry.trace import Link, SpanContext, SpanKind, Status
 
 from .._encoding.scalars import encode_fixed32, encode_int
 from .._encoding.tag import encode_tag
@@ -108,6 +107,13 @@ def _fix32(field_number: int, value: int) -> bytes:
     if value == 0:
         return b""
     return encode_tag(field_number, _WT_32BIT) + encode_fixed32(value)
+
+
+def _fix64(field_number: int, value: int) -> bytes:
+    """Write a fixed64 field (8 bytes little-endian uint64); omit if zero."""
+    if value == 0:
+        return b""
+    return encode_tag(field_number, _WT_64BIT) + struct.pack("<Q", value)
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +215,7 @@ def _resource_bytes(resource: Any) -> bytes:
 
 def _event_bytes(event: Any) -> bytes:
     return (
-        _u64(1, event.timestamp or 0)           # Event.time_unix_nano          = field 1
+        _fix64(1, event.timestamp or 0)         # Event.time_unix_nano (fixed64) = field 1
         + _str(2, event.name)                   # Event.name                    = field 2
         + _attrs(3, event.attributes)           # Event.attributes              = field 3
         + _u64(4, event.dropped_attributes or 0)  # Event.dropped_attributes_count = field 4
@@ -280,8 +286,8 @@ def _span_bytes(sdk_span: ReadableSpan) -> bytes:
         + _fix32(16, flags)                                  # flags (fixed32)         = 16
         + _str(5, sdk_span.name)                             # name                    = 5
         + _u64(6, kind)                                      # kind (enum)             = 6
-        + _u64(7, sdk_span.start_time or 0)                  # start_time_unix_nano    = 7
-        + _u64(8, sdk_span.end_time or 0)                    # end_time_unix_nano      = 8
+        + _fix64(7, sdk_span.start_time or 0)                # start_time_unix_nano (fixed64) = 7
+        + _fix64(8, sdk_span.end_time or 0)                 # end_time_unix_nano (fixed64)   = 8
         + _attrs(9, sdk_span.attributes)                     # attributes              = 9
         + _u64(10, sdk_span.dropped_attributes or 0)         # dropped_attributes_count = 10
         + events_bytes                                        # events                  = 11
