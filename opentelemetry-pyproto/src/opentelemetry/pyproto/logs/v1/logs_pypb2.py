@@ -11,12 +11,12 @@ Field numbers:
 
 from __future__ import annotations
 
-from opentelemetry.pyproto.common.v1.common_pyproto2 import (
+from opentelemetry.pyproto.common.v1.common_pypb2 import (
     AnyValue,
     InstrumentationScope,
     KeyValue,
 )
-from opentelemetry.pyproto.resource.v1.resource_pyproto2 import Resource
+from opentelemetry.pyproto.resource.v1.resource_pypb2 import Resource
 from opentelemetry.pyproto._pyprotobuf.fields import (
     byt,
     fix32,

@@ -12,10 +12,10 @@ from opentelemetry.exporter.otlp.pyproto.common._internal import (
     _encode_span_id,
     _encode_trace_id,
 )
-from opentelemetry.pyproto.collector.trace.v1.trace_service_pyproto2 import (
+from opentelemetry.pyproto.collector.trace.v1.trace_service_pypb2 import (
     ExportTraceServiceRequest,
 )
-from opentelemetry.pyproto.trace.v1.trace_pyproto2 import (
+from opentelemetry.pyproto.trace.v1.trace_pypb2 import (
     ResourceSpans,
     ScopeSpans,
     Span,

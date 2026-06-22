@@ -7,7 +7,7 @@ Field numbers:
 
 from __future__ import annotations
 
-from opentelemetry.pyproto.logs.v1.logs_pyproto2 import ResourceLogs
+from opentelemetry.pyproto.logs.v1.logs_pypb2 import ResourceLogs
 from opentelemetry.pyproto._pyprotobuf.fields import msg
 
 

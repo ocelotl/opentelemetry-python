@@ -42,7 +42,7 @@ Layering within _pyprotobuf
     enum.py      — encode a proto3 enum value (thin wrapper over scalars)
     fields.py    — encode a complete proto3 field (tag + default check + value)
 
-The message classes (common_pyproto2.py, metrics_pyproto2.py, etc.) use this
+The message classes (common_pypb2.py, metrics_pypb2.py, etc.) use this
 module directly. They import the encode_* primitives from the package root
 (__init__.py) and the field helpers from here.
 
