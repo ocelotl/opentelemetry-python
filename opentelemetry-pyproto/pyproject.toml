@@ -19,3 +19,6 @@ include = ["/src"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/opentelemetry"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
