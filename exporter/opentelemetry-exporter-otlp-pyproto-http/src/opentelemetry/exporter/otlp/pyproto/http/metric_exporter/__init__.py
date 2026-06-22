@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
+import os
 from collections.abc import Iterable
 from gzip import GzipFile
 from io import BytesIO
@@ -10,11 +11,15 @@ from os import environ
 from random import uniform
 from threading import Event
 from time import time
+from urllib.parse import urlparse
 from zlib import compress
 
 from requests import Session
 from requests.exceptions import ConnectionError, RequestException
 
+from opentelemetry.exporter.otlp.pyproto.common._exporter_metrics import (
+    create_exporter_metrics,
+)
 from opentelemetry.exporter.otlp.pyproto.common._internal.metrics_encoder import (
     OTLPMetricExporterMixin,
     encode_metrics,
@@ -27,6 +32,7 @@ from opentelemetry.exporter.otlp.pyproto.http._common import (
     _is_retryable,
     _load_session_from_envvar,
 )
+from opentelemetry.metrics import MeterProvider
 from opentelemetry.pyproto.collector.metrics.v1.metrics_service_pypb2 import (
     ExportMetricsServiceRequest,
 )
@@ -56,6 +62,7 @@ from opentelemetry.sdk.environment_variables import (
     OTEL_EXPORTER_OTLP_METRICS_HEADERS,
     OTEL_EXPORTER_OTLP_METRICS_TIMEOUT,
     OTEL_EXPORTER_OTLP_TIMEOUT,
+    OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED,
 )
 from opentelemetry.sdk.metrics._internal.aggregation import Aggregation
 from opentelemetry.sdk.metrics.export import (
@@ -63,6 +70,12 @@ from opentelemetry.sdk.metrics.export import (
     MetricExporter,
     MetricExportResult,
     MetricsData,
+)
+from opentelemetry.semconv._incubating.attributes.otel_attributes import (
+    OtelComponentTypeValues,
+)
+from opentelemetry.semconv.attributes.http_attributes import (
+    HTTP_RESPONSE_STATUS_CODE,
 )
 from opentelemetry.util.re import parse_env_headers
 
@@ -88,6 +101,8 @@ class OTLPMetricExporter(MetricExporter, OTLPMetricExporterMixin):
         preferred_temporality: dict[type, AggregationTemporality] | None = None,
         preferred_aggregation: dict[type, Aggregation] | None = None,
         max_export_batch_size: int | None = None,
+        *,
+        meter_provider: MeterProvider | None = None,
     ):
         self._shutdown_in_progress = Event()
         self._endpoint = endpoint or environ.get(
@@ -143,6 +158,17 @@ class OTLPMetricExporter(MetricExporter, OTLPMetricExporterMixin):
         self._max_export_batch_size = max_export_batch_size
         self._shutdown = False
 
+        self._metrics = create_exporter_metrics(
+            OtelComponentTypeValues.OTLP_HTTP_METRIC_EXPORTER,
+            "metrics",
+            urlparse(self._endpoint),
+            meter_provider,
+            os.environ.get(OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED, "")
+            .strip()
+            .lower()
+            == "true",
+        )
+
     def _export(self, serialized_data: bytes, timeout_sec: float | None = None):
         data = serialized_data
         if self._compression == Compression.Gzip:
@@ -178,51 +204,66 @@ class OTLPMetricExporter(MetricExporter, OTLPMetricExporterMixin):
         deadline_sec: float,
         num_items: int,
     ) -> MetricExportResult:
-        serialized_data = export_request.SerializeToString()
-        for retry_num in range(_MAX_RETRYS):
-            backoff_seconds = 2**retry_num * uniform(0.8, 1.2)
-            export_error: Exception | None = None
-            try:
-                resp = self._export(serialized_data, deadline_sec - time())
-                if resp.ok:
-                    return MetricExportResult.SUCCESS
-            except RequestException as error:
-                reason = error
-                export_error = error
-                retryable = isinstance(error, ConnectionError)
-                status_code = None
-            else:
-                reason = resp.reason
-                retryable = _is_retryable(resp)
-                status_code = resp.status_code
+        with self._metrics.export_operation(num_items) as result:
+            serialized_data = export_request.SerializeToString()
+            for retry_num in range(_MAX_RETRYS):
+                backoff_seconds = 2**retry_num * uniform(0.8, 1.2)
+                export_error: Exception | None = None
+                try:
+                    resp = self._export(serialized_data, deadline_sec - time())
+                    if resp.ok:
+                        return MetricExportResult.SUCCESS
+                except RequestException as error:
+                    reason = error
+                    export_error = error
+                    retryable = isinstance(error, ConnectionError)
+                    status_code = None
+                else:
+                    reason = resp.reason
+                    retryable = _is_retryable(resp)
+                    status_code = resp.status_code
 
-            if not retryable:
-                _logger.error(
-                    "Failed to export metrics batch code: %s, reason: %s",
-                    status_code,
+                if not retryable:
+                    _logger.error(
+                        "Failed to export metrics batch code: %s, reason: %s",
+                        status_code,
+                        reason,
+                    )
+                    error_attrs = (
+                        {HTTP_RESPONSE_STATUS_CODE: status_code}
+                        if status_code is not None
+                        else None
+                    )
+                    result.error = export_error
+                    result.error_attrs = error_attrs
+                    return MetricExportResult.FAILURE
+
+                if (
+                    retry_num + 1 == _MAX_RETRYS
+                    or backoff_seconds > (deadline_sec - time())
+                    or self._shutdown
+                ):
+                    _logger.error(
+                        "Failed to export metrics batch due to timeout, max retries or shutdown."
+                    )
+                    error_attrs = (
+                        {HTTP_RESPONSE_STATUS_CODE: status_code}
+                        if status_code is not None
+                        else None
+                    )
+                    result.error = export_error
+                    result.error_attrs = error_attrs
+                    return MetricExportResult.FAILURE
+
+                _logger.warning(
+                    "Transient error %s encountered while exporting metrics batch, retrying in %.2fs.",
                     reason,
+                    backoff_seconds,
                 )
-                return MetricExportResult.FAILURE
-
-            if (
-                retry_num + 1 == _MAX_RETRYS
-                or backoff_seconds > (deadline_sec - time())
-                or self._shutdown
-            ):
-                _logger.error(
-                    "Failed to export metrics batch due to timeout, max retries or shutdown."
-                )
-                return MetricExportResult.FAILURE
-
-            _logger.warning(
-                "Transient error %s encountered while exporting metrics batch, retrying in %.2fs.",
-                reason,
-                backoff_seconds,
-            )
-            if self._shutdown_in_progress.wait(backoff_seconds):
-                _logger.warning("Shutdown in progress, aborting retry.")
-                break
-        return MetricExportResult.FAILURE
+                if self._shutdown_in_progress.wait(backoff_seconds):
+                    _logger.warning("Shutdown in progress, aborting retry.")
+                    break
+            return MetricExportResult.FAILURE
 
     def export(
         self,
@@ -262,6 +303,18 @@ class OTLPMetricExporter(MetricExporter, OTLPMetricExporterMixin):
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
         return True
+
+    def set_meter_provider(self, meter_provider: MeterProvider) -> None:
+        self._metrics = create_exporter_metrics(
+            OtelComponentTypeValues.OTLP_HTTP_METRIC_EXPORTER,
+            "metrics",
+            urlparse(self._endpoint),
+            meter_provider,
+            os.environ.get(OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED, "")
+            .strip()
+            .lower()
+            == "true",
+        )
 
     @property
     def _exporting(self) -> str:
