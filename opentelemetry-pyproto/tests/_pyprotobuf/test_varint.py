@@ -1,8 +1,9 @@
 # tests/test__varint.py
 
-from pytest import raises
+from google.protobuf import descriptor_pb2, descriptor_pool, message_factory
+from pytest import mark, raises
 
-from opentelemetry.pyproto._pyprotobuf import encode_varint
+from opentelemetry.pyproto._pyprotobuf import encode_tag, encode_varint
 
 
 def test_zero() -> None:
@@ -52,3 +53,63 @@ def test_three_byte_boundary_low() -> None:
 def test_one() -> None:
     # 1 fits in a single byte; no continuation bit needed.
     assert encode_varint(1) == b"\x01"
+
+
+# ── oracle — byte-for-byte comparison with google.protobuf ────────────────────
+#
+# A proto2 message with a single uint64 field is used as the oracle.  proto2
+# is chosen because it serialises the field even when its value is the type
+# default (0).  uint64 covers the full [0, 2^64-1] varint range.
+#
+# The serialised message for a single field is exactly:
+#   tag (varint) + value (varint)
+#
+# Asserting that encode_tag(field, wt) + encode_varint(value) equals the
+# serialised message verifies that our varint encoder produces the exact same
+# bytes as google.protobuf for every tested value.
+
+_FIELD = 1
+_WT = 0  # wire type 0 — varint
+
+
+def _build_varint_message_class():
+    file_proto = descriptor_pb2.FileDescriptorProto()
+    file_proto.name = "opentelemetry_pyproto_test_varint.proto"
+    file_proto.syntax = "proto2"
+    msg_proto = file_proto.message_type.add()
+    msg_proto.name = "VarintMessage"
+    f = msg_proto.field.add()
+    f.name = "uint64_field"
+    f.number = _FIELD
+    f.type = descriptor_pb2.FieldDescriptorProto.TYPE_UINT64
+    f.label = descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL
+    pool = descriptor_pool.DescriptorPool()
+    pool.Add(file_proto)
+    return message_factory.GetMessageClass(pool.FindMessageTypeByName("VarintMessage"))
+
+
+_VarintMessage = _build_varint_message_class()
+
+
+@mark.parametrize(
+    "value",
+    [
+        0,
+        1,
+        127,
+        128,
+        150,
+        300,
+        16_383,
+        16_384,
+        2**16,
+        2**28,
+        2**32 - 1,
+        2**32,
+        2**63 - 1,
+        2**64 - 1,
+    ],
+)
+def test_encode_varint_matches_protobuf(value: int) -> None:
+    expected = encode_tag(_FIELD, _WT) + encode_varint(value)
+    assert _VarintMessage(uint64_field=value).SerializeToString() == expected

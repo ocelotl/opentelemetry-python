@@ -5,7 +5,10 @@
 # two's-complement varint. These tests verify that contract using hand-computed
 # expected byte literals.
 
-from opentelemetry.pyproto._pyprotobuf import encode_enum, encode_int
+from google.protobuf import descriptor_pb2, descriptor_pool, message_factory
+from pytest import mark
+
+from opentelemetry.pyproto._pyprotobuf import encode_enum, encode_int, encode_tag
 
 
 def test_zero() -> None:
@@ -42,3 +45,52 @@ def test_matches_encode_int_for_positive_values() -> None:
 def test_matches_encode_int_for_negative_values() -> None:
     for value in [-1, -2, -(2**31)]:
         assert encode_enum(value) == encode_int(value)
+
+
+# ── oracle — byte-for-byte comparison with google.protobuf ────────────────────
+#
+# A proto2 message with a Color enum field is used as the oracle.  proto2 is
+# chosen so the field is serialised even when its value is the default (0).
+#
+# The Color enum defines RED=0, GREEN=1, BLUE=2.  Only those three values are
+# used because proto2 rejects assignments of undefined enum constants.
+#
+# The serialised message is exactly encode_tag(field, 0) + encode_enum(value).
+
+_FIELD = 1
+_WT = 0  # wire type 0 — varint
+
+
+def _build_enum_message_class():
+    file_proto = descriptor_pb2.FileDescriptorProto()
+    file_proto.name = "opentelemetry_pyproto_test_enum.proto"
+    file_proto.syntax = "proto2"
+
+    color = file_proto.enum_type.add()
+    color.name = "Color"
+    for name, number in [("RED", 0), ("GREEN", 1), ("BLUE", 2)]:
+        ev = color.value.add()
+        ev.name = name
+        ev.number = number
+
+    msg_proto = file_proto.message_type.add()
+    msg_proto.name = "EnumMessage"
+    f = msg_proto.field.add()
+    f.name = "color_field"
+    f.number = _FIELD
+    f.type = descriptor_pb2.FieldDescriptorProto.TYPE_ENUM
+    f.label = descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL
+    f.type_name = ".Color"
+
+    pool = descriptor_pool.DescriptorPool()
+    pool.Add(file_proto)
+    return message_factory.GetMessageClass(pool.FindMessageTypeByName("EnumMessage"))
+
+
+_EnumMessage = _build_enum_message_class()
+
+
+@mark.parametrize("value", [0, 1, 2])
+def test_encode_enum_matches_protobuf(value: int) -> None:
+    expected = encode_tag(_FIELD, _WT) + encode_enum(value)
+    assert _EnumMessage(color_field=value).SerializeToString() == expected
