@@ -45,6 +45,9 @@ opentelemetry-exporter-prometheus = {workspace = true }
 opentelemetry-propagator-jaeger = { workspace = true }
 opentelemetry-propagator-b3 = { workspace = true }
 opentelemetry-codegen-json = { workspace = true }
+opentelemetry-pyproto = { workspace = true }
+opentelemetry-exporter-otlp-pyproto-common = { workspace = true }
+opentelemetry-exporter-otlp-pyproto-http = { workspace = true }
 
 [tool.uv.workspace]
 members = [
@@ -57,6 +60,7 @@ members = [
   "propagator/*",
   "codegen/*",
   "tests/opentelemetry-test-utils",
+  "opentelemetry-pyproto",
 ]
 
 exclude = [
