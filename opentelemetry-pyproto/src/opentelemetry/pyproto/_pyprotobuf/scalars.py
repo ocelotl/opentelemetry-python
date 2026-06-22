@@ -46,7 +46,7 @@ Reference:
 
 from struct import pack
 
-from opentelemetry.pyproto._pyproto._varint import encode_varint
+from .varint import encode_varint
 
 
 # ── Wire type 0 — Varint ──────────────────────────────────────────────────────

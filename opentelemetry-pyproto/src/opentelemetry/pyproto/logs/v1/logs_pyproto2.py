@@ -17,7 +17,7 @@ from opentelemetry.pyproto.common.v1.common_pyproto2 import (
     KeyValue,
 )
 from opentelemetry.pyproto.resource.v1.resource_pyproto2 import Resource
-from opentelemetry.pyproto._wire import (
+from opentelemetry.pyproto._pyprotobuf.fields import (
     _byt,
     _fix32,
     _fix64,

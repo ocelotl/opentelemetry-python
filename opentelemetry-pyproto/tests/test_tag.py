@@ -12,7 +12,7 @@
 
 from pytest import mark
 
-from opentelemetry.pyproto._pyproto import encode_tag, encode_varint
+from opentelemetry.pyproto._pyprotobuf import encode_tag, encode_varint
 
 
 @mark.parametrize(

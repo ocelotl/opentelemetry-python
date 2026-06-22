@@ -2,7 +2,7 @@
 
 from pytest import raises
 
-from opentelemetry.pyproto._pyproto import encode_varint
+from opentelemetry.pyproto._pyprotobuf import encode_varint
 
 
 def test_zero() -> None:
