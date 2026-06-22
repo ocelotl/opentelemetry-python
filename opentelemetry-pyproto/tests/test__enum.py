@@ -5,7 +5,7 @@
 # two's-complement varint. These tests verify that contract using hand-computed
 # expected byte literals.
 
-from opentelemetry.pyproto._pyproto import encode_enum
+from opentelemetry.pyproto._pyproto import encode_enum, encode_int
 
 
 def test_zero() -> None:
@@ -35,12 +35,10 @@ def test_negative_value() -> None:
 
 def test_matches_encode_int_for_positive_values() -> None:
     # encode_enum and encode_int must produce identical bytes for non-negative inputs.
-    from opentelemetry.pyproto._pyproto import encode_int
     for value in [0, 1, 2, 127, 128, 255, 300, 2**16]:
         assert encode_enum(value) == encode_int(value)
 
 
 def test_matches_encode_int_for_negative_values() -> None:
-    from opentelemetry.pyproto._pyproto import encode_int
     for value in [-1, -2, -(2**31)]:
         assert encode_enum(value) == encode_int(value)
