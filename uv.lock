@@ -22,6 +22,7 @@ members = [
     "opentelemetry-exporter-otlp-proto-grpc",
     "opentelemetry-exporter-otlp-proto-http",
     "opentelemetry-exporter-otlp-pyproto-common",
+    "opentelemetry-exporter-otlp-pyproto-grpc",
     "opentelemetry-exporter-otlp-pyproto-http",
     "opentelemetry-exporter-prometheus",
     "opentelemetry-exporter-zipkin-json",
@@ -1064,6 +1065,34 @@ dev = [
     { name = "protobuf", specifier = ">=5.0" },
     { name = "pytest", specifier = ">=7.0" },
 ]
+
+[[package]]
+name = "opentelemetry-exporter-otlp-pyproto-grpc"
+source = { editable = "exporter/opentelemetry-exporter-otlp-pyproto-grpc" }
+dependencies = [
+    { name = "grpcio" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-pyproto-common" },
+    { name = "opentelemetry-sdk" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "grpcio", marker = "python_full_version < '3.13'", specifier = ">=1.63.2,<2.0.0" },
+    { name = "grpcio", marker = "python_full_version == '3.13.*'", specifier = ">=1.66.2,<2.0.0" },
+    { name = "grpcio", marker = "python_full_version >= '3.14'", specifier = ">=1.75.1,<2.0.0" },
+    { name = "opentelemetry-api", editable = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-pyproto-common", editable = "exporter/opentelemetry-exporter-otlp-pyproto-common" },
+    { name = "opentelemetry-sdk", editable = "opentelemetry-sdk" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=7.0" }]
 
 [[package]]
 name = "opentelemetry-exporter-otlp-pyproto-http"
