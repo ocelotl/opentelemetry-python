@@ -1,14 +1,10 @@
-"""Internal protobuf wire-format field builders.
-
-Uses python-protobuf (python_protobuf) for the low-level primitives and
-provides higher-level helpers for writing typed protobuf fields.
-"""
+"""Internal protobuf wire-format field builders."""
 
 from __future__ import annotations
 
 import struct
 
-from python_protobuf import (
+from opentelemetry.pyproto._pyproto import (
     encode_fixed32,
     encode_fixed64,
     encode_sint32,

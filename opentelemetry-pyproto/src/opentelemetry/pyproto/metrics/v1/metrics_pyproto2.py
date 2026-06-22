@@ -59,7 +59,7 @@ from opentelemetry.pyproto._wire import (
     _u64,
     _WT_64BIT,
 )
-from python_protobuf import encode_tag
+from opentelemetry.pyproto._pyproto import encode_tag
 
 
 def _sfixed64(field: int, value: int) -> bytes:
