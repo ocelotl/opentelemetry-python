@@ -108,15 +108,15 @@ class Exemplar:
         return None
 
     def SerializeToString(self) -> bytes:
-        result = b"".join(
-            msg(7, kv.SerializeToString()) for kv in self.filtered_attributes
-        )
-        result += fix64(2, self.time_unix_nano)
+        result = fix64(2, self.time_unix_nano)
         if self._which == "as_double":
             result += _as_double(3, self._as_double)  # type: ignore[arg-type]
-        elif self._which == "as_int":
-            result += _as_int(6, self._as_int)  # type: ignore[arg-type]
         result += byt(4, self.span_id) + byt(5, self.trace_id)
+        if self._which == "as_int":
+            result += _as_int(6, self._as_int)  # type: ignore[arg-type]
+        result += b"".join(
+            msg(7, kv.SerializeToString()) for kv in self.filtered_attributes
+        )
         return result
 
 
@@ -149,13 +149,13 @@ class NumberDataPoint:
         return None
 
     def SerializeToString(self) -> bytes:
-        result = b"".join(msg(7, kv.SerializeToString()) for kv in self.attributes)
-        result += fix64(2, self.start_time_unix_nano) + fix64(3, self.time_unix_nano)
+        result = fix64(2, self.start_time_unix_nano) + fix64(3, self.time_unix_nano)
         if self._which == "as_double":
             result += _as_double(4, self._as_double)  # type: ignore[arg-type]
-        elif self._which == "as_int":
-            result += _as_int(6, self._as_int)  # type: ignore[arg-type]
         result += b"".join(msg(5, ex.SerializeToString()) for ex in self.exemplars)
+        if self._which == "as_int":
+            result += _as_int(6, self._as_int)  # type: ignore[arg-type]
+        result += b"".join(msg(7, kv.SerializeToString()) for kv in self.attributes)
         result += u64(8, self.flags)
         return result
 
@@ -190,8 +190,7 @@ class HistogramDataPoint:
         self.max = max
 
     def SerializeToString(self) -> bytes:
-        result = b"".join(msg(9, kv.SerializeToString()) for kv in self.attributes)
-        result += (
+        return (
             fix64(2, self.start_time_unix_nano)
             + fix64(3, self.time_unix_nano)
             + fix64(4, self.count)
@@ -199,11 +198,11 @@ class HistogramDataPoint:
             + packed_fix64(6, self.bucket_counts)
             + packed_double(7, self.explicit_bounds)
             + b"".join(msg(8, ex.SerializeToString()) for ex in self.exemplars)
+            + b"".join(msg(9, kv.SerializeToString()) for kv in self.attributes)
             + u64(10, self.flags)
             + opt_dbl(11, self.min)
             + opt_dbl(12, self.max)
         )
-        return result
 
 
 class ExponentialHistogramDataPoint:
@@ -310,16 +309,15 @@ class SummaryDataPoint:
         self.flags = flags
 
     def SerializeToString(self) -> bytes:
-        result = b"".join(msg(7, kv.SerializeToString()) for kv in self.attributes)
-        result += (
+        return (
             fix64(2, self.start_time_unix_nano)
             + fix64(3, self.time_unix_nano)
             + fix64(4, self.count)
             + dbl(5, self.sum)
             + b"".join(msg(6, qv.SerializeToString()) for qv in self.quantile_values)
+            + b"".join(msg(7, kv.SerializeToString()) for kv in self.attributes)
             + u64(8, self.flags)
         )
-        return result
 
 
 class Gauge:
