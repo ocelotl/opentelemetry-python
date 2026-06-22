@@ -24,5 +24,9 @@ class ExportTraceServiceRequest:
 
 
 class ExportTraceServiceResponse:
+    @classmethod
+    def FromString(cls, data: bytes) -> 'ExportTraceServiceResponse':
+        return cls()
+
     def SerializeToString(self) -> bytes:
         return b""
