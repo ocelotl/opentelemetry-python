@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-import logging
+from logging import getLogger
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, TypeVar
 
@@ -19,7 +19,7 @@ from opentelemetry.sdk.trace import Resource
 from opentelemetry.sdk.util.instrumentation import InstrumentationScope
 from opentelemetry.util.types import _ExtendedAttributes
 
-_logger = logging.getLogger(__name__)
+_logger = getLogger(__name__)
 
 _TypingResourceT = TypeVar("_TypingResourceT")
 _ResourceDataT = TypeVar("_ResourceDataT")

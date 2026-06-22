@@ -4,7 +4,7 @@
 from os import environ
 from typing import Literal
 
-import requests
+from requests import Response, Session
 
 from opentelemetry.sdk.environment_variables import (
     _OTEL_PYTHON_EXPORTER_OTLP_HTTP_CREDENTIAL_PROVIDER,
@@ -12,7 +12,7 @@ from opentelemetry.sdk.environment_variables import (
 from opentelemetry.util._importlib_metadata import entry_points
 
 
-def _is_retryable(resp: requests.Response) -> bool:
+def _is_retryable(resp: Response) -> bool:
     if resp.status_code == 408:
         return True
     if 500 <= resp.status_code <= 599:
@@ -26,7 +26,7 @@ def _load_session_from_envvar(
         "OTEL_PYTHON_EXPORTER_OTLP_HTTP_TRACES_CREDENTIAL_PROVIDER",
         "OTEL_PYTHON_EXPORTER_OTLP_HTTP_METRICS_CREDENTIAL_PROVIDER",
     ],
-) -> requests.Session | None:
+) -> Session | None:
     _credential_env = environ.get(
         _OTEL_PYTHON_EXPORTER_OTLP_HTTP_CREDENTIAL_PROVIDER
     ) or environ.get(cred_envvar)
@@ -45,11 +45,11 @@ def _load_session_from_envvar(
                 f"Requested component '{_credential_env}' not found in "
                 f"entry point 'opentelemetry_otlp_credential_provider'"
             )
-        if isinstance(maybe_session, requests.Session):
+        if isinstance(maybe_session, Session):
             return maybe_session
         else:
             raise RuntimeError(
                 f"Requested component '{_credential_env}' is of type {type(maybe_session)}"
-                f" must be of type `requests.Session`."
+                f" must be of type `Session`."
             )
     return None

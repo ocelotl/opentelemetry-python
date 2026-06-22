@@ -13,7 +13,7 @@ Field numbers:
 
 from __future__ import annotations
 
-import struct
+from struct import pack
 
 from opentelemetry.pyproto._pyproto import encode_int, encode_tag, encode_varint
 
@@ -71,7 +71,7 @@ class AnyValue:
         if self._which == "int_value":
             return encode_tag(3, _WT_VARINT) + encode_int(self.int_value)
         if self._which == "double_value":
-            return encode_tag(4, _WT_64BIT) + struct.pack("<d", self.double_value)
+            return encode_tag(4, _WT_64BIT) + pack("<d", self.double_value)
         if self._which == "array_value":
             return _msg(5, self.array_value.SerializeToString())
         if self._which == "kvlist_value":

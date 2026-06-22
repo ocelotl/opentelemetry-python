@@ -37,7 +37,7 @@ Field numbers:
 
 from __future__ import annotations
 
-import struct
+from struct import pack
 
 from opentelemetry.pyproto.common.v1.common_pyproto2 import (
     InstrumentationScope,
@@ -66,17 +66,17 @@ def _sfixed64(field: int, value: int) -> bytes:
     """sfixed64 field (little-endian signed 64-bit int)."""
     if value == 0:
         return b""
-    return encode_tag(field, _WT_64BIT) + struct.pack("<q", int(value))
+    return encode_tag(field, _WT_64BIT) + pack("<q", int(value))
 
 
 def _as_double(field: int, value: float) -> bytes:
     """Oneof as_double: always write, even if 0.0."""
-    return encode_tag(field, _WT_64BIT) + struct.pack("<d", value)
+    return encode_tag(field, _WT_64BIT) + pack("<d", value)
 
 
 def _as_int(field: int, value: int) -> bytes:
     """Oneof as_int: always write, even if 0."""
-    return encode_tag(field, _WT_64BIT) + struct.pack("<q", int(value))
+    return encode_tag(field, _WT_64BIT) + pack("<q", int(value))
 
 
 class Exemplar:

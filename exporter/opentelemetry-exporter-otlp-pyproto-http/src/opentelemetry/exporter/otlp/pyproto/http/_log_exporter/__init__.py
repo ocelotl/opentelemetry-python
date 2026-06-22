@@ -1,18 +1,18 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-import gzip
-import logging
-import random
-import threading
-import zlib
 from collections.abc import Sequence
+from gzip import GzipFile
 from io import BytesIO
+from logging import getLogger
 from os import environ
+from random import uniform
+from threading import Event
 from time import time
+from zlib import compress
 
-import requests
-from requests.exceptions import ConnectionError
+from requests import Session
+from requests.exceptions import ConnectionError, RequestException
 
 from opentelemetry.exporter.otlp.pyproto.common._internal._log_encoder import (
     encode_logs,
@@ -49,7 +49,7 @@ from opentelemetry.sdk.environment_variables import (
 )
 from opentelemetry.util.re import parse_env_headers
 
-_logger = logging.getLogger(__name__)
+_logger = getLogger(__name__)
 
 DEFAULT_ENDPOINT = "http://localhost:4318/"
 DEFAULT_LOGS_EXPORT_PATH = "v1/logs"
@@ -67,9 +67,9 @@ class OTLPLogExporter(LogRecordExporter):
         headers: dict[str, str] | None = None,
         timeout: float | None = None,
         compression: Compression | None = None,
-        session: requests.Session | None = None,
+        session: Session | None = None,
     ):
-        self._shutdown_is_occuring = threading.Event()
+        self._shutdown_is_occuring = Event()
         self._endpoint = endpoint or environ.get(
             OTEL_EXPORTER_OTLP_LOGS_ENDPOINT,
             _append_logs_path(
@@ -110,7 +110,7 @@ class OTLPLogExporter(LogRecordExporter):
             or _load_session_from_envvar(
                 _OTEL_PYTHON_EXPORTER_OTLP_HTTP_LOGS_CREDENTIAL_PROVIDER
             )
-            or requests.Session()
+            or Session()
         )
         self._session.headers.update(self._headers)
         self._session.headers.update(_OTLP_HTTP_HEADERS)
@@ -125,11 +125,11 @@ class OTLPLogExporter(LogRecordExporter):
         data = serialized_data
         if self._compression == Compression.Gzip:
             gzip_data = BytesIO()
-            with gzip.GzipFile(fileobj=gzip_data, mode="w") as gzip_stream:
+            with GzipFile(fileobj=gzip_data, mode="w") as gzip_stream:
                 gzip_stream.write(serialized_data)
             data = gzip_data.getvalue()
         elif self._compression == Compression.Deflate:
-            data = zlib.compress(serialized_data)
+            data = compress(serialized_data)
         if timeout_sec is None:
             timeout_sec = self._timeout
         try:
@@ -158,13 +158,13 @@ class OTLPLogExporter(LogRecordExporter):
         serialized_data = encode_logs(batch).SerializeToString()
         deadline_sec = time() + self._timeout
         for retry_num in range(_MAX_RETRYS):
-            backoff_seconds = 2**retry_num * random.uniform(0.8, 1.2)
+            backoff_seconds = 2**retry_num * uniform(0.8, 1.2)
             export_error: Exception | None = None
             try:
                 resp = self._export(serialized_data, deadline_sec - time())
                 if resp.ok:
                     return LogRecordExportResult.SUCCESS
-            except requests.exceptions.RequestException as error:
+            except RequestException as error:
                 reason = error
                 export_error = error
                 retryable = isinstance(error, ConnectionError)
