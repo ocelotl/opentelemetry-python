@@ -1,10 +1,9 @@
 def encode_varint(value: int) -> bytes:
-    bits = value & 0x7F
-    value >>= 7
-    result = b""
-    while value:
-        result += bytes([0x80 | bits])
-        bits = value & 0x7F
+    if value < 0:
+        raise ValueError("varint values must be non-negative")
+    output = bytearray()
+    while value > 0x7F:
+        output.append((value & 0x7F) | 0x80)
         value >>= 7
-    result += bytes([bits])
-    return result
+    output.append(value)
+    return bytes(output)
