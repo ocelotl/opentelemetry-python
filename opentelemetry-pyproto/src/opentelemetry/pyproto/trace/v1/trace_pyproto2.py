@@ -22,12 +22,12 @@ from opentelemetry.pyproto.common.v1.common_pyproto2 import (
 )
 from opentelemetry.pyproto.resource.v1.resource_pyproto2 import Resource
 from opentelemetry.pyproto._pyprotobuf.fields import (
-    _byt,
-    _fix32,
-    _fix64,
-    _msg,
-    _str,
-    _u64,
+    byt,
+    fix32,
+    fix64,
+    msg,
+    string,
+    u64,
 )
 
 
@@ -37,7 +37,7 @@ class Status:
         self.code = code
 
     def SerializeToString(self) -> bytes:
-        return _str(2, self.message) + _u64(3, self.code)
+        return string(2, self.message) + u64(3, self.code)
 
 
 class Span:
@@ -56,10 +56,10 @@ class Span:
 
         def SerializeToString(self) -> bytes:
             return (
-                _fix64(1, self.time_unix_nano)
-                + _str(2, self.name)
-                + b"".join(_msg(3, kv.SerializeToString()) for kv in self.attributes)
-                + _u64(4, self.dropped_attributes_count)
+                fix64(1, self.time_unix_nano)
+                + string(2, self.name)
+                + b"".join(msg(3, kv.SerializeToString()) for kv in self.attributes)
+                + u64(4, self.dropped_attributes_count)
             )
 
     class Link:
@@ -81,12 +81,12 @@ class Span:
 
         def SerializeToString(self) -> bytes:
             return (
-                _byt(1, self.trace_id)
-                + _byt(2, self.span_id)
-                + _str(3, self.trace_state)
-                + b"".join(_msg(4, kv.SerializeToString()) for kv in self.attributes)
-                + _u64(5, self.dropped_attributes_count)
-                + _fix32(6, self.flags)
+                byt(1, self.trace_id)
+                + byt(2, self.span_id)
+                + string(3, self.trace_state)
+                + b"".join(msg(4, kv.SerializeToString()) for kv in self.attributes)
+                + u64(5, self.dropped_attributes_count)
+                + fix32(6, self.flags)
             )
 
     def __init__(
@@ -127,24 +127,24 @@ class Span:
 
     def SerializeToString(self) -> bytes:
         result = (
-            _byt(1, self.trace_id)
-            + _byt(2, self.span_id)
-            + _str(3, self.trace_state)
-            + _byt(4, self.parent_span_id)
-            + _fix32(16, self.flags)
-            + _str(5, self.name)
-            + _u64(6, self.kind)
-            + _fix64(7, self.start_time_unix_nano)
-            + _fix64(8, self.end_time_unix_nano)
-            + b"".join(_msg(9, kv.SerializeToString()) for kv in self.attributes)
-            + _u64(10, self.dropped_attributes_count)
-            + b"".join(_msg(11, ev.SerializeToString()) for ev in self.events)
-            + _u64(12, self.dropped_events_count)
-            + b"".join(_msg(13, lk.SerializeToString()) for lk in self.links)
-            + _u64(14, self.dropped_links_count)
+            byt(1, self.trace_id)
+            + byt(2, self.span_id)
+            + string(3, self.trace_state)
+            + byt(4, self.parent_span_id)
+            + fix32(16, self.flags)
+            + string(5, self.name)
+            + u64(6, self.kind)
+            + fix64(7, self.start_time_unix_nano)
+            + fix64(8, self.end_time_unix_nano)
+            + b"".join(msg(9, kv.SerializeToString()) for kv in self.attributes)
+            + u64(10, self.dropped_attributes_count)
+            + b"".join(msg(11, ev.SerializeToString()) for ev in self.events)
+            + u64(12, self.dropped_events_count)
+            + b"".join(msg(13, lk.SerializeToString()) for lk in self.links)
+            + u64(14, self.dropped_links_count)
         )
         if self.status is not None:
-            result += _msg(15, self.status.SerializeToString())
+            result += msg(15, self.status.SerializeToString())
         return result
 
 
@@ -162,9 +162,9 @@ class ScopeSpans:
     def SerializeToString(self) -> bytes:
         result = b""
         if self.scope is not None:
-            result += _msg(1, self.scope.SerializeToString())
-        result += b"".join(_msg(2, sp.SerializeToString()) for sp in self.spans)
-        result += _str(3, self.schema_url)
+            result += msg(1, self.scope.SerializeToString())
+        result += b"".join(msg(2, sp.SerializeToString()) for sp in self.spans)
+        result += string(3, self.schema_url)
         return result
 
 
@@ -182,7 +182,7 @@ class ResourceSpans:
     def SerializeToString(self) -> bytes:
         result = b""
         if self.resource is not None:
-            result += _msg(1, self.resource.SerializeToString())
-        result += b"".join(_msg(2, ss.SerializeToString()) for ss in self.scope_spans)
-        result += _str(3, self.schema_url)
+            result += msg(1, self.resource.SerializeToString())
+        result += b"".join(msg(2, ss.SerializeToString()) for ss in self.scope_spans)
+        result += string(3, self.schema_url)
         return result

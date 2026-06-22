@@ -7,7 +7,7 @@ Field numbers:
 from __future__ import annotations
 
 from opentelemetry.pyproto.common.v1.common_pyproto2 import KeyValue
-from opentelemetry.pyproto._pyprotobuf.fields import _msg, _u64
+from opentelemetry.pyproto._pyprotobuf.fields import msg, u64
 
 
 class Resource:
@@ -21,6 +21,6 @@ class Resource:
 
     def SerializeToString(self) -> bytes:
         return (
-            b"".join(_msg(1, kv.SerializeToString()) for kv in self.attributes)
-            + _u64(2, self.dropped_attributes_count)
+            b"".join(msg(1, kv.SerializeToString()) for kv in self.attributes)
+            + u64(2, self.dropped_attributes_count)
         )

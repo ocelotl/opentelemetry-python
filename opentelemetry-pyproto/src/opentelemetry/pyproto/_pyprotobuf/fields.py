@@ -53,15 +53,15 @@ the three lowest bits of every tag integer. Only four wire types appear in
 proto3 messages (wire types 3 and 4, the deprecated group delimiters, do not
 appear in new proto3 code):
 
-    _WT_VARINT = 0  — one or more bytes with a continuation bit in the MSB of
+    WT_VARINT = 0  — one or more bytes with a continuation bit in the MSB of
                       each byte. Used for: int32, int64, uint32, uint64, sint32,
                       sint64, bool, enum.
-    _WT_64BIT  = 1  — exactly 8 bytes, little-endian. Used for: double,
+    WT_64BIT  = 1  — exactly 8 bytes, little-endian. Used for: double,
                       fixed64, sfixed64.
-    _WT_LEN    = 2  — a varint length prefix followed by that many bytes. Used
+    WT_LEN    = 2  — a varint length prefix followed by that many bytes. Used
                       for: string, bytes, embedded messages, packed repeated
                       fields.
-    _WT_32BIT  = 5  — exactly 4 bytes, little-endian. Used for: float, fixed32,
+    WT_32BIT  = 5  — exactly 4 bytes, little-endian. Used for: float, fixed32,
                       sfixed32.
 
 Reference: https://protobuf.dev/programming-guides/encoding/
@@ -75,13 +75,13 @@ from .scalars import encode_fixed32, encode_fixed64, encode_sint32
 from .tag import encode_tag
 from .varint import encode_varint
 
-_WT_VARINT = 0  # int32, int64, uint32, uint64, bool, enum
-_WT_64BIT = 1   # double, fixed64, sfixed64
-_WT_LEN = 2     # string, bytes, embedded messages, packed arrays
-_WT_32BIT = 5   # float, fixed32, sfixed32
+WT_VARINT = 0  # int32, int64, uint32, uint64, bool, enum
+WT_64BIT = 1   # double, fixed64, sfixed64
+WT_LEN = 2     # string, bytes, embedded messages, packed arrays
+WT_32BIT = 5   # float, fixed32, sfixed32
 
 
-def _msg(field: int, content: bytes) -> bytes:
+def msg(field: int, content: bytes) -> bytes:
     """Encode an embedded message or group as a length-delimited field.
 
     In the protobuf wire format, an embedded message is a length-delimited
@@ -93,7 +93,7 @@ def _msg(field: int, content: bytes) -> bytes:
     number of bytes in the already-serialised sub-message. The content is the
     verbatim output of the sub-message's own SerializeToString() call.
 
-    Unlike the scalar helpers, _msg does not apply an omission rule for empty
+    Unlike the scalar helpers, msg does not apply an omission rule for empty
     content. An embedded message with no fields set serialises to b"" (zero
     bytes), and the caller decides whether to write it at all. In practice,
     message fields are either written unconditionally when present or guarded
@@ -116,10 +116,10 @@ def _msg(field: int, content: bytes) -> bytes:
     bytes
         tag + varint(len(content)) + content
     """
-    return encode_tag(field, _WT_LEN) + encode_varint(len(content)) + content
+    return encode_tag(field, WT_LEN) + encode_varint(len(content)) + content
 
 
-def _str(field: int, value: str) -> bytes:
+def string(field: int, value: str) -> bytes:
     """Encode a proto3 string field, omitting it when the value is empty.
 
     Proto3 defines the default value for string fields as the empty string
@@ -149,10 +149,10 @@ def _str(field: int, value: str) -> bytes:
     if not value:
         return b""
     utf8 = value.encode("utf-8")
-    return encode_tag(field, _WT_LEN) + encode_varint(len(utf8)) + utf8
+    return encode_tag(field, WT_LEN) + encode_varint(len(utf8)) + utf8
 
 
-def _byt(field: int, value: bytes) -> bytes:
+def byt(field: int, value: bytes) -> bytes:
     """Encode a proto3 bytes field, omitting it when the value is empty.
 
     Proto3 defines the default value for bytes fields as the empty byte
@@ -163,7 +163,7 @@ def _byt(field: int, value: bytes) -> bytes:
 
         tag (varint) | byte_length (varint) | raw bytes
 
-    Unlike _str, no UTF-8 encoding step is needed because the caller already
+    Unlike string, no UTF-8 encoding step is needed because the caller already
     holds raw bytes. This helper is used for span_id, trace_id, and any other
     proto3 bytes field.
 
@@ -182,13 +182,13 @@ def _byt(field: int, value: bytes) -> bytes:
     """
     if not value:
         return b""
-    return encode_tag(field, _WT_LEN) + encode_varint(len(value)) + value
+    return encode_tag(field, WT_LEN) + encode_varint(len(value)) + value
 
 
-def _u64(field: int, value: int) -> bytes:
+def u64(field: int, value: int) -> bytes:
     """Encode a proto3 uint64 (or any varint-encoded integer) field.
 
-    This helper covers all proto3 field types whose wire type is _WT_VARINT
+    This helper covers all proto3 field types whose wire type is WT_VARINT
     and whose value is a non-negative integer: uint32, uint64, int32 (when
     non-negative), int64 (when non-negative), bool (encoded as 0 or 1), and
     enum (encoded as its integer value).
@@ -215,10 +215,10 @@ def _u64(field: int, value: int) -> bytes:
     """
     if value == 0:
         return b""
-    return encode_tag(field, _WT_VARINT) + encode_varint(value)
+    return encode_tag(field, WT_VARINT) + encode_varint(value)
 
 
-def _bool_field(field: int, value: bool) -> bytes:
+def bool_field(field: int, value: bool) -> bytes:
     """Encode a proto3 bool field, omitting it when False.
 
     Proto3 defines the default value for bool as False (encoded as 0). A
@@ -228,7 +228,7 @@ def _bool_field(field: int, value: bool) -> bytes:
 
         tag (varint) | 0x01
 
-    This helper is separate from _u64 because booleans carry different
+    This helper is separate from u64 because booleans carry different
     semantic meaning even though they share wire type 0 (varint). Keeping
     them distinct makes SerializeToString() implementations easier to read.
 
@@ -247,13 +247,13 @@ def _bool_field(field: int, value: bool) -> bytes:
     """
     if not value:
         return b""
-    return encode_tag(field, _WT_VARINT) + encode_varint(1)
+    return encode_tag(field, WT_VARINT) + encode_varint(1)
 
 
-def _fix32(field: int, value: int) -> bytes:
+def fix32(field: int, value: int) -> bytes:
     """Encode a proto3 fixed32 field (4-byte little-endian uint32).
 
-    fixed32 uses wire type _WT_32BIT. The decoder reads exactly 4 bytes after
+    fixed32 uses wire type WT_32BIT. The decoder reads exactly 4 bytes after
     the tag. This makes fixed32 more efficient than uint32 for values that are
     frequently large (close to 2^32), because it avoids varint overhead.
 
@@ -278,13 +278,13 @@ def _fix32(field: int, value: int) -> bytes:
     """
     if value == 0:
         return b""
-    return encode_tag(field, _WT_32BIT) + encode_fixed32(value)
+    return encode_tag(field, WT_32BIT) + encode_fixed32(value)
 
 
-def _fix64(field: int, value: int) -> bytes:
+def fix64(field: int, value: int) -> bytes:
     """Encode a proto3 fixed64 field (8-byte little-endian uint64).
 
-    fixed64 uses wire type _WT_64BIT. The decoder reads exactly 8 bytes after
+    fixed64 uses wire type WT_64BIT. The decoder reads exactly 8 bytes after
     the tag. In the OTel proto schemas, fixed64 is used for nanosecond
     timestamps (start_time_unix_nano, time_unix_nano), counts, and bucket
     counts that are guaranteed to be non-negative.
@@ -310,19 +310,19 @@ def _fix64(field: int, value: int) -> bytes:
     """
     if value == 0:
         return b""
-    return encode_tag(field, _WT_64BIT) + encode_fixed64(value)
+    return encode_tag(field, WT_64BIT) + encode_fixed64(value)
 
 
-def _dbl(field: int, value: float) -> bytes:
+def dbl(field: int, value: float) -> bytes:
     """Encode a proto3 double field (8-byte IEEE 754), omitting when zero.
 
-    double uses wire type _WT_64BIT. The decoder reads exactly 8 bytes and
+    double uses wire type WT_64BIT. The decoder reads exactly 8 bytes and
     interprets them as an IEEE 754 double-precision floating-point number in
     little-endian byte order.
 
     Proto3 default is 0.0. A zero value must not be written to the wire.
-    Note that -0.0 compares equal to 0.0 in Python, so _dbl(field, -0.0)
-    returns b"" — if that distinction matters, use _opt_dbl instead.
+    Note that -0.0 compares equal to 0.0 in Python, so dbl(field, -0.0)
+    returns b"" — if that distinction matters, use opt_dbl instead.
 
     This helper is used for scalar double fields that have a meaningful zero
     default and should be omitted when zero: for example, the `sum` field of
@@ -344,10 +344,10 @@ def _dbl(field: int, value: float) -> bytes:
     """
     if value == 0.0:
         return b""
-    return encode_tag(field, _WT_64BIT) + pack("<d", value)
+    return encode_tag(field, WT_64BIT) + pack("<d", value)
 
 
-def _opt_dbl(field: int, value: float | None) -> bytes:
+def opt_dbl(field: int, value: float | None) -> bytes:
     """Encode an optional proto3 double field, written even when 0.0.
 
     Some double fields in the OTel proto schemas are declared optional
@@ -356,12 +356,12 @@ def _opt_dbl(field: int, value: float | None) -> bytes:
     measurement and must be written; only None (field not set) causes the
     field to be omitted.
 
-    This is distinct from _dbl, which omits 0.0 as the proto3 default.
-    _opt_dbl is used for fields such as `sum`, `min`, and `max` on histogram
+    This is distinct from dbl, which omits 0.0 as the proto3 default.
+    opt_dbl is used for fields such as `sum`, `min`, and `max` on histogram
     data points, where None means "not present" and 0.0 means "present and
     measured as zero".
 
-    The encoding on the wire is identical to _dbl when the value is present:
+    The encoding on the wire is identical to dbl when the value is present:
 
         tag (varint) | 8-byte little-endian double
 
@@ -381,13 +381,13 @@ def _opt_dbl(field: int, value: float | None) -> bytes:
     """
     if value is None:
         return b""
-    return encode_tag(field, _WT_64BIT) + pack("<d", value)
+    return encode_tag(field, WT_64BIT) + pack("<d", value)
 
 
-def _sint32(field: int, value: int) -> bytes:
+def sint32(field: int, value: int) -> bytes:
     """Encode a proto3 sint32 field (ZigZag varint), omitting when zero.
 
-    sint32 uses wire type _WT_VARINT but applies ZigZag encoding before the
+    sint32 uses wire type WT_VARINT but applies ZigZag encoding before the
     varint step. ZigZag maps signed integers to unsigned integers so that
     small negative values produce short varints rather than the ten-byte
     varints that two's-complement representation would require:
@@ -400,7 +400,7 @@ def _sint32(field: int, value: int) -> bytes:
         n  →  -2*n - 1   (for n < 0)
 
     This is the correct encoding for the proto3 `sint32` type. It is NOT used
-    for `int32` fields (use _u64 for non-negative int32, or encode_int from
+    for `int32` fields (use u64 for non-negative int32, or encode_int from
     the package for signed int32).
 
     In the OTel proto schemas, sint32 appears on the `scale` field of
@@ -424,10 +424,10 @@ def _sint32(field: int, value: int) -> bytes:
     """
     if value == 0:
         return b""
-    return encode_tag(field, _WT_VARINT) + encode_sint32(value)
+    return encode_tag(field, WT_VARINT) + encode_sint32(value)
 
 
-def _packed_uint64(field: int, values: list[int]) -> bytes:
+def packed_uint64(field: int, values: list[int]) -> bytes:
     """Encode a packed repeated uint64 field.
 
     In proto3, repeated scalar fields are packed by default. "Packed" means
@@ -465,13 +465,13 @@ def _packed_uint64(field: int, values: list[int]) -> bytes:
     if not values:
         return b""
     payload = b"".join(encode_varint(v) for v in values)
-    return encode_tag(field, _WT_LEN) + encode_varint(len(payload)) + payload
+    return encode_tag(field, WT_LEN) + encode_varint(len(payload)) + payload
 
 
-def _packed_fix64(field: int, values: list[int]) -> bytes:
+def packed_fix64(field: int, values: list[int]) -> bytes:
     """Encode a packed repeated fixed64 field.
 
-    Like _packed_uint64 but each element is encoded as an 8-byte
+    Like packed_uint64 but each element is encoded as an 8-byte
     little-endian uint64 rather than a varint. The wire layout is:
 
         tag (varint) | payload_length (varint) | element0 (8 bytes) | element1 (8 bytes) | ...
@@ -502,13 +502,13 @@ def _packed_fix64(field: int, values: list[int]) -> bytes:
     if not values:
         return b""
     payload = b"".join(encode_fixed64(v) for v in values)
-    return encode_tag(field, _WT_LEN) + encode_varint(len(payload)) + payload
+    return encode_tag(field, WT_LEN) + encode_varint(len(payload)) + payload
 
 
-def _packed_double(field: int, values: list[float]) -> bytes:
+def packed_double(field: int, values: list[float]) -> bytes:
     """Encode a packed repeated double field.
 
-    Like _packed_uint64 but each element is an IEEE 754 double (8 bytes,
+    Like packed_uint64 but each element is an IEEE 754 double (8 bytes,
     little-endian). The wire layout is:
 
         tag (varint) | payload_length (varint) | element0 (8 bytes) | element1 (8 bytes) | ...
@@ -539,4 +539,4 @@ def _packed_double(field: int, values: list[float]) -> bytes:
     if not values:
         return b""
     payload = pack(f"<{len(values)}d", *values)
-    return encode_tag(field, _WT_LEN) + encode_varint(len(payload)) + payload
+    return encode_tag(field, WT_LEN) + encode_varint(len(payload)) + payload

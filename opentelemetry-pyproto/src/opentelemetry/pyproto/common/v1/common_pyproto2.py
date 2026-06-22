@@ -17,7 +17,7 @@ from struct import pack
 
 from opentelemetry.pyproto._pyprotobuf import encode_int, encode_tag, encode_varint
 
-from opentelemetry.pyproto._pyprotobuf.fields import _msg, _str, _u64, _WT_LEN, _WT_VARINT, _WT_64BIT
+from opentelemetry.pyproto._pyprotobuf.fields import msg, string, u64, WT_LEN, WT_VARINT, WT_64BIT
 
 
 class AnyValue:
@@ -65,20 +65,20 @@ class AnyValue:
         # oneof: always written even when the value equals the proto3 default.
         if self._which == "string_value":
             utf8 = self.string_value.encode("utf-8")
-            return encode_tag(1, _WT_LEN) + encode_varint(len(utf8)) + utf8
+            return encode_tag(1, WT_LEN) + encode_varint(len(utf8)) + utf8
         if self._which == "bool_value":
-            return encode_tag(2, _WT_VARINT) + encode_varint(1 if self.bool_value else 0)
+            return encode_tag(2, WT_VARINT) + encode_varint(1 if self.bool_value else 0)
         if self._which == "int_value":
-            return encode_tag(3, _WT_VARINT) + encode_int(self.int_value)
+            return encode_tag(3, WT_VARINT) + encode_int(self.int_value)
         if self._which == "double_value":
-            return encode_tag(4, _WT_64BIT) + pack("<d", self.double_value)
+            return encode_tag(4, WT_64BIT) + pack("<d", self.double_value)
         if self._which == "array_value":
-            return _msg(5, self.array_value.SerializeToString())
+            return msg(5, self.array_value.SerializeToString())
         if self._which == "kvlist_value":
-            return _msg(6, self.kvlist_value.SerializeToString())
+            return msg(6, self.kvlist_value.SerializeToString())
         if self._which == "bytes_value":
             bv = self.bytes_value
-            return encode_tag(7, _WT_LEN) + encode_varint(len(bv)) + bv
+            return encode_tag(7, WT_LEN) + encode_varint(len(bv)) + bv
         return b""
 
 
@@ -87,7 +87,7 @@ class ArrayValue:
         self.values: list[AnyValue] = list(values) if values else []
 
     def SerializeToString(self) -> bytes:
-        return b"".join(_msg(1, v.SerializeToString()) for v in self.values)
+        return b"".join(msg(1, v.SerializeToString()) for v in self.values)
 
 
 class KeyValueList:
@@ -95,7 +95,7 @@ class KeyValueList:
         self.values: list[KeyValue] = list(values) if values else []
 
     def SerializeToString(self) -> bytes:
-        return b"".join(_msg(1, kv.SerializeToString()) for kv in self.values)
+        return b"".join(msg(1, kv.SerializeToString()) for kv in self.values)
 
 
 class KeyValue:
@@ -104,9 +104,9 @@ class KeyValue:
         self.value = value
 
     def SerializeToString(self) -> bytes:
-        result = _str(1, self.key)
+        result = string(1, self.key)
         if self.value is not None:
-            result += _msg(2, self.value.SerializeToString())
+            result += msg(2, self.value.SerializeToString())
         return result
 
 
@@ -125,8 +125,8 @@ class InstrumentationScope:
 
     def SerializeToString(self) -> bytes:
         return (
-            _str(1, self.name)
-            + _str(2, self.version)
-            + b"".join(_msg(3, kv.SerializeToString()) for kv in self.attributes)
-            + _u64(4, self.dropped_attributes_count)
+            string(1, self.name)
+            + string(2, self.version)
+            + b"".join(msg(3, kv.SerializeToString()) for kv in self.attributes)
+            + u64(4, self.dropped_attributes_count)
         )
