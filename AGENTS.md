@@ -62,12 +62,6 @@ uv run tox -e typecheck
 - Do not add `type: ignore` comments. If a type error arises, solve it properly or write a follow-up plan to address it in another PR.
 - Whenever applicable, all code changes should have tests that actually validate the changes.
 
-## Commit cadence
-
-Make a separate git commit after every discrete change. Do not batch unrelated
-changes into a single commit. Each commit should be self-contained and leave
-the repository in a working state.
-
 ## Commit formatting
 
 We appreciate it if users disclose the use of AI tools when the significant part of a commit is
