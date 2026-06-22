@@ -45,19 +45,19 @@ from opentelemetry.pyproto.common.v1.common_pyproto2 import (
 )
 from opentelemetry.pyproto.resource.v1.resource_pyproto2 import Resource
 from opentelemetry.pyproto._pyprotobuf.fields import (
-    _byt,
-    _bool_field,
-    _dbl,
-    _fix64,
-    _msg,
-    _opt_dbl,
-    _packed_double,
-    _packed_fix64,
-    _packed_uint64,
-    _sint32,
-    _str,
-    _u64,
-    _WT_64BIT,
+    byt,
+    bool_field,
+    dbl,
+    fix64,
+    msg,
+    opt_dbl,
+    packed_double,
+    packed_fix64,
+    packed_uint64,
+    sint32,
+    string,
+    u64,
+    WT_64BIT,
 )
 from opentelemetry.pyproto._pyprotobuf import encode_tag
 
@@ -66,17 +66,17 @@ def _sfixed64(field: int, value: int) -> bytes:
     """sfixed64 field (little-endian signed 64-bit int)."""
     if value == 0:
         return b""
-    return encode_tag(field, _WT_64BIT) + pack("<q", int(value))
+    return encode_tag(field, WT_64BIT) + pack("<q", int(value))
 
 
 def _as_double(field: int, value: float) -> bytes:
     """Oneof as_double: always write, even if 0.0."""
-    return encode_tag(field, _WT_64BIT) + pack("<d", value)
+    return encode_tag(field, WT_64BIT) + pack("<d", value)
 
 
 def _as_int(field: int, value: int) -> bytes:
     """Oneof as_int: always write, even if 0."""
-    return encode_tag(field, _WT_64BIT) + pack("<q", int(value))
+    return encode_tag(field, WT_64BIT) + pack("<q", int(value))
 
 
 class Exemplar:
@@ -109,14 +109,14 @@ class Exemplar:
 
     def SerializeToString(self) -> bytes:
         result = b"".join(
-            _msg(7, kv.SerializeToString()) for kv in self.filtered_attributes
+            msg(7, kv.SerializeToString()) for kv in self.filtered_attributes
         )
-        result += _fix64(2, self.time_unix_nano)
+        result += fix64(2, self.time_unix_nano)
         if self._which == "as_double":
             result += _as_double(3, self._as_double)  # type: ignore[arg-type]
         elif self._which == "as_int":
             result += _as_int(6, self._as_int)  # type: ignore[arg-type]
-        result += _byt(4, self.span_id) + _byt(5, self.trace_id)
+        result += byt(4, self.span_id) + byt(5, self.trace_id)
         return result
 
 
@@ -149,14 +149,14 @@ class NumberDataPoint:
         return None
 
     def SerializeToString(self) -> bytes:
-        result = b"".join(_msg(7, kv.SerializeToString()) for kv in self.attributes)
-        result += _fix64(2, self.start_time_unix_nano) + _fix64(3, self.time_unix_nano)
+        result = b"".join(msg(7, kv.SerializeToString()) for kv in self.attributes)
+        result += fix64(2, self.start_time_unix_nano) + fix64(3, self.time_unix_nano)
         if self._which == "as_double":
             result += _as_double(4, self._as_double)  # type: ignore[arg-type]
         elif self._which == "as_int":
             result += _as_int(6, self._as_int)  # type: ignore[arg-type]
-        result += b"".join(_msg(5, ex.SerializeToString()) for ex in self.exemplars)
-        result += _u64(8, self.flags)
+        result += b"".join(msg(5, ex.SerializeToString()) for ex in self.exemplars)
+        result += u64(8, self.flags)
         return result
 
 
@@ -190,18 +190,18 @@ class HistogramDataPoint:
         self.max = max
 
     def SerializeToString(self) -> bytes:
-        result = b"".join(_msg(9, kv.SerializeToString()) for kv in self.attributes)
+        result = b"".join(msg(9, kv.SerializeToString()) for kv in self.attributes)
         result += (
-            _fix64(2, self.start_time_unix_nano)
-            + _fix64(3, self.time_unix_nano)
-            + _fix64(4, self.count)
-            + _opt_dbl(5, self.sum)
-            + _packed_fix64(6, self.bucket_counts)
-            + _packed_double(7, self.explicit_bounds)
-            + b"".join(_msg(8, ex.SerializeToString()) for ex in self.exemplars)
-            + _u64(10, self.flags)
-            + _opt_dbl(11, self.min)
-            + _opt_dbl(12, self.max)
+            fix64(2, self.start_time_unix_nano)
+            + fix64(3, self.time_unix_nano)
+            + fix64(4, self.count)
+            + opt_dbl(5, self.sum)
+            + packed_fix64(6, self.bucket_counts)
+            + packed_double(7, self.explicit_bounds)
+            + b"".join(msg(8, ex.SerializeToString()) for ex in self.exemplars)
+            + u64(10, self.flags)
+            + opt_dbl(11, self.min)
+            + opt_dbl(12, self.max)
         )
         return result
 
@@ -220,8 +220,8 @@ class ExponentialHistogramDataPoint:
 
         def SerializeToString(self) -> bytes:
             return (
-                _sint32(1, self.offset)
-                + _packed_uint64(2, self.bucket_counts)
+                sint32(1, self.offset)
+                + packed_uint64(2, self.bucket_counts)
             )
 
     def __init__(
@@ -257,25 +257,25 @@ class ExponentialHistogramDataPoint:
         self.zero_threshold = zero_threshold
 
     def SerializeToString(self) -> bytes:
-        result = b"".join(_msg(1, kv.SerializeToString()) for kv in self.attributes)
+        result = b"".join(msg(1, kv.SerializeToString()) for kv in self.attributes)
         result += (
-            _fix64(2, self.start_time_unix_nano)
-            + _fix64(3, self.time_unix_nano)
-            + _fix64(4, self.count)
-            + _opt_dbl(5, self.sum)
-            + _sint32(6, self.scale)
-            + _fix64(7, self.zero_count)
+            fix64(2, self.start_time_unix_nano)
+            + fix64(3, self.time_unix_nano)
+            + fix64(4, self.count)
+            + opt_dbl(5, self.sum)
+            + sint32(6, self.scale)
+            + fix64(7, self.zero_count)
         )
         if self.positive is not None:
-            result += _msg(8, self.positive.SerializeToString())
+            result += msg(8, self.positive.SerializeToString())
         if self.negative is not None:
-            result += _msg(9, self.negative.SerializeToString())
+            result += msg(9, self.negative.SerializeToString())
         result += (
-            _u64(10, self.flags)
-            + b"".join(_msg(11, ex.SerializeToString()) for ex in self.exemplars)
-            + _opt_dbl(12, self.min)
-            + _opt_dbl(13, self.max)
-            + _dbl(14, self.zero_threshold)
+            u64(10, self.flags)
+            + b"".join(msg(11, ex.SerializeToString()) for ex in self.exemplars)
+            + opt_dbl(12, self.min)
+            + opt_dbl(13, self.max)
+            + dbl(14, self.zero_threshold)
         )
         return result
 
@@ -287,7 +287,7 @@ class SummaryDataPoint:
             self.value = value
 
         def SerializeToString(self) -> bytes:
-            return _dbl(1, self.quantile) + _dbl(2, self.value)
+            return dbl(1, self.quantile) + dbl(2, self.value)
 
     def __init__(
         self,
@@ -310,14 +310,14 @@ class SummaryDataPoint:
         self.flags = flags
 
     def SerializeToString(self) -> bytes:
-        result = b"".join(_msg(7, kv.SerializeToString()) for kv in self.attributes)
+        result = b"".join(msg(7, kv.SerializeToString()) for kv in self.attributes)
         result += (
-            _fix64(2, self.start_time_unix_nano)
-            + _fix64(3, self.time_unix_nano)
-            + _fix64(4, self.count)
-            + _dbl(5, self.sum)
-            + b"".join(_msg(6, qv.SerializeToString()) for qv in self.quantile_values)
-            + _u64(8, self.flags)
+            fix64(2, self.start_time_unix_nano)
+            + fix64(3, self.time_unix_nano)
+            + fix64(4, self.count)
+            + dbl(5, self.sum)
+            + b"".join(msg(6, qv.SerializeToString()) for qv in self.quantile_values)
+            + u64(8, self.flags)
         )
         return result
 
@@ -329,7 +329,7 @@ class Gauge:
         )
 
     def SerializeToString(self) -> bytes:
-        return b"".join(_msg(1, dp.SerializeToString()) for dp in self.data_points)
+        return b"".join(msg(1, dp.SerializeToString()) for dp in self.data_points)
 
 
 class Sum:
@@ -349,9 +349,9 @@ class Sum:
         temp = self.aggregation_temporality
         temp_int = temp.value if hasattr(temp, "value") else int(temp)
         return (
-            b"".join(_msg(1, dp.SerializeToString()) for dp in self.data_points)
-            + _u64(2, temp_int)
-            + _bool_field(3, self.is_monotonic)
+            b"".join(msg(1, dp.SerializeToString()) for dp in self.data_points)
+            + u64(2, temp_int)
+            + bool_field(3, self.is_monotonic)
         )
 
 
@@ -370,8 +370,8 @@ class Histogram:
         temp = self.aggregation_temporality
         temp_int = temp.value if hasattr(temp, "value") else int(temp)
         return (
-            b"".join(_msg(1, dp.SerializeToString()) for dp in self.data_points)
-            + _u64(2, temp_int)
+            b"".join(msg(1, dp.SerializeToString()) for dp in self.data_points)
+            + u64(2, temp_int)
         )
 
 
@@ -390,8 +390,8 @@ class ExponentialHistogram:
         temp = self.aggregation_temporality
         temp_int = temp.value if hasattr(temp, "value") else int(temp)
         return (
-            b"".join(_msg(1, dp.SerializeToString()) for dp in self.data_points)
-            + _u64(2, temp_int)
+            b"".join(msg(1, dp.SerializeToString()) for dp in self.data_points)
+            + u64(2, temp_int)
         )
 
 
@@ -402,7 +402,7 @@ class Summary:
         )
 
     def SerializeToString(self) -> bytes:
-        return b"".join(_msg(1, dp.SerializeToString()) for dp in self.data_points)
+        return b"".join(msg(1, dp.SerializeToString()) for dp in self.data_points)
 
 
 class Metric:
@@ -446,17 +446,17 @@ class Metric:
         return None
 
     def SerializeToString(self) -> bytes:
-        result = _str(1, self.name) + _str(2, self.description) + _str(3, self.unit)
+        result = string(1, self.name) + string(2, self.description) + string(3, self.unit)
         if self.gauge is not None:
-            result += _msg(5, self.gauge.SerializeToString())
+            result += msg(5, self.gauge.SerializeToString())
         elif self.sum is not None:
-            result += _msg(7, self.sum.SerializeToString())
+            result += msg(7, self.sum.SerializeToString())
         elif self.histogram is not None:
-            result += _msg(9, self.histogram.SerializeToString())
+            result += msg(9, self.histogram.SerializeToString())
         elif self.exponential_histogram is not None:
-            result += _msg(10, self.exponential_histogram.SerializeToString())
+            result += msg(10, self.exponential_histogram.SerializeToString())
         elif self.summary is not None:
-            result += _msg(11, self.summary.SerializeToString())
+            result += msg(11, self.summary.SerializeToString())
         return result
 
 
@@ -474,9 +474,9 @@ class ScopeMetrics:
     def SerializeToString(self) -> bytes:
         result = b""
         if self.scope is not None:
-            result += _msg(1, self.scope.SerializeToString())
-        result += b"".join(_msg(2, m.SerializeToString()) for m in self.metrics)
-        result += _str(3, self.schema_url)
+            result += msg(1, self.scope.SerializeToString())
+        result += b"".join(msg(2, m.SerializeToString()) for m in self.metrics)
+        result += string(3, self.schema_url)
         return result
 
 
@@ -496,7 +496,7 @@ class ResourceMetrics:
     def SerializeToString(self) -> bytes:
         result = b""
         if self.resource is not None:
-            result += _msg(1, self.resource.SerializeToString())
-        result += b"".join(_msg(2, sm.SerializeToString()) for sm in self.scope_metrics)
-        result += _str(3, self.schema_url)
+            result += msg(1, self.resource.SerializeToString())
+        result += b"".join(msg(2, sm.SerializeToString()) for sm in self.scope_metrics)
+        result += string(3, self.schema_url)
         return result
