@@ -131,7 +131,6 @@ class Span:
             + byt(2, self.span_id)
             + string(3, self.trace_state)
             + byt(4, self.parent_span_id)
-            + fix32(16, self.flags)
             + string(5, self.name)
             + u64(6, self.kind)
             + fix64(7, self.start_time_unix_nano)
@@ -145,6 +144,7 @@ class Span:
         )
         if self.status is not None:
             result += msg(15, self.status.SerializeToString())
+        result += fix32(16, self.flags)
         return result
 
 
