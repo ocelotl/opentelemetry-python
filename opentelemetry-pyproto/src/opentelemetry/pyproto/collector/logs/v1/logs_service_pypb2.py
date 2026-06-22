@@ -24,5 +24,9 @@ class ExportLogsServiceRequest:
 
 
 class ExportLogsServiceResponse:
+    @classmethod
+    def FromString(cls, data: bytes) -> 'ExportLogsServiceResponse':
+        return cls()
+
     def SerializeToString(self) -> bytes:
         return b""
