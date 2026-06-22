@@ -5,10 +5,10 @@
 # Variable-width types (varint-backed) are verified against hand-computed
 # expected byte literals derived from the protobuf wire-format spec.
 
-import math
-import struct
+from math import e, inf, nan, pi, tau
+from struct import pack, unpack
 
-from pytest import mark, raises
+from pytest import mark
 
 from opentelemetry.pyproto._pyproto import (
     encode_bool,
@@ -25,6 +25,7 @@ from opentelemetry.pyproto._pyproto import (
     encode_string,
     encode_uint32,
     encode_uint64,
+    encode_varint,
 )
 
 
@@ -66,7 +67,6 @@ def test_uint64_max() -> None:
     [0, 1, 127, 128, 2**32 - 1, 2**32, 2**56, 2**63 - 1, 2**63, 2**64 - 1],
 )
 def test_uint64_is_varint(value: int) -> None:
-    from opentelemetry.pyproto._pyproto import encode_varint
     assert encode_uint64(value) == encode_varint(value)
 
 
@@ -171,7 +171,6 @@ def test_sint32_min() -> None:
 def test_sint32_zigzag(value: int) -> None:
     # Verify ZigZag correctness using the arithmetic definition as oracle.
     zigzag = 2 * value if value >= 0 else -2 * value - 1
-    from opentelemetry.pyproto._pyproto import encode_varint
     assert encode_sint32(value) == encode_varint(zigzag)
 
 
@@ -208,7 +207,6 @@ def test_sint64_min() -> None:
 )
 def test_sint64_zigzag(value: int) -> None:
     zigzag = 2 * value if value >= 0 else -2 * value - 1
-    from opentelemetry.pyproto._pyproto import encode_varint
     assert encode_sint64(value) == encode_varint(zigzag)
 
 
@@ -232,23 +230,23 @@ def test_float_negative_one() -> None:
 def test_float_always_four_bytes() -> None:
     assert len(encode_float(0.0)) == 4
     assert len(encode_float(1.0)) == 4
-    assert len(encode_float(math.inf)) == 4
+    assert len(encode_float(inf)) == 4
 
 
 @mark.parametrize(
     "value",
     [
         0.0, 1.0, -1.0, 0.5, -0.5, 0.25, 2.0, -2.0,
-        struct.unpack("<f", b"\xff\x7f\x7f\x7f")[0],
-        math.inf, -math.inf,
+        unpack("<f", b"\xff\x7f\x7f\x7f")[0],
+        inf, -inf,
     ],
 )
 def test_float_matches_struct(value: float) -> None:
-    assert encode_float(value) == struct.pack("<f", value)
+    assert encode_float(value) == pack("<f", value)
 
 
 def test_float_nan_matches_struct() -> None:
-    assert encode_float(math.nan) == struct.pack("<f", math.nan)
+    assert encode_float(nan) == pack("<f", nan)
 
 
 # ── encode_double ──────────────────────────────────────────────────────────────
@@ -270,22 +268,22 @@ def test_double_negative_one() -> None:
 def test_double_always_eight_bytes() -> None:
     assert len(encode_double(0.0)) == 8
     assert len(encode_double(1.0)) == 8
-    assert len(encode_double(math.inf)) == 8
+    assert len(encode_double(inf)) == 8
 
 
 @mark.parametrize(
     "value",
     [
-        0.0, 1.0, -1.0, 0.5, -0.5, math.pi, math.e, math.tau,
-        1e100, -1e100, 5e-324, 1.7976931348623157e308, math.inf, -math.inf,
+        0.0, 1.0, -1.0, 0.5, -0.5, pi, e, tau,
+        1e100, -1e100, 5e-324, 1.7976931348623157e308, inf, -inf,
     ],
 )
 def test_double_matches_struct(value: float) -> None:
-    assert encode_double(value) == struct.pack("<d", value)
+    assert encode_double(value) == pack("<d", value)
 
 
 def test_double_nan_matches_struct() -> None:
-    assert encode_double(math.nan) == struct.pack("<d", math.nan)
+    assert encode_double(nan) == pack("<d", nan)
 
 
 # ── encode_fixed32 ─────────────────────────────────────────────────────────────
@@ -310,7 +308,7 @@ def test_fixed32_always_four_bytes() -> None:
 
 @mark.parametrize("value", [0, 1, 127, 128, 255, 256, 2**16 - 1, 2**16, 2**24, 2**32 - 1])
 def test_fixed32_matches_struct(value: int) -> None:
-    assert encode_fixed32(value) == struct.pack("<I", value)
+    assert encode_fixed32(value) == pack("<I", value)
 
 
 # ── encode_sfixed32 ────────────────────────────────────────────────────────────
@@ -342,7 +340,7 @@ def test_sfixed32_always_four_bytes() -> None:
 
 @mark.parametrize("value", [0, 1, -1, 127, -128, 2**15 - 1, -(2**15), 2**31 - 1, -(2**31)])
 def test_sfixed32_matches_struct(value: int) -> None:
-    assert encode_sfixed32(value) == struct.pack("<i", value)
+    assert encode_sfixed32(value) == pack("<i", value)
 
 
 # ── encode_fixed64 ─────────────────────────────────────────────────────────────
@@ -369,7 +367,7 @@ def test_fixed64_always_eight_bytes() -> None:
     "value", [0, 1, 255, 2**16 - 1, 2**32 - 1, 2**32, 2**48, 2**63, 2**64 - 1]
 )
 def test_fixed64_matches_struct(value: int) -> None:
-    assert encode_fixed64(value) == struct.pack("<Q", value)
+    assert encode_fixed64(value) == pack("<Q", value)
 
 
 # ── encode_sfixed64 ────────────────────────────────────────────────────────────
@@ -404,7 +402,7 @@ def test_sfixed64_always_eight_bytes() -> None:
     [0, 1, -1, 127, -128, 2**31 - 1, -(2**31), 2**32, -(2**32), 2**63 - 1, -(2**63)],
 )
 def test_sfixed64_matches_struct(value: int) -> None:
-    assert encode_sfixed64(value) == struct.pack("<q", value)
+    assert encode_sfixed64(value) == pack("<q", value)
 
 
 # ── encode_string ──────────────────────────────────────────────────────────────
@@ -456,7 +454,6 @@ def test_string_two_byte_length_prefix() -> None:
 def test_string_length_prefix_matches_utf8_bytecount(value: str) -> None:
     utf8 = value.encode("utf-8")
     result = encode_string(value)
-    from opentelemetry.pyproto._pyproto import encode_varint
     assert result == encode_varint(len(utf8)) + utf8
 
 
@@ -501,5 +498,4 @@ def test_bytes_two_byte_length_prefix() -> None:
 )
 def test_bytes_length_prefix_matches_payload_length(value: bytes) -> None:
     result = encode_bytes(value)
-    from opentelemetry.pyproto._pyproto import encode_varint
     assert result == encode_varint(len(value)) + value
