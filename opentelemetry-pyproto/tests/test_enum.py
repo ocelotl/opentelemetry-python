@@ -5,7 +5,7 @@
 # two's-complement varint. These tests verify that contract using hand-computed
 # expected byte literals.
 
-from opentelemetry.pyproto._pyproto import encode_enum, encode_int
+from opentelemetry.pyproto._pyprotobuf import encode_enum, encode_int
 
 
 def test_zero() -> None:

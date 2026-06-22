@@ -2,12 +2,12 @@
 
 Why this module exists
 ----------------------
-The _pyproto subpackage provides the raw encoding kernel: functions that take a
-Python value and return its bytes representation in the protobuf wire format
-(encode_varint, encode_fixed64, encode_sint32, etc.). Those functions know
-nothing about proto3 messages. They do not know about field numbers, wire-type
-tags, or the rule that says a field whose value equals the proto3 default must
-be omitted from the serialised output.
+The other modules in this package (varint, tag, scalars, enum) provide the
+raw encoding kernel: functions that take a Python value and return its bytes
+representation in the protobuf wire format. Those functions know nothing about
+proto3 messages. They do not know about field numbers, wire-type tags, or the
+rule that says a field whose value equals the proto3 default must be omitted
+from the serialised output.
 
 This module sits one level above that kernel. It provides one helper per
 proto3 scalar category (uint64, sint32, double, string, bytes, bool, fixed32,
@@ -15,49 +15,36 @@ fixed64) plus helpers for embedded messages and packed repeated fields. Each
 helper combines three operations that every SerializeToString() method must
 perform for every field it writes:
 
-    1. Encode the tag  — (field_number << 3) | wire_type, then varint-encoded.
-    2. Apply the proto3 default-omission rule — if the value equals the type's
+    1. Apply the proto3 default-omission rule — if the value equals the type's
        default (0, 0.0, False, b"", ""), return b"" immediately.
-    3. Encode the value — using the appropriate _pyproto primitive.
+    2. Encode the tag — (field_number << 3) | wire_type, then varint-encoded.
+    3. Encode the value — using the appropriate primitive from this package.
 
 Without these helpers, every SerializeToString() method would repeat that
 three-step pattern inline for every field, cluttering the message classes with
 low-level wire-format details and making the default-omission logic easy to get
 wrong or forget.
 
-Why it is named "_wire"
------------------------
-"Wire" refers to the protobuf wire format: the binary layout that the protobuf
-specification defines for how messages are encoded on the wire (in a network
-packet, in a file, in a byte string). The wire format is the layer below the
-message API and above raw bytes. Each field in a proto3 message is encoded as
-one or more wire-format records, each consisting of a tag and a value.
+Why it is named "fields"
+------------------------
+Each function in this module encodes one proto3 field: it takes a field number
+and a value, and returns the complete on-wire bytes for that field — tag plus
+encoded value, or b"" when the value is the proto3 default. The word "field"
+is the right abstraction because a proto3 field is exactly this: a field number,
+a wire type, a default-omission rule, and a value encoding. The other modules
+in this package encode raw values; this module encodes fields.
 
-The leading underscore marks this module as private to the opentelemetry.pyproto
-package. It is an implementation detail used by the generated-equivalent message
-modules (common_pyproto2.py, metrics_pyproto2.py, etc.). Code outside this
-package should not import from it directly.
+Layering within _pyprotobuf
+----------------------------
+    varint.py    — encode a varint integer to bytes
+    tag.py       — encode a (field_number, wire_type) tag using varint
+    scalars.py   — encode all proto3 scalar types to bytes
+    enum.py      — encode a proto3 enum value (thin wrapper over scalars)
+    fields.py    — encode a complete proto3 field (tag + default check + value)
 
-Why it is not inside _pyproto
-------------------------------
-_pyproto is the pure encoding kernel. Its functions take raw values and produce
-raw bytes, with no knowledge of proto3 message structure. encode_fixed64(0)
-produces eight zero bytes even though proto3 says a zero fixed64 field should be
-omitted. That is correct for the kernel: it encodes what it is told to encode.
-
-This module implements proto3 field semantics on top of the kernel. That means
-it must know about field numbers, tags, and the omit-if-default rule. Placing
-that logic inside _pyproto would mix two different levels of abstraction: the
-encoding kernel and the proto3 message layer. The dependency arrow would also
-point the wrong way — the kernel would contain logic that depends on message
-semantics. Keeping _wire.py at the opentelemetry.pyproto level, importing from
-_pyproto rather than being part of it, preserves the clean layering:
-
-    opentelemetry.pyproto message classes
-        ↓ import from
-    opentelemetry.pyproto._wire   (this module)
-        ↓ import from
-    opentelemetry.pyproto._pyproto  (pure encoding kernel)
+The message classes (common_pyproto2.py, metrics_pyproto2.py, etc.) use this
+module directly. They import the encode_* primitives from the package root
+(__init__.py) and the field helpers from here.
 
 Wire-type constants
 -------------------
@@ -84,13 +71,9 @@ from __future__ import annotations
 
 from struct import pack
 
-from opentelemetry.pyproto._pyproto import (
-    encode_fixed32,
-    encode_fixed64,
-    encode_sint32,
-    encode_tag,
-    encode_varint,
-)
+from .scalars import encode_fixed32, encode_fixed64, encode_sint32
+from .tag import encode_tag
+from .varint import encode_varint
 
 _WT_VARINT = 0  # int32, int64, uint32, uint64, bool, enum
 _WT_64BIT = 1   # double, fixed64, sfixed64
@@ -418,7 +401,7 @@ def _sint32(field: int, value: int) -> bytes:
 
     This is the correct encoding for the proto3 `sint32` type. It is NOT used
     for `int32` fields (use _u64 for non-negative int32, or encode_int from
-    _pyproto for signed int32).
+    the package for signed int32).
 
     In the OTel proto schemas, sint32 appears on the `scale` field of
     ExponentialHistogramDataPoint and the `offset` field of its Buckets

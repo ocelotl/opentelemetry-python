@@ -10,7 +10,7 @@ from struct import pack, unpack
 
 from pytest import mark
 
-from opentelemetry.pyproto._pyproto import (
+from opentelemetry.pyproto._pyprotobuf import (
     encode_bool,
     encode_bytes,
     encode_double,

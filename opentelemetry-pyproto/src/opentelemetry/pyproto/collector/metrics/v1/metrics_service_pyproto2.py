@@ -8,7 +8,7 @@ Field numbers:
 from __future__ import annotations
 
 from opentelemetry.pyproto.metrics.v1.metrics_pyproto2 import ResourceMetrics
-from opentelemetry.pyproto._wire import _msg
+from opentelemetry.pyproto._pyprotobuf.fields import _msg
 
 
 class ExportMetricsServiceRequest:

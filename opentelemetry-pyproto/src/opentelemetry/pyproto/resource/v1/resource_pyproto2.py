@@ -7,7 +7,7 @@ Field numbers:
 from __future__ import annotations
 
 from opentelemetry.pyproto.common.v1.common_pyproto2 import KeyValue
-from opentelemetry.pyproto._wire import _msg, _u64
+from opentelemetry.pyproto._pyprotobuf.fields import _msg, _u64
 
 
 class Resource:
