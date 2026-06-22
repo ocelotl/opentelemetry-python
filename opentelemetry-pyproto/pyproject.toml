@@ -9,9 +9,7 @@ description = "OpenTelemetry Python Proto — pure-Python protobuf message class
 readme = "README.rst"
 license = "Apache-2.0"
 requires-python = ">=3.10"
-dependencies = [
-  "python-protobuf",
-]
+dependencies = []
 
 [tool.hatch.version]
 path = "src/opentelemetry/pyproto/version/__init__.py"
