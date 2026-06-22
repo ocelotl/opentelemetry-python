@@ -18,12 +18,12 @@ from opentelemetry.pyproto.common.v1.common_pyproto2 import (
 )
 from opentelemetry.pyproto.resource.v1.resource_pyproto2 import Resource
 from opentelemetry.pyproto._pyprotobuf.fields import (
-    _byt,
-    _fix32,
-    _fix64,
-    _msg,
-    _str,
-    _u64,
+    byt,
+    fix32,
+    fix64,
+    msg,
+    string,
+    u64,
 )
 
 
@@ -56,20 +56,20 @@ class LogRecord:
 
     def SerializeToString(self) -> bytes:
         result = (
-            _fix64(1, self.time_unix_nano)
-            + _u64(2, self.severity_number)
-            + _str(3, self.severity_text)
+            fix64(1, self.time_unix_nano)
+            + u64(2, self.severity_number)
+            + string(3, self.severity_text)
         )
         if self.body is not None:
-            result += _msg(5, self.body.SerializeToString())
+            result += msg(5, self.body.SerializeToString())
         result += (
-            b"".join(_msg(6, kv.SerializeToString()) for kv in self.attributes)
-            + _u64(7, self.dropped_attributes_count)
-            + _fix32(8, self.flags)
-            + _byt(9, self.trace_id)
-            + _byt(10, self.span_id)
-            + _fix64(11, self.observed_time_unix_nano)
-            + _str(12, self.event_name)
+            b"".join(msg(6, kv.SerializeToString()) for kv in self.attributes)
+            + u64(7, self.dropped_attributes_count)
+            + fix32(8, self.flags)
+            + byt(9, self.trace_id)
+            + byt(10, self.span_id)
+            + fix64(11, self.observed_time_unix_nano)
+            + string(12, self.event_name)
         )
         return result
 
@@ -88,9 +88,9 @@ class ScopeLogs:
     def SerializeToString(self) -> bytes:
         result = b""
         if self.scope is not None:
-            result += _msg(1, self.scope.SerializeToString())
-        result += b"".join(_msg(2, lr.SerializeToString()) for lr in self.log_records)
-        result += _str(3, self.schema_url)
+            result += msg(1, self.scope.SerializeToString())
+        result += b"".join(msg(2, lr.SerializeToString()) for lr in self.log_records)
+        result += string(3, self.schema_url)
         return result
 
 
@@ -108,7 +108,7 @@ class ResourceLogs:
     def SerializeToString(self) -> bytes:
         result = b""
         if self.resource is not None:
-            result += _msg(1, self.resource.SerializeToString())
-        result += b"".join(_msg(2, sl.SerializeToString()) for sl in self.scope_logs)
-        result += _str(3, self.schema_url)
+            result += msg(1, self.resource.SerializeToString())
+        result += b"".join(msg(2, sl.SerializeToString()) for sl in self.scope_logs)
+        result += string(3, self.schema_url)
         return result

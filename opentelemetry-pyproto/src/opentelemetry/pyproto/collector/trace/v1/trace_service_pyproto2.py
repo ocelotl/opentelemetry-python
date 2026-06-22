@@ -8,7 +8,7 @@ Field numbers:
 from __future__ import annotations
 
 from opentelemetry.pyproto.trace.v1.trace_pyproto2 import ResourceSpans
-from opentelemetry.pyproto._pyprotobuf.fields import _msg
+from opentelemetry.pyproto._pyprotobuf.fields import msg
 
 
 class ExportTraceServiceRequest:
@@ -19,7 +19,7 @@ class ExportTraceServiceRequest:
 
     def SerializeToString(self) -> bytes:
         return b"".join(
-            _msg(1, rs.SerializeToString()) for rs in self.resource_spans
+            msg(1, rs.SerializeToString()) for rs in self.resource_spans
         )
 
 
