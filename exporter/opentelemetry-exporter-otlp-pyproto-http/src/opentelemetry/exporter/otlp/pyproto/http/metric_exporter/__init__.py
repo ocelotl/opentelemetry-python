@@ -27,10 +27,10 @@ from opentelemetry.exporter.otlp.pyproto.http._common import (
     _is_retryable,
     _load_session_from_envvar,
 )
-from opentelemetry.pyproto.collector.metrics.v1.metrics_service_pyproto2 import (
+from opentelemetry.pyproto.collector.metrics.v1.metrics_service_pypb2 import (
     ExportMetricsServiceRequest,
 )
-from opentelemetry.pyproto.metrics.v1.metrics_pyproto2 import (
+from opentelemetry.pyproto.metrics.v1.metrics_pypb2 import (
     ExponentialHistogram,
     Gauge,
     Histogram,
