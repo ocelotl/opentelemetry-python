@@ -1,6 +1,7 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+import os
 from collections.abc import Sequence
 from gzip import GzipFile
 from io import BytesIO
@@ -9,11 +10,15 @@ from os import environ
 from random import uniform
 from threading import Event
 from time import time
+from urllib.parse import urlparse
 from zlib import compress
 
 from requests import Session
 from requests.exceptions import ConnectionError, RequestException
 
+from opentelemetry.exporter.otlp.pyproto.common._exporter_metrics import (
+    create_exporter_metrics,
+)
 from opentelemetry.exporter.otlp.pyproto.common._internal._log_encoder import (
     encode_logs,
 )
@@ -25,11 +30,13 @@ from opentelemetry.exporter.otlp.pyproto.http._common import (
     _is_retryable,
     _load_session_from_envvar,
 )
+from opentelemetry.metrics import MeterProvider
 from opentelemetry.sdk._logs import ReadableLogRecord
 from opentelemetry.sdk._logs.export import (
     LogRecordExporter,
     LogRecordExportResult,
 )
+from opentelemetry.sdk._shared_internal import DuplicateFilter
 from opentelemetry.sdk.environment_variables import (
     _OTEL_PYTHON_EXPORTER_OTLP_HTTP_LOGS_CREDENTIAL_PROVIDER,
     OTEL_EXPORTER_OTLP_CERTIFICATE,
@@ -46,10 +53,18 @@ from opentelemetry.sdk.environment_variables import (
     OTEL_EXPORTER_OTLP_LOGS_HEADERS,
     OTEL_EXPORTER_OTLP_LOGS_TIMEOUT,
     OTEL_EXPORTER_OTLP_TIMEOUT,
+    OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED,
+)
+from opentelemetry.semconv._incubating.attributes.otel_attributes import (
+    OtelComponentTypeValues,
+)
+from opentelemetry.semconv.attributes.http_attributes import (
+    HTTP_RESPONSE_STATUS_CODE,
 )
 from opentelemetry.util.re import parse_env_headers
 
 _logger = getLogger(__name__)
+_logger.addFilter(DuplicateFilter())
 
 DEFAULT_ENDPOINT = "http://localhost:4318/"
 DEFAULT_LOGS_EXPORT_PATH = "v1/logs"
@@ -68,6 +83,8 @@ class OTLPLogExporter(LogRecordExporter):
         timeout: float | None = None,
         compression: Compression | None = None,
         session: Session | None = None,
+        *,
+        meter_provider: MeterProvider | None = None,
     ):
         self._shutdown_is_occuring = Event()
         self._endpoint = endpoint or environ.get(
@@ -121,6 +138,17 @@ class OTLPLogExporter(LogRecordExporter):
             )
         self._shutdown = False
 
+        self._metrics = create_exporter_metrics(
+            OtelComponentTypeValues.OTLP_HTTP_LOG_EXPORTER,
+            "logs",
+            urlparse(self._endpoint),
+            meter_provider,
+            os.environ.get(OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED, "")
+            .strip()
+            .lower()
+            == "true",
+        )
+
     def _export(self, serialized_data: bytes, timeout_sec: float | None = None):
         data = serialized_data
         if self._compression == Compression.Gzip:
@@ -155,52 +183,67 @@ class OTLPLogExporter(LogRecordExporter):
             _logger.warning("Exporter already shutdown, ignoring batch")
             return LogRecordExportResult.FAILURE
 
-        serialized_data = encode_logs(batch).SerializeToString()
-        deadline_sec = time() + self._timeout
-        for retry_num in range(_MAX_RETRYS):
-            backoff_seconds = 2**retry_num * uniform(0.8, 1.2)
-            export_error: Exception | None = None
-            try:
-                resp = self._export(serialized_data, deadline_sec - time())
-                if resp.ok:
-                    return LogRecordExportResult.SUCCESS
-            except RequestException as error:
-                reason = error
-                export_error = error
-                retryable = isinstance(error, ConnectionError)
-                status_code = None
-            else:
-                reason = resp.reason
-                retryable = _is_retryable(resp)
-                status_code = resp.status_code
+        with self._metrics.export_operation(len(batch)) as result:
+            serialized_data = encode_logs(batch).SerializeToString()
+            deadline_sec = time() + self._timeout
+            for retry_num in range(_MAX_RETRYS):
+                backoff_seconds = 2**retry_num * uniform(0.8, 1.2)
+                export_error: Exception | None = None
+                try:
+                    resp = self._export(serialized_data, deadline_sec - time())
+                    if resp.ok:
+                        return LogRecordExportResult.SUCCESS
+                except RequestException as error:
+                    reason = error
+                    export_error = error
+                    retryable = isinstance(error, ConnectionError)
+                    status_code = None
+                else:
+                    reason = resp.reason
+                    retryable = _is_retryable(resp)
+                    status_code = resp.status_code
 
-            if not retryable:
-                _logger.error(
-                    "Failed to export logs batch code: %s, reason: %s",
-                    status_code,
+                if not retryable:
+                    _logger.error(
+                        "Failed to export logs batch code: %s, reason: %s",
+                        status_code,
+                        reason,
+                    )
+                    error_attrs = (
+                        {HTTP_RESPONSE_STATUS_CODE: status_code}
+                        if status_code is not None
+                        else None
+                    )
+                    result.error = export_error
+                    result.error_attrs = error_attrs
+                    return LogRecordExportResult.FAILURE
+
+                if (
+                    retry_num + 1 == _MAX_RETRYS
+                    or backoff_seconds > (deadline_sec - time())
+                    or self._shutdown
+                ):
+                    _logger.error(
+                        "Failed to export logs batch due to timeout, max retries or shutdown."
+                    )
+                    error_attrs = (
+                        {HTTP_RESPONSE_STATUS_CODE: status_code}
+                        if status_code is not None
+                        else None
+                    )
+                    result.error = export_error
+                    result.error_attrs = error_attrs
+                    return LogRecordExportResult.FAILURE
+
+                _logger.warning(
+                    "Transient error %s encountered while exporting logs batch, retrying in %.2fs.",
                     reason,
+                    backoff_seconds,
                 )
-                return LogRecordExportResult.FAILURE
-
-            if (
-                retry_num + 1 == _MAX_RETRYS
-                or backoff_seconds > (deadline_sec - time())
-                or self._shutdown
-            ):
-                _logger.error(
-                    "Failed to export logs batch due to timeout, max retries or shutdown."
-                )
-                return LogRecordExportResult.FAILURE
-
-            _logger.warning(
-                "Transient error %s encountered while exporting logs batch, retrying in %.2fs.",
-                reason,
-                backoff_seconds,
-            )
-            if self._shutdown_is_occuring.wait(backoff_seconds):
-                _logger.warning("Shutdown in progress, aborting retry.")
-                break
-        return LogRecordExportResult.FAILURE
+                if self._shutdown_is_occuring.wait(backoff_seconds):
+                    _logger.warning("Shutdown in progress, aborting retry.")
+                    break
+            return LogRecordExportResult.FAILURE
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
         return True
