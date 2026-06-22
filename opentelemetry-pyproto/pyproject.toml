@@ -20,5 +20,11 @@ include = ["/src"]
 [tool.hatch.build.targets.wheel]
 packages = ["src/opentelemetry"]
 
+[dependency-groups]
+dev = [
+    "protobuf>=5.0",
+    "pytest>=7.0",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
