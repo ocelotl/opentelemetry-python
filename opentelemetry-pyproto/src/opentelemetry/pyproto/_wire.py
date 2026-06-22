@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import struct
+from struct import pack
 
 from opentelemetry.pyproto._pyproto import (
     encode_fixed32,
@@ -70,14 +70,14 @@ def _dbl(field: int, value: float) -> bytes:
     """double field (8 bytes, IEEE 754); omitted when zero."""
     if value == 0.0:
         return b""
-    return encode_tag(field, _WT_64BIT) + struct.pack("<d", value)
+    return encode_tag(field, _WT_64BIT) + pack("<d", value)
 
 
 def _opt_dbl(field: int, value: float | None) -> bytes:
     """Optional double field; omitted when None, written even if 0.0."""
     if value is None:
         return b""
-    return encode_tag(field, _WT_64BIT) + struct.pack("<d", value)
+    return encode_tag(field, _WT_64BIT) + pack("<d", value)
 
 
 def _sint32(field: int, value: int) -> bytes:
@@ -107,5 +107,5 @@ def _packed_double(field: int, values: list[float]) -> bytes:
     """Packed repeated double (8-byte IEEE 754 each)."""
     if not values:
         return b""
-    payload = struct.pack(f"<{len(values)}d", *values)
+    payload = pack(f"<{len(values)}d", *values)
     return encode_tag(field, _WT_LEN) + encode_varint(len(payload)) + payload

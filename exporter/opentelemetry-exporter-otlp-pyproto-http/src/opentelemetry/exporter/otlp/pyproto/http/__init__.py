@@ -1,7 +1,7 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-import enum
+from enum import Enum
 
 from .version import __version__
 
@@ -11,7 +11,7 @@ _OTLP_HTTP_HEADERS = {
 }
 
 
-class Compression(enum.Enum):
+class Compression(Enum):
     NoCompression = "none"
     Deflate = "deflate"
     Gzip = "gzip"

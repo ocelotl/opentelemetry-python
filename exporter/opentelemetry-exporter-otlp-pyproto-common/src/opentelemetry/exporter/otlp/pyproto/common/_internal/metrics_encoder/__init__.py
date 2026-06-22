@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
-import logging
+from logging import getLogger
 from os import environ
 
 from opentelemetry.exporter.otlp.pyproto.common._internal import (
@@ -60,7 +60,7 @@ from opentelemetry.sdk.metrics.view import (
     ExponentialBucketHistogramAggregation,
 )
 
-_logger = logging.getLogger(__name__)
+_logger = getLogger(__name__)
 
 
 class OTLPMetricExporterMixin:
