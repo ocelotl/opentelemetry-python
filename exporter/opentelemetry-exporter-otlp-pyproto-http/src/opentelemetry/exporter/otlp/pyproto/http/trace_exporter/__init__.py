@@ -1,18 +1,18 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-import gzip
-import logging
-import random
-import threading
-import zlib
 from collections.abc import Sequence
+from gzip import GzipFile
 from io import BytesIO
+from logging import getLogger
 from os import environ
+from random import uniform
+from threading import Event
 from time import time
+from zlib import compress
 
-import requests
-from requests.exceptions import ConnectionError
+from requests import Session
+from requests.exceptions import ConnectionError, RequestException
 
 from opentelemetry.exporter.otlp.pyproto.common._internal.trace_encoder import (
     encode_spans,
@@ -46,7 +46,7 @@ from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from opentelemetry.util.re import parse_env_headers
 
-_logger = logging.getLogger(__name__)
+_logger = getLogger(__name__)
 
 DEFAULT_ENDPOINT = "http://localhost:4318/"
 DEFAULT_TRACES_EXPORT_PATH = "v1/traces"
@@ -64,9 +64,9 @@ class OTLPSpanExporter(SpanExporter):
         headers: dict[str, str] | None = None,
         timeout: float | None = None,
         compression: Compression | None = None,
-        session: requests.Session | None = None,
+        session: Session | None = None,
     ):
-        self._shutdown_in_progress = threading.Event()
+        self._shutdown_in_progress = Event()
         self._endpoint = endpoint or environ.get(
             OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
             _append_trace_path(
@@ -107,7 +107,7 @@ class OTLPSpanExporter(SpanExporter):
             or _load_session_from_envvar(
                 _OTEL_PYTHON_EXPORTER_OTLP_HTTP_TRACES_CREDENTIAL_PROVIDER
             )
-            or requests.Session()
+            or Session()
         )
         self._session.headers.update(self._headers)
         self._session.headers.update(_OTLP_HTTP_HEADERS)
@@ -122,11 +122,11 @@ class OTLPSpanExporter(SpanExporter):
         data = serialized_data
         if self._compression == Compression.Gzip:
             gzip_data = BytesIO()
-            with gzip.GzipFile(fileobj=gzip_data, mode="w") as gzip_stream:
+            with GzipFile(fileobj=gzip_data, mode="w") as gzip_stream:
                 gzip_stream.write(serialized_data)
             data = gzip_data.getvalue()
         elif self._compression == Compression.Deflate:
-            data = zlib.compress(serialized_data)
+            data = compress(serialized_data)
         if timeout_sec is None:
             timeout_sec = self._timeout
         try:
@@ -155,13 +155,13 @@ class OTLPSpanExporter(SpanExporter):
         serialized_data = encode_spans(spans).SerializeToString()
         deadline_sec = time() + self._timeout
         for retry_num in range(_MAX_RETRYS):
-            backoff_seconds = 2**retry_num * random.uniform(0.8, 1.2)
+            backoff_seconds = 2**retry_num * uniform(0.8, 1.2)
             export_error: Exception | None = None
             try:
                 resp = self._export(serialized_data, deadline_sec - time())
                 if resp.ok:
                     return SpanExportResult.SUCCESS
-            except requests.exceptions.RequestException as error:
+            except RequestException as error:
                 reason = error
                 export_error = error
                 retryable = isinstance(error, ConnectionError)

@@ -1,7 +1,7 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-import logging
+from logging import getLogger
 from collections import defaultdict
 from collections.abc import Sequence
 
@@ -38,7 +38,7 @@ _SPAN_KIND_MAP = {
 _SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK = 0x00000100
 _SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK = 0x00000200
 
-_logger = logging.getLogger(__name__)
+_logger = getLogger(__name__)
 
 
 def encode_spans(sdk_spans: Sequence[ReadableSpan]) -> ExportTraceServiceRequest:
