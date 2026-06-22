@@ -27,6 +27,11 @@ otlp_pyproto_grpc = "opentelemetry.exporter.otlp.pyproto.grpc.metric_exporter:OT
 [project.entry-points.opentelemetry_logs_exporter]
 otlp_pyproto_grpc = "opentelemetry.exporter.otlp.pyproto.grpc._log_exporter:OTLPLogExporter"
 
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+]
+
 [tool.hatch.version]
 path = "src/opentelemetry/exporter/otlp/pyproto/grpc/version/__init__.py"
 
