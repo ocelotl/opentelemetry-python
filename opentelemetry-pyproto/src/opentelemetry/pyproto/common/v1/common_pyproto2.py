@@ -15,9 +15,9 @@ from __future__ import annotations
 
 from struct import pack
 
-from opentelemetry.pyproto._pyproto import encode_int, encode_tag, encode_varint
+from opentelemetry.pyproto._pyprotobuf import encode_int, encode_tag, encode_varint
 
-from ..._wire import _msg, _str, _u64, _WT_LEN, _WT_VARINT, _WT_64BIT
+from opentelemetry.pyproto._pyprotobuf.fields import _msg, _str, _u64, _WT_LEN, _WT_VARINT, _WT_64BIT
 
 
 class AnyValue:

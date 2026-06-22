@@ -74,7 +74,7 @@ Reference:
     https://protobuf.dev/programming-guides/encoding/
 """
 
-from opentelemetry.pyproto._pyproto._varint import encode_varint
+from .varint import encode_varint
 
 
 def encode_tag(field_number: int, wire_type: int) -> bytes:

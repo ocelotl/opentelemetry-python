@@ -10,7 +10,7 @@ Reference:
     https://protobuf.dev/programming-guides/encoding/
 """
 
-from opentelemetry.pyproto._pyproto._scalars import encode_int
+from .scalars import encode_int
 
 
 def encode_enum(value: int) -> bytes:
