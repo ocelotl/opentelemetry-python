@@ -1,6 +1,7 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+import os
 from collections.abc import Sequence
 from gzip import GzipFile
 from io import BytesIO
@@ -9,11 +10,15 @@ from os import environ
 from random import uniform
 from threading import Event
 from time import time
+from urllib.parse import urlparse
 from zlib import compress
 
 from requests import Session
 from requests.exceptions import ConnectionError, RequestException
 
+from opentelemetry.exporter.otlp.pyproto.common._exporter_metrics import (
+    create_exporter_metrics,
+)
 from opentelemetry.exporter.otlp.pyproto.common._internal.trace_encoder import (
     encode_spans,
 )
@@ -25,6 +30,7 @@ from opentelemetry.exporter.otlp.pyproto.http._common import (
     _is_retryable,
     _load_session_from_envvar,
 )
+from opentelemetry.metrics import MeterProvider
 from opentelemetry.sdk.environment_variables import (
     _OTEL_PYTHON_EXPORTER_OTLP_HTTP_TRACES_CREDENTIAL_PROVIDER,
     OTEL_EXPORTER_OTLP_CERTIFICATE,
@@ -41,9 +47,16 @@ from opentelemetry.sdk.environment_variables import (
     OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
     OTEL_EXPORTER_OTLP_TRACES_HEADERS,
     OTEL_EXPORTER_OTLP_TRACES_TIMEOUT,
+    OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED,
 )
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
+from opentelemetry.semconv._incubating.attributes.otel_attributes import (
+    OtelComponentTypeValues,
+)
+from opentelemetry.semconv.attributes.http_attributes import (
+    HTTP_RESPONSE_STATUS_CODE,
+)
 from opentelemetry.util.re import parse_env_headers
 
 _logger = getLogger(__name__)
@@ -65,6 +78,8 @@ class OTLPSpanExporter(SpanExporter):
         timeout: float | None = None,
         compression: Compression | None = None,
         session: Session | None = None,
+        *,
+        meter_provider: MeterProvider | None = None,
     ):
         self._shutdown_in_progress = Event()
         self._endpoint = endpoint or environ.get(
@@ -118,6 +133,17 @@ class OTLPSpanExporter(SpanExporter):
             )
         self._shutdown = False
 
+        self._metrics = create_exporter_metrics(
+            OtelComponentTypeValues.OTLP_HTTP_SPAN_EXPORTER,
+            "traces",
+            urlparse(self._endpoint),
+            meter_provider,
+            os.environ.get(OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED, "")
+            .strip()
+            .lower()
+            == "true",
+        )
+
     def _export(self, serialized_data: bytes, timeout_sec: float | None = None):
         data = serialized_data
         if self._compression == Compression.Gzip:
@@ -152,52 +178,67 @@ class OTLPSpanExporter(SpanExporter):
             _logger.warning("Exporter already shutdown, ignoring batch")
             return SpanExportResult.FAILURE
 
-        serialized_data = encode_spans(spans).SerializeToString()
-        deadline_sec = time() + self._timeout
-        for retry_num in range(_MAX_RETRYS):
-            backoff_seconds = 2**retry_num * uniform(0.8, 1.2)
-            export_error: Exception | None = None
-            try:
-                resp = self._export(serialized_data, deadline_sec - time())
-                if resp.ok:
-                    return SpanExportResult.SUCCESS
-            except RequestException as error:
-                reason = error
-                export_error = error
-                retryable = isinstance(error, ConnectionError)
-                status_code = None
-            else:
-                reason = resp.reason
-                retryable = _is_retryable(resp)
-                status_code = resp.status_code
+        with self._metrics.export_operation(len(spans)) as result:
+            serialized_data = encode_spans(spans).SerializeToString()
+            deadline_sec = time() + self._timeout
+            for retry_num in range(_MAX_RETRYS):
+                backoff_seconds = 2**retry_num * uniform(0.8, 1.2)
+                export_error: Exception | None = None
+                try:
+                    resp = self._export(serialized_data, deadline_sec - time())
+                    if resp.ok:
+                        return SpanExportResult.SUCCESS
+                except RequestException as error:
+                    reason = error
+                    export_error = error
+                    retryable = isinstance(error, ConnectionError)
+                    status_code = None
+                else:
+                    reason = resp.reason
+                    retryable = _is_retryable(resp)
+                    status_code = resp.status_code
 
-            if not retryable:
-                _logger.error(
-                    "Failed to export span batch code: %s, reason: %s",
-                    status_code,
+                if not retryable:
+                    _logger.error(
+                        "Failed to export span batch code: %s, reason: %s",
+                        status_code,
+                        reason,
+                    )
+                    error_attrs = (
+                        {HTTP_RESPONSE_STATUS_CODE: status_code}
+                        if status_code is not None
+                        else None
+                    )
+                    result.error = export_error
+                    result.error_attrs = error_attrs
+                    return SpanExportResult.FAILURE
+
+                if (
+                    retry_num + 1 == _MAX_RETRYS
+                    or backoff_seconds > (deadline_sec - time())
+                    or self._shutdown
+                ):
+                    _logger.error(
+                        "Failed to export span batch due to timeout, max retries or shutdown."
+                    )
+                    error_attrs = (
+                        {HTTP_RESPONSE_STATUS_CODE: status_code}
+                        if status_code is not None
+                        else None
+                    )
+                    result.error = export_error
+                    result.error_attrs = error_attrs
+                    return SpanExportResult.FAILURE
+
+                _logger.warning(
+                    "Transient error %s encountered while exporting span batch, retrying in %.2fs.",
                     reason,
+                    backoff_seconds,
                 )
-                return SpanExportResult.FAILURE
-
-            if (
-                retry_num + 1 == _MAX_RETRYS
-                or backoff_seconds > (deadline_sec - time())
-                or self._shutdown
-            ):
-                _logger.error(
-                    "Failed to export span batch due to timeout, max retries or shutdown."
-                )
-                return SpanExportResult.FAILURE
-
-            _logger.warning(
-                "Transient error %s encountered while exporting span batch, retrying in %.2fs.",
-                reason,
-                backoff_seconds,
-            )
-            if self._shutdown_in_progress.wait(backoff_seconds):
-                _logger.warning("Shutdown in progress, aborting retry.")
-                break
-        return SpanExportResult.FAILURE
+                if self._shutdown_in_progress.wait(backoff_seconds):
+                    _logger.warning("Shutdown in progress, aborting retry.")
+                    break
+            return SpanExportResult.FAILURE
 
     def shutdown(self):
         if self._shutdown:
