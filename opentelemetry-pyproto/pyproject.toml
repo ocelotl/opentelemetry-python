@@ -25,6 +25,7 @@ dev = [
     "opentelemetry-proto == 1.43.0.dev",
     "protobuf>=5.0",
     "pytest>=7.0",
+    "pytest-benchmark>=4",
 ]
 
 [tool.uv.sources]
