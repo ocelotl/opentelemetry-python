@@ -117,8 +117,39 @@ def _build_field_msg_classes():
     )
 
 
-_Inner,     _Record   = _build_full_record_classes()
-_FieldInner, _FieldMsg = _build_field_msg_classes()
+def _build_repeated_msg_classes():
+    """Item + Container — repeated embedded message benchmark."""
+    fp = descriptor_pb2.FileDescriptorProto()
+    fp.name = "pyproto_repeated_benchmark.proto"
+    fp.syntax = "proto3"
+
+    item = fp.message_type.add()
+    item.name = "Item"
+    for name, number, tid in (
+        ("label", 1, _T.TYPE_STRING),
+        ("count", 2, _T.TYPE_UINT64),
+        ("value", 3, _T.TYPE_DOUBLE),
+    ):
+        f = item.field.add()
+        f.name = name; f.number = number; f.type = tid; f.label = _T.LABEL_OPTIONAL
+
+    container = fp.message_type.add()
+    container.name = "Container"
+    rf = container.field.add()
+    rf.name = "items"; rf.number = 1; rf.type = _T.TYPE_MESSAGE
+    rf.label = _T.LABEL_REPEATED; rf.type_name = "Item"
+
+    pool = descriptor_pool.DescriptorPool()
+    pool.Add(fp)
+    return (
+        message_factory.GetMessageClass(pool.FindMessageTypeByName("Item")),
+        message_factory.GetMessageClass(pool.FindMessageTypeByName("Container")),
+    )
+
+
+_Inner,     _Record    = _build_full_record_classes()
+_FieldInner, _FieldMsg  = _build_field_msg_classes()
+_Item,       _Container = _build_repeated_msg_classes()
 
 
 # ── Shared benchmark data ──────────────────────────────────────────────────────
@@ -135,6 +166,14 @@ _BUCKET_COUNTS = [0, 1, 4, 12, 35, 78, 120, 89, 42, 15, 4, 1, 0]
 _BOUNDS        = [0.0, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
 
 _FIELD_INNER_BYTES = _FieldInner(v=42).SerializeToString()
+
+# Item data for repeated-message benchmarks: (label, count, value) tuples.
+# All values are non-default so every field is serialized.
+_REPEATED_SIZES = [1, 5, 20]
+_ITEM_DATA = [
+    (f"item.label.{i}", (i + 1) * 100, (i + 1) * 0.5)
+    for i in range(max(_REPEATED_SIZES))
+]
 
 # Pre-built google.protobuf objects — construction cost excluded from
 # serialization-only benchmarks in section 7.
@@ -481,4 +520,50 @@ def test_encode_protobuf_serialize(benchmark) -> None:
 @mark.parametrize("name", list(_PRE_BUILT_FIELD_PB), ids=list(_PRE_BUILT_FIELD_PB))
 def test_field_serialize_only_protobuf(benchmark, name) -> None:
     result = benchmark(_PRE_BUILT_FIELD_PB[name].SerializeToString)
+    assert len(result) > 0
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 8. Repeated embedded messages
+#
+# Encodes a Container with N Item sub-messages.  Each Item has a string,
+# uint64, and double field.  Unlike packed repeated scalars, repeated messages
+# require one SerializeToString-equivalent call per element plus one msg()
+# wrapper per element — this tests whether per-element overhead compounds
+# or stays flat.
+#
+# pyproto side:  b"".join(msg(1, string(1,l)+u64(2,c)+dbl(3,v)) for ...)
+# protobuf side: _Container(items=[_Item(...), ...]).SerializeToString()
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _pyproto_encode_repeated(n: int) -> bytes:
+    return b"".join(
+        msg(1, string(1, label) + u64(2, count) + dbl(3, value))
+        for label, count, value in _ITEM_DATA[:n]
+    )
+
+
+def _pb_encode_repeated(n: int) -> bytes:
+    return _Container(
+        items=[
+            _Item(label=label, count=count, value=value)
+            for label, count, value in _ITEM_DATA[:n]
+        ]
+    ).SerializeToString()
+
+
+@mark.parametrize("n", _REPEATED_SIZES, ids=["1", "5", "20"])
+def test_repeated_msg_outputs_identical(n) -> None:
+    assert _pyproto_encode_repeated(n) == _pb_encode_repeated(n)
+
+
+@mark.parametrize("n", _REPEATED_SIZES, ids=["1", "5", "20"])
+def test_repeated_msg_pyproto(benchmark, n) -> None:
+    result = benchmark(lambda: _pyproto_encode_repeated(n))
+    assert len(result) > 0
+
+
+@mark.parametrize("n", _REPEATED_SIZES, ids=["1", "5", "20"])
+def test_repeated_msg_protobuf(benchmark, n) -> None:
+    result = benchmark(lambda: _pb_encode_repeated(n))
     assert len(result) > 0
