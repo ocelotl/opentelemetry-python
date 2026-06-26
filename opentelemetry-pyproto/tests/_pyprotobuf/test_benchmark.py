@@ -136,6 +136,29 @@ _BOUNDS        = [0.0, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 
 
 _FIELD_INNER_BYTES = _FieldInner(v=42).SerializeToString()
 
+# Pre-built google.protobuf objects — construction cost excluded from
+# serialization-only benchmarks in section 7.
+_PRE_BUILT_RECORD = _Record(
+    name=_NAME, count=_COUNT, value=_VALUE, active=True,
+    data=_DATA, timestamp_ns=_TS, flags=_FLAGS,
+    inner=_Inner(label=_INNER_LABEL, seq=_INNER_SEQ),
+    bucket_counts=_BUCKET_COUNTS, bounds=_BOUNDS,
+)
+
+_PRE_BUILT_FIELD_PB = {
+    "uint64":        _FieldMsg(f_uint64=_COUNT),
+    "string":        _FieldMsg(f_string=_NAME),
+    "bytes":         _FieldMsg(f_bytes=_DATA),
+    "double":        _FieldMsg(f_double=_VALUE),
+    "bool":          _FieldMsg(f_bool=True),
+    "fixed64":       _FieldMsg(f_fixed64=_TS),
+    "fixed32":       _FieldMsg(f_fixed32=_FLAGS),
+    "sint32":        _FieldMsg(f_sint32=-12345),
+    "packed_uint64": _FieldMsg(f_packed_u64=_BUCKET_COUNTS),
+    "packed_double": _FieldMsg(f_packed_dbl=_BOUNDS),
+    "msg":           _FieldMsg(f_msg=_FieldInner(v=42)),
+}
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 1. Full-message benchmark
@@ -343,4 +366,119 @@ def test_varint_pyproto(benchmark, v) -> None:
 @mark.parametrize("v", _VARINT_VALUES, ids=_VARINT_IDS)
 def test_varint_protobuf(benchmark, v) -> None:
     result = benchmark(lambda: _FieldMsg(f_uint64=v).SerializeToString())
+    assert len(result) > 0
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 5. Concatenation strategy: `+` vs `b"".join()`
+#
+# The current SerializeToString() pattern chains field results with `+`,
+# creating N-1 intermediate bytes objects (one per addition).  b"".join()
+# allocates the final buffer once and copies each part exactly once.
+# These two tests use the same field data so the only variable is the
+# concatenation strategy.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _pyproto_encode_join() -> bytes:
+    inner = b"".join([string(1, _INNER_LABEL), u64(2, _INNER_SEQ)])
+    return b"".join([
+        string(1, _NAME),
+        u64(2, _COUNT),
+        dbl(3, _VALUE),
+        bool_field(4, True),
+        byt(5, _DATA),
+        fix64(6, _TS),
+        fix32(7, _FLAGS),
+        msg(8, inner),
+        packed_uint64(9, _BUCKET_COUNTS),
+        packed_double(10, _BOUNDS),
+    ])
+
+
+def test_concat_strategy_outputs_identical() -> None:
+    assert _pyproto_encode() == _pyproto_encode_join()
+
+
+def test_encode_concat_pyproto(benchmark) -> None:
+    result = benchmark(_pyproto_encode)
+    assert len(result) > 0
+
+
+def test_encode_join_pyproto(benchmark) -> None:
+    result = benchmark(_pyproto_encode_join)
+    assert len(result) > 0
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 6. All-default fields (fast path)
+#
+# Proto3 omits fields whose value equals the type default (0, "", b"", False,
+# 0.0, []).  Each _pyprotobuf helper returns b"" immediately for defaults.
+# This benchmark measures the minimum cost of SerializeToString() — calling
+# every helper in a message when none produce any output.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _pyproto_encode_all_defaults() -> bytes:
+    # Embedded message field omitted: real SerializeToString() guards with
+    # `if self.field is not None`.  Every helper here returns b"".
+    return (
+        string(1, "")
+        + u64(2, 0)
+        + dbl(3, 0.0)
+        + bool_field(4, False)
+        + byt(5, b"")
+        + fix64(6, 0)
+        + fix32(7, 0)
+        + packed_uint64(9, [])
+        + packed_double(10, [])
+    )
+
+
+def test_all_defaults_pyproto(benchmark) -> None:
+    result = benchmark(_pyproto_encode_all_defaults)
+    assert result == b""
+
+
+def test_all_defaults_protobuf(benchmark) -> None:
+    result = benchmark(lambda: _Record().SerializeToString())
+    assert result == b""
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 7. google.protobuf: construction vs serialization split
+#
+# Previous benchmarks bundle message-object construction and serialization
+# together for google.protobuf.  pyproto has no construction phase — it is a
+# pure function call.  Separating the two phases shows where google.protobuf's
+# time actually goes and gives a fairer encoding-only comparison.
+#
+# Read these alongside the existing test_encode_pyproto / test_encode_protobuf:
+#   test_encode_pyproto              — pyproto: pure call, no object
+#   test_encode_protobuf_construct   — google.protobuf: construction only
+#   test_encode_protobuf_serialize   — google.protobuf: serialization only
+#   test_encode_protobuf             — google.protobuf: construction + serialization
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _pb_construct():
+    return _Record(
+        name=_NAME, count=_COUNT, value=_VALUE, active=True,
+        data=_DATA, timestamp_ns=_TS, flags=_FLAGS,
+        inner=_Inner(label=_INNER_LABEL, seq=_INNER_SEQ),
+        bucket_counts=_BUCKET_COUNTS, bounds=_BOUNDS,
+    )
+
+
+def test_encode_protobuf_construct(benchmark) -> None:
+    result = benchmark(_pb_construct)
+    assert result is not None
+
+
+def test_encode_protobuf_serialize(benchmark) -> None:
+    result = benchmark(_PRE_BUILT_RECORD.SerializeToString)
+    assert len(result) > 0
+
+
+@mark.parametrize("name", list(_PRE_BUILT_FIELD_PB), ids=list(_PRE_BUILT_FIELD_PB))
+def test_field_serialize_only_protobuf(benchmark, name) -> None:
+    result = benchmark(_PRE_BUILT_FIELD_PB[name].SerializeToString)
     assert len(result) > 0
