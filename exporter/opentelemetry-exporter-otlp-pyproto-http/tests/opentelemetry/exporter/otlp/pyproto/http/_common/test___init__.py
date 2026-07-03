@@ -4,7 +4,6 @@
 from unittest.mock import Mock, patch
 
 import pytest
-from requests import Session
 
 from opentelemetry.exporter.otlp.pyproto.http._common import (
     _is_retryable,
@@ -15,31 +14,31 @@ from opentelemetry.exporter.otlp.pyproto.http._common import (
 # ── _is_retryable ─────────────────────────────────────────────────────────────
 
 def test_is_retryable_408():
-    assert _is_retryable(Mock(status_code=408)) is True
+    assert _is_retryable(408) is True
 
 
 def test_is_retryable_500():
-    assert _is_retryable(Mock(status_code=500)) is True
+    assert _is_retryable(500) is True
 
 
 def test_is_retryable_503():
-    assert _is_retryable(Mock(status_code=503)) is True
+    assert _is_retryable(503) is True
 
 
 def test_is_retryable_599():
-    assert _is_retryable(Mock(status_code=599)) is True
+    assert _is_retryable(599) is True
 
 
 def test_is_retryable_200():
-    assert _is_retryable(Mock(status_code=200)) is False
+    assert _is_retryable(200) is False
 
 
 def test_is_retryable_404():
-    assert _is_retryable(Mock(status_code=404)) is False
+    assert _is_retryable(404) is False
 
 
 def test_is_retryable_400():
-    assert _is_retryable(Mock(status_code=400)) is False
+    assert _is_retryable(400) is False
 
 
 # ── _load_session_from_envvar ─────────────────────────────────────────────────
@@ -60,8 +59,8 @@ def test_load_session_raises_on_unknown_provider():
             _load_session_from_envvar(_CRED_ENVVAR)
 
 
-def test_load_session_returns_session_from_provider():
-    mock_session = Session()
+def test_load_session_returns_value_from_provider():
+    mock_session = Mock()
     mock_ep = Mock()
     mock_ep.load.return_value = lambda: mock_session
 
@@ -72,16 +71,3 @@ def test_load_session_returns_session_from_provider():
         ):
             result = _load_session_from_envvar(_CRED_ENVVAR)
     assert result is mock_session
-
-
-def test_load_session_raises_if_provider_returns_non_session():
-    mock_ep = Mock()
-    mock_ep.load.return_value = lambda: "not-a-session"
-
-    with patch.dict("os.environ", {_GENERIC_ENVVAR: "bad_provider"}):
-        with patch(
-            "opentelemetry.exporter.otlp.pyproto.http._common.entry_points",
-            return_value=iter([mock_ep]),
-        ):
-            with pytest.raises(RuntimeError, match="must be of type"):
-                _load_session_from_envvar(_CRED_ENVVAR)

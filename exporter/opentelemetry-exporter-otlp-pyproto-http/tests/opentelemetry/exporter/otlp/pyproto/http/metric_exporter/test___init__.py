@@ -4,10 +4,7 @@
 # pylint: disable=protected-access
 
 import unittest
-from unittest.mock import Mock, patch
-
-from requests import Session
-from requests.exceptions import ConnectionError
+from unittest.mock import patch
 
 from opentelemetry.exporter.otlp.pyproto.common._internal.metrics_encoder import (
     encode_metrics,
@@ -38,15 +35,15 @@ _UNIFORM = "opentelemetry.exporter.otlp.pyproto.http.metric_exporter.uniform"
 
 
 def _ok():
-    return Mock(ok=True, status_code=200)
+    return (200, "OK")
 
 
 def _503():
-    return Mock(ok=False, status_code=503, reason="Service Unavailable")
+    return (503, "Service Unavailable")
 
 
 def _404():
-    return Mock(ok=False, status_code=404, reason="Not Found")
+    return (404, "Not Found")
 
 
 def _make_metrics_data(n_gauge_points: int = 1) -> MetricsData:
@@ -100,9 +97,8 @@ class TestOTLPMetricExporter(unittest.TestCase):
         )
         self.assertEqual(exporter._timeout, DEFAULT_TIMEOUT)
         self.assertEqual(exporter._compression, Compression.NoCompression)
-        self.assertIsInstance(exporter._session, Session)
         self.assertEqual(
-            exporter._session.headers["Content-Type"], "application/x-protobuf"
+            exporter._request_headers["Content-Type"], "application/x-protobuf"
         )
         self.assertIsNone(exporter._max_export_batch_size)
         self.assertFalse(exporter._shutdown)
@@ -150,7 +146,7 @@ class TestOTLPMetricExporter(unittest.TestCase):
         with patch.dict("os.environ", {"OTEL_EXPORTER_OTLP_COMPRESSION": "gzip"}):
             exporter = OTLPMetricExporter()
         self.assertEqual(exporter._compression, Compression.Gzip)
-        self.assertEqual(exporter._session.headers.get("Content-Encoding"), "gzip")
+        self.assertEqual(exporter._request_headers.get("Content-Encoding"), "gzip")
         exporter.shutdown()
 
     def test_compression_metrics_env_overrides_generic(self):
@@ -167,24 +163,18 @@ class TestOTLPMetricExporter(unittest.TestCase):
         self.assertEqual(exporter._max_export_batch_size, 100)
         exporter.shutdown()
 
-    def test_custom_session_used(self):
-        custom_session = Session()
-        exporter = OTLPMetricExporter(session=custom_session)
-        self.assertIs(exporter._session, custom_session)
-        exporter.shutdown()
-
     # ── export ────────────────────────────────────────────────────────────────
 
     def test_export_success_empty_data(self):
         exporter = OTLPMetricExporter()
-        with patch.object(exporter._session, "post", return_value=_ok()):
+        with patch.object(exporter, "_export", return_value=_ok()):
             result = exporter.export(_empty_metrics_data())
         self.assertEqual(result, MetricExportResult.SUCCESS)
         exporter.shutdown()
 
     def test_export_success_with_data(self):
         exporter = OTLPMetricExporter()
-        with patch.object(exporter._session, "post", return_value=_ok()):
+        with patch.object(exporter, "_export", return_value=_ok()):
             result = exporter.export(_make_metrics_data(2))
         self.assertEqual(result, MetricExportResult.SUCCESS)
         exporter.shutdown()
@@ -197,14 +187,14 @@ class TestOTLPMetricExporter(unittest.TestCase):
 
     def test_export_non_retryable_failure(self):
         exporter = OTLPMetricExporter()
-        with patch.object(exporter._session, "post", return_value=_404()):
+        with patch.object(exporter, "_export", return_value=_404()):
             result = exporter.export(_empty_metrics_data())
         self.assertEqual(result, MetricExportResult.FAILURE)
         exporter.shutdown()
 
     def test_export_retry_then_deadline_exceeded(self):
         exporter = OTLPMetricExporter(timeout=0.01)
-        with patch.object(exporter._session, "post", return_value=_503()):
+        with patch.object(exporter, "_export", return_value=_503()):
             with patch(_UNIFORM, return_value=100.0):
                 result = exporter.export(_empty_metrics_data())
         self.assertEqual(result, MetricExportResult.FAILURE)
@@ -212,7 +202,7 @@ class TestOTLPMetricExporter(unittest.TestCase):
 
     def test_export_max_retries_exhausted(self):
         exporter = OTLPMetricExporter(timeout=100)
-        with patch.object(exporter._session, "post", return_value=_503()):
+        with patch.object(exporter, "_export", return_value=_503()):
             with patch(_UNIFORM, return_value=0.0001):
                 with patch.object(exporter._shutdown_in_progress, "wait", return_value=False):
                     result = exporter.export(_empty_metrics_data())
@@ -221,7 +211,7 @@ class TestOTLPMetricExporter(unittest.TestCase):
 
     def test_shutdown_interrupts_retry(self):
         exporter = OTLPMetricExporter(timeout=100)
-        with patch.object(exporter._session, "post", return_value=_503()):
+        with patch.object(exporter, "_export", return_value=_503()):
             with patch(_UNIFORM, return_value=0.0001):
                 with patch.object(exporter._shutdown_in_progress, "wait", return_value=True):
                     result = exporter.export(_empty_metrics_data())
@@ -233,12 +223,12 @@ class TestOTLPMetricExporter(unittest.TestCase):
         exporter = OTLPMetricExporter(max_export_batch_size=1)
         call_count = 0
 
-        def post_side_effect(**_kwargs):
+        def export_side_effect(*_args, **_kwargs):
             nonlocal call_count
             call_count += 1
             return _ok()
 
-        with patch.object(exporter._session, "post", side_effect=post_side_effect):
+        with patch.object(exporter, "_export", side_effect=export_side_effect):
             result = exporter.export(_make_metrics_data(3))
         self.assertEqual(result, MetricExportResult.SUCCESS)
         self.assertEqual(call_count, 3)
