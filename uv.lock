@@ -1063,7 +1063,6 @@ dependencies = [
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp-pyproto-common" },
     { name = "opentelemetry-sdk" },
-    { name = "requests" },
 ]
 
 [package.dev-dependencies]
@@ -1081,7 +1080,6 @@ requires-dist = [
     { name = "opentelemetry-api", editable = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp-pyproto-common", editable = "exporter/opentelemetry-exporter-otlp-pyproto-common" },
     { name = "opentelemetry-sdk", editable = "opentelemetry-sdk" },
-    { name = "requests", specifier = "~=2.7" },
 ]
 
 [package.metadata.requires-dev]

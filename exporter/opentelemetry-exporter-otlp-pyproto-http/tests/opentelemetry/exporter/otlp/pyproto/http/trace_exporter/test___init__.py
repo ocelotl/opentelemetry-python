@@ -4,10 +4,8 @@
 # pylint: disable=protected-access
 
 import unittest
-from unittest.mock import Mock, patch
-
-from requests import Session
-from requests.exceptions import ConnectionError
+from unittest.mock import patch
+from urllib.error import URLError
 
 from opentelemetry.exporter.otlp.pyproto.http import Compression
 from opentelemetry.exporter.otlp.pyproto.http.trace_exporter import (
@@ -23,15 +21,15 @@ _UNIFORM = "opentelemetry.exporter.otlp.pyproto.http.trace_exporter.uniform"
 
 
 def _ok():
-    return Mock(ok=True, status_code=200)
+    return (200, "OK")
 
 
 def _503():
-    return Mock(ok=False, status_code=503, reason="Service Unavailable")
+    return (503, "Service Unavailable")
 
 
 def _404():
-    return Mock(ok=False, status_code=404, reason="Not Found")
+    return (404, "Not Found")
 
 
 class TestOTLPSpanExporter(unittest.TestCase):
@@ -46,9 +44,8 @@ class TestOTLPSpanExporter(unittest.TestCase):
         )
         self.assertEqual(exporter._timeout, DEFAULT_TIMEOUT)
         self.assertEqual(exporter._compression, Compression.NoCompression)
-        self.assertIsInstance(exporter._session, Session)
         self.assertEqual(
-            exporter._session.headers["Content-Type"], "application/x-protobuf"
+            exporter._request_headers["Content-Type"], "application/x-protobuf"
         )
         self.assertFalse(exporter._shutdown)
         exporter.shutdown()
@@ -101,14 +98,14 @@ class TestOTLPSpanExporter(unittest.TestCase):
         with patch.dict("os.environ", {"OTEL_EXPORTER_OTLP_COMPRESSION": "gzip"}):
             exporter = OTLPSpanExporter()
         self.assertEqual(exporter._compression, Compression.Gzip)
-        self.assertEqual(exporter._session.headers.get("Content-Encoding"), "gzip")
+        self.assertEqual(exporter._request_headers.get("Content-Encoding"), "gzip")
         exporter.shutdown()
 
     def test_compression_env_var_deflate(self):
         with patch.dict("os.environ", {"OTEL_EXPORTER_OTLP_COMPRESSION": "deflate"}):
             exporter = OTLPSpanExporter()
         self.assertEqual(exporter._compression, Compression.Deflate)
-        self.assertEqual(exporter._session.headers.get("Content-Encoding"), "deflate")
+        self.assertEqual(exporter._request_headers.get("Content-Encoding"), "deflate")
         exporter.shutdown()
 
     def test_compression_traces_env_overrides_generic(self):
@@ -123,25 +120,19 @@ class TestOTLPSpanExporter(unittest.TestCase):
     def test_compression_arg_gzip(self):
         exporter = OTLPSpanExporter(compression=Compression.Gzip)
         self.assertEqual(exporter._compression, Compression.Gzip)
-        self.assertEqual(exporter._session.headers.get("Content-Encoding"), "gzip")
+        self.assertEqual(exporter._request_headers.get("Content-Encoding"), "gzip")
         exporter.shutdown()
 
     def test_no_compression_header_for_none_compression(self):
         exporter = OTLPSpanExporter(compression=Compression.NoCompression)
-        self.assertNotIn("Content-Encoding", exporter._session.headers)
-        exporter.shutdown()
-
-    def test_custom_session_used(self):
-        custom_session = Session()
-        exporter = OTLPSpanExporter(session=custom_session)
-        self.assertIs(exporter._session, custom_session)
+        self.assertNotIn("Content-Encoding", exporter._request_headers)
         exporter.shutdown()
 
     # ── export ────────────────────────────────────────────────────────────────
 
     def test_export_success(self):
         exporter = OTLPSpanExporter()
-        with patch.object(exporter._session, "post", return_value=_ok()):
+        with patch.object(exporter, "_export", return_value=_ok()):
             result = exporter.export([])
         self.assertEqual(result, SpanExportResult.SUCCESS)
         exporter.shutdown()
@@ -154,7 +145,7 @@ class TestOTLPSpanExporter(unittest.TestCase):
 
     def test_export_non_retryable_failure(self):
         exporter = OTLPSpanExporter()
-        with patch.object(exporter._session, "post", return_value=_404()):
+        with patch.object(exporter, "_export", return_value=_404()):
             result = exporter.export([])
         self.assertEqual(result, SpanExportResult.FAILURE)
         exporter.shutdown()
@@ -162,7 +153,7 @@ class TestOTLPSpanExporter(unittest.TestCase):
     def test_export_retry_then_deadline_exceeded(self):
         # backoff(100) > remaining timeout(0.01) → exits on first retry
         exporter = OTLPSpanExporter(timeout=0.01)
-        with patch.object(exporter._session, "post", return_value=_503()):
+        with patch.object(exporter, "_export", return_value=_503()):
             with patch(_UNIFORM, return_value=100.0):
                 result = exporter.export([])
         self.assertEqual(result, SpanExportResult.FAILURE)
@@ -170,7 +161,7 @@ class TestOTLPSpanExporter(unittest.TestCase):
 
     def test_export_max_retries_exhausted(self):
         exporter = OTLPSpanExporter(timeout=100)
-        with patch.object(exporter._session, "post", return_value=_503()):
+        with patch.object(exporter, "_export", return_value=_503()):
             with patch(_UNIFORM, return_value=0.0001):
                 with patch.object(exporter._shutdown_in_progress, "wait", return_value=False):
                     result = exporter.export([])
@@ -179,7 +170,7 @@ class TestOTLPSpanExporter(unittest.TestCase):
 
     def test_shutdown_interrupts_retry(self):
         exporter = OTLPSpanExporter(timeout=100)
-        with patch.object(exporter._session, "post", return_value=_503()):
+        with patch.object(exporter, "_export", return_value=_503()):
             with patch(_UNIFORM, return_value=0.0001):
                 with patch.object(exporter._shutdown_in_progress, "wait", return_value=True):
                     result = exporter.export([])
@@ -187,9 +178,9 @@ class TestOTLPSpanExporter(unittest.TestCase):
         exporter.shutdown()
 
     def test_connection_error_is_retryable(self):
-        # ConnectionError from _export goes into the retry path; deadline kills it fast.
+        # URLError from _export goes into the retry path; deadline kills it fast.
         exporter = OTLPSpanExporter(timeout=0.01)
-        with patch.object(exporter, "_export", side_effect=ConnectionError("refused")):
+        with patch.object(exporter, "_export", side_effect=URLError("refused")):
             with patch(_UNIFORM, return_value=100.0):
                 result = exporter.export([])
         self.assertEqual(result, SpanExportResult.FAILURE)

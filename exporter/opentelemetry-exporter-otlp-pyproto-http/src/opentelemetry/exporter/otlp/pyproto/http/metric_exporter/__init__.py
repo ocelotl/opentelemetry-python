@@ -11,11 +11,9 @@ from os import environ
 from random import uniform
 from threading import Event
 from time import time
+from urllib.error import URLError
 from urllib.parse import urlparse
 from zlib import compress
-
-from requests import Session
-from requests.exceptions import ConnectionError, RequestException
 
 from opentelemetry.exporter.otlp.pyproto.common._exporter_metrics import (
     create_exporter_metrics,
@@ -29,8 +27,9 @@ from opentelemetry.exporter.otlp.pyproto.http import (
     Compression,
 )
 from opentelemetry.exporter.otlp.pyproto.http._common import (
+    _build_ssl_context,
     _is_retryable,
-    _load_session_from_envvar,
+    _post,
 )
 from opentelemetry.metrics import MeterProvider
 from opentelemetry.pyproto.collector.metrics.v1.metrics_service_pypb2 import (
@@ -47,7 +46,6 @@ from opentelemetry.pyproto.metrics.v1.metrics_pypb2 import (
     Summary,
 )
 from opentelemetry.sdk.environment_variables import (
-    _OTEL_PYTHON_EXPORTER_OTLP_HTTP_METRICS_CREDENTIAL_PROVIDER,
     OTEL_EXPORTER_OTLP_CERTIFICATE,
     OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE,
     OTEL_EXPORTER_OTLP_CLIENT_KEY,
@@ -97,7 +95,6 @@ class OTLPMetricExporter(MetricExporter, OTLPMetricExporterMixin):
         headers: dict[str, str] | None = None,
         timeout: float | None = None,
         compression: Compression | None = None,
-        session: Session | None = None,
         preferred_temporality: dict[type, AggregationTemporality] | None = None,
         preferred_aggregation: dict[type, Aggregation] | None = None,
         max_export_batch_size: int | None = None,
@@ -140,20 +137,12 @@ class OTLPMetricExporter(MetricExporter, OTLPMetricExporterMixin):
             )
         )
         self._compression = compression or _compression_from_env()
-        self._session = (
-            session
-            or _load_session_from_envvar(
-                _OTEL_PYTHON_EXPORTER_OTLP_HTTP_METRICS_CREDENTIAL_PROVIDER
-            )
-            or Session()
-        )
-        self._session.headers.update(self._headers)
-        self._session.headers.update(_OTLP_HTTP_HEADERS)
-        self._session.headers.update(self._headers)
+        self._request_headers = {**_OTLP_HTTP_HEADERS, **self._headers}
         if self._compression is not Compression.NoCompression:
-            self._session.headers.update(
-                {"Content-Encoding": self._compression.value}
-            )
+            self._request_headers["Content-Encoding"] = self._compression.value
+        self._ssl_context = _build_ssl_context(
+            self._certificate_file, self._client_cert
+        )
         self._common_configuration(preferred_temporality, preferred_aggregation)
         self._max_export_batch_size = max_export_batch_size
         self._shutdown = False
@@ -181,22 +170,21 @@ class OTLPMetricExporter(MetricExporter, OTLPMetricExporterMixin):
         if timeout_sec is None:
             timeout_sec = self._timeout
         try:
-            resp = self._session.post(
-                url=self._endpoint,
-                data=data,
-                verify=self._certificate_file,
-                timeout=timeout_sec,
-                cert=self._client_cert,
+            return _post(
+                self._endpoint,
+                data,
+                self._request_headers,
+                timeout_sec,
+                self._ssl_context,
             )
-        except ConnectionError:
-            resp = self._session.post(
-                url=self._endpoint,
-                data=data,
-                verify=self._certificate_file,
-                timeout=timeout_sec,
-                cert=self._client_cert,
+        except URLError:
+            return _post(
+                self._endpoint,
+                data,
+                self._request_headers,
+                timeout_sec,
+                self._ssl_context,
             )
-        return resp
 
     def _export_with_retries(
         self,
@@ -210,18 +198,17 @@ class OTLPMetricExporter(MetricExporter, OTLPMetricExporterMixin):
                 backoff_seconds = 2**retry_num * uniform(0.8, 1.2)
                 export_error: Exception | None = None
                 try:
-                    resp = self._export(serialized_data, deadline_sec - time())
-                    if resp.ok:
+                    status_code, reason = self._export(
+                        serialized_data, deadline_sec - time()
+                    )
+                    if status_code < 400:
                         return MetricExportResult.SUCCESS
-                except RequestException as error:
-                    reason = error
+                    retryable = _is_retryable(status_code)
+                except URLError as error:
+                    reason = error.reason
                     export_error = error
-                    retryable = isinstance(error, ConnectionError)
+                    retryable = True
                     status_code = None
-                else:
-                    reason = resp.reason
-                    retryable = _is_retryable(resp)
-                    status_code = resp.status_code
 
                 if not retryable:
                     _logger.error(
@@ -299,7 +286,6 @@ class OTLPMetricExporter(MetricExporter, OTLPMetricExporterMixin):
             return
         self._shutdown = True
         self._shutdown_in_progress.set()
-        self._session.close()
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
         return True
