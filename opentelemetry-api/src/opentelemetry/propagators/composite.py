@@ -39,7 +39,7 @@ class CompositePropagator(textmap.TextMapPropagator):
         """
         for propagator in self._propagators:
             context = propagator.extract(carrier, context, getter=getter)
-        return context  # type: ignore
+        return context if context is not None else Context()
 
     def inject(
         self,
