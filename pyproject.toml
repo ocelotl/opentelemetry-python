@@ -49,7 +49,6 @@ opentelemetry-propagator-b3 = { workspace = true }
 opentelemetry-codegen-json = { workspace = true }
 opentelemetry-pyproto = { workspace = true }
 opentelemetry-exporter-otlp-pyproto-common = { workspace = true }
-opentelemetry-exporter-otlp-pyproto-http = { workspace = true }
 
 [tool.uv.workspace]
 members = [
@@ -68,6 +67,8 @@ members = [
 
 exclude = [
   "exporter/opentelemetry-exporter-opencensus",
+  "exporter/opentelemetry-exporter-otlp-pyproto-http",
+  "exporter/opentelemetry-exporter-otlp-pyproto-grpc",
   "exporter/opentelemetry-exporter-zipkin",
   "exporter/opentelemetry-exporter-zipkin-proto-http",
 ]
