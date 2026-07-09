@@ -9,7 +9,7 @@ from opentelemetry.exporter.otlp.proto.common._internal import (
     _encode_trace_id as proto_encode_trace_id,
     _encode_value as proto_encode_value,
 )
-from opentelemetry.exporter.otlp.proto.common._internal import (
+from opentelemetry.exporter.otlp.proto._common._internal import (
     _encode_attributes,
     _encode_instrumentation_scope,
     _encode_resource,

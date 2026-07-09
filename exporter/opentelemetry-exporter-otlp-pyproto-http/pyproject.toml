@@ -12,7 +12,7 @@ requires-python = ">=3.10"
 dependencies = [
   "opentelemetry-api ~= 1.12",
   "opentelemetry-sdk ~= 1.12",
-  "opentelemetry-exporter-otlp-pyproto-common == 1.43.0.dev",
+  "opentelemetry-exporter-otlp-pyproto-common == 1.44.0.dev",
 ]
 
 [project.entry-points.opentelemetry_traces_exporter]
@@ -26,10 +26,10 @@ otlp_proto_http = "opentelemetry.exporter.otlp.proto.http._log_exporter:OTLPLogE
 
 [dependency-groups]
 dev = [
-    "opentelemetry-proto == 1.43.0.dev",
-    "opentelemetry-exporter-otlp-proto-common == 1.43.0.dev",
-    "opentelemetry-exporter-otlp-proto-http == 1.43.0.dev",
-    "opentelemetry-test-utils == 1.43.0.dev",
+    "opentelemetry-proto == 1.44.0.dev",
+    "opentelemetry-exporter-otlp-proto-common == 1.44.0.dev",
+    "opentelemetry-exporter-otlp-proto-http == 1.44.0.dev",
+    "opentelemetry-test-utils == 0.65b0.dev",
     "protobuf>=5.0",
     "pytest>=7.0",
 ]

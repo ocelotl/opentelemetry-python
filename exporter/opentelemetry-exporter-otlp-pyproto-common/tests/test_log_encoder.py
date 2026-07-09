@@ -5,7 +5,7 @@ from opentelemetry._logs import LogRecord, SeverityNumber
 from opentelemetry.exporter.otlp.proto.common._log_encoder import (
     encode_logs as proto_encode_logs,
 )
-from opentelemetry.exporter.otlp.proto.common._internal._log_encoder import (
+from opentelemetry.exporter.otlp.proto._common._internal._log_encoder import (
     encode_logs as pyproto_encode_logs,
 )
 from opentelemetry.sdk._logs import LogRecordLimits, ReadWriteLogRecord
