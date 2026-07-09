@@ -30,7 +30,7 @@ opentelemetry-exporter-otlp-proto-common = { workspace = true }
 opentelemetry-test-utils = { workspace = true }
 
 [tool.hatch.version]
-path = "src/opentelemetry/exporter/otlp/pyproto/common/version/__init__.py"
+path = "src/opentelemetry/exporter/otlp/proto/common/version/__init__.py"
 
 [tool.hatch.build.targets.sdist]
 include = ["/src"]
