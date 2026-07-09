@@ -15,6 +15,9 @@ from urllib.error import URLError
 from urllib.parse import urlparse
 from zlib import compress
 
+from opentelemetry.exporter.otlp.proto._common._internal import (
+    _get_resource_data,
+)
 from opentelemetry.exporter.otlp.proto._common._exporter_metrics import (
     create_exporter_metrics,
 )
@@ -79,6 +82,7 @@ from opentelemetry.util.re import parse_env_headers
 
 _logger = getLogger(__name__)
 
+DEFAULT_COMPRESSION = Compression.NoCompression
 DEFAULT_ENDPOINT = "http://localhost:4318/"
 DEFAULT_METRICS_EXPORT_PATH = "v1/metrics"
 DEFAULT_TIMEOUT = 10
@@ -95,12 +99,18 @@ class OTLPMetricExporter(MetricExporter, OTLPMetricExporterMixin):
         headers: dict[str, str] | None = None,
         timeout: float | None = None,
         compression: Compression | None = None,
+        session: object | None = None,
         preferred_temporality: dict[type, AggregationTemporality] | None = None,
         preferred_aggregation: dict[type, Aggregation] | None = None,
         max_export_batch_size: int | None = None,
         *,
         meter_provider: MeterProvider | None = None,
     ):
+        if session is not None:
+            _logger.warning(
+                "session is not supported by the pure-Python OTLP HTTP "
+                "exporter and will be ignored"
+            )
         self._shutdown_in_progress = Event()
         self._endpoint = endpoint or environ.get(
             OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,
@@ -483,3 +493,7 @@ def _append_metrics_path(endpoint: str) -> str:
     if endpoint.endswith("/"):
         return endpoint + DEFAULT_METRICS_EXPORT_PATH
     return endpoint + f"/{DEFAULT_METRICS_EXPORT_PATH}"
+
+
+def get_resource_data(sdk_resource_scope_data, resource_class, name):
+    return _get_resource_data(sdk_resource_scope_data, resource_class, name)

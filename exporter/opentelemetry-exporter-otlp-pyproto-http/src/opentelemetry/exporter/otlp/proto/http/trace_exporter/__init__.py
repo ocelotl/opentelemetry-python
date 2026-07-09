@@ -59,6 +59,7 @@ from opentelemetry.util.re import parse_env_headers
 
 _logger = getLogger(__name__)
 
+DEFAULT_COMPRESSION = Compression.NoCompression
 DEFAULT_ENDPOINT = "http://localhost:4318/"
 DEFAULT_TRACES_EXPORT_PATH = "v1/traces"
 DEFAULT_TIMEOUT = 10
@@ -75,9 +76,15 @@ class OTLPSpanExporter(SpanExporter):
         headers: dict[str, str] | None = None,
         timeout: float | None = None,
         compression: Compression | None = None,
+        session: object | None = None,
         *,
         meter_provider: MeterProvider | None = None,
     ):
+        if session is not None:
+            _logger.warning(
+                "session is not supported by the pure-Python OTLP HTTP "
+                "exporter and will be ignored"
+            )
         self._shutdown_in_progress = Event()
         self._endpoint = endpoint or environ.get(
             OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
