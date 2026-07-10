@@ -33,7 +33,7 @@ dev = [
 ]
 
 [tool.hatch.version]
-path = "src/opentelemetry/exporter/otlp/proto/grpc/version/__init__.py"
+path = "src/opentelemetry/exporter/otlp/_proto/grpc/version/__init__.py"
 
 [tool.hatch.build.targets.sdist]
 include = ["/src"]

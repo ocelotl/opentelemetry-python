@@ -17,8 +17,8 @@ from opentelemetry.exporter.otlp.proto.grpc.exporter import (
     environ_to_compression,
 )
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.pyproto.collector.trace.v1.trace_service_pypb2 import ExportTraceServiceRequest
-from opentelemetry.pyproto.collector.trace.v1.trace_service_pypb2_grpc import TraceServiceStub
+from opentelemetry._proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
+from opentelemetry._proto.collector.trace.v1.trace_service_pb2_grpc import TraceServiceStub
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
