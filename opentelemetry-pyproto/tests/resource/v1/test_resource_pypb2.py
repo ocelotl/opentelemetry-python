@@ -4,8 +4,8 @@ from opentelemetry.proto.common.v1.common_pb2 import (
 )
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource as ProtoResource
 
-from opentelemetry.pyproto.common.v1.common_pypb2 import AnyValue, KeyValue
-from opentelemetry.pyproto.resource.v1.resource_pypb2 import Resource
+from opentelemetry._proto.common.v1.common_pb2 import AnyValue, KeyValue
+from opentelemetry._proto.resource.v1.resource_pb2 import Resource
 
 
 def test_resource_empty() -> None:

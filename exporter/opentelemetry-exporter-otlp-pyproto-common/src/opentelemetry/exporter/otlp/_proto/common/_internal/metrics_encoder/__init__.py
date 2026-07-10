@@ -11,10 +11,10 @@ from opentelemetry.exporter.otlp._proto.common._internal import (
     _encode_span_id,
     _encode_trace_id,
 )
-from opentelemetry.pyproto.collector.metrics.v1.metrics_service_pypb2 import (
+from opentelemetry._proto.collector.metrics.v1.metrics_service_pb2 import (
     ExportMetricsServiceRequest,
 )
-from opentelemetry.pyproto.metrics.v1.metrics_pypb2 import (
+from opentelemetry._proto.metrics.v1.metrics_pb2 import (
     Exemplar,
     ExponentialHistogram,
     ExponentialHistogramDataPoint,
@@ -27,7 +27,7 @@ from opentelemetry.pyproto.metrics.v1.metrics_pypb2 import (
     ScopeMetrics,
     Sum,
 )
-from opentelemetry.pyproto.resource.v1.resource_pypb2 import Resource as PB2Resource
+from opentelemetry._proto.resource.v1.resource_pb2 import Resource as PB2Resource
 from opentelemetry.sdk.environment_variables import (
     OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION,
     OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE,

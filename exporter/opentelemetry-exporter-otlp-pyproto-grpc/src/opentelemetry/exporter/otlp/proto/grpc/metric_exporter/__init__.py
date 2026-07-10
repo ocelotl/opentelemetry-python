@@ -17,8 +17,8 @@ from opentelemetry.exporter.otlp.proto.grpc.exporter import (
     environ_to_compression,
 )
 from opentelemetry.metrics import MeterProvider
-from opentelemetry.pyproto.collector.metrics.v1.metrics_service_pypb2 import ExportMetricsServiceRequest
-from opentelemetry.pyproto.collector.metrics.v1.metrics_service_pypb2_grpc import MetricsServiceStub
+from opentelemetry._proto.collector.metrics.v1.metrics_service_pb2 import ExportMetricsServiceRequest
+from opentelemetry._proto.collector.metrics.v1.metrics_service_pb2_grpc import MetricsServiceStub
 from opentelemetry.sdk.environment_variables import (
     _OTEL_PYTHON_EXPORTER_OTLP_GRPC_METRICS_CREDENTIAL_PROVIDER,
     OTEL_EXPORTER_OTLP_METRICS_CERTIFICATE,

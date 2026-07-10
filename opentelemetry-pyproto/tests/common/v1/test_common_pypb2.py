@@ -6,7 +6,7 @@ from opentelemetry.proto.common.v1.common_pb2 import (
     KeyValueList as ProtoKeyValueList,
 )
 
-from opentelemetry.pyproto.common.v1.common_pypb2 import (
+from opentelemetry._proto.common.v1.common_pb2 import (
     AnyValue,
     ArrayValue,
     InstrumentationScope,

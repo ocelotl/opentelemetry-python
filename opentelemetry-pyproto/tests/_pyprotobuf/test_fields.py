@@ -16,8 +16,8 @@ from struct import pack
 
 from pytest import mark
 
-from opentelemetry.pyproto._pyprotobuf import encode_tag, encode_varint
-from opentelemetry.pyproto._pyprotobuf.fields import (
+from opentelemetry._proto._pyprotobuf import encode_tag, encode_varint
+from opentelemetry._proto._pyprotobuf.fields import (
     WT_32BIT,
     WT_64BIT,
     WT_LEN,

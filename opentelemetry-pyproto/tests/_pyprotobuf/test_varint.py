@@ -3,7 +3,7 @@
 from google.protobuf import descriptor_pb2, descriptor_pool, message_factory
 from pytest import mark, raises
 
-from opentelemetry.pyproto._pyprotobuf import encode_tag, encode_varint
+from opentelemetry._proto._pyprotobuf import encode_tag, encode_varint
 
 
 def test_zero() -> None:

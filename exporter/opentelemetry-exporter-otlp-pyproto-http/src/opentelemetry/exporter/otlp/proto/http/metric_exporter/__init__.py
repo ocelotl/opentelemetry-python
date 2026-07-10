@@ -35,10 +35,10 @@ from opentelemetry.exporter.otlp.proto.http._common import (
     _post,
 )
 from opentelemetry.metrics import MeterProvider
-from opentelemetry.pyproto.collector.metrics.v1.metrics_service_pypb2 import (
+from opentelemetry._proto.collector.metrics.v1.metrics_service_pb2 import (
     ExportMetricsServiceRequest,
 )
-from opentelemetry.pyproto.metrics.v1.metrics_pypb2 import (
+from opentelemetry._proto.metrics.v1.metrics_pb2 import (
     ExponentialHistogram,
     Gauge,
     Histogram,

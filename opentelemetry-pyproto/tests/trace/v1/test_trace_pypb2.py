@@ -11,13 +11,13 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
     Status as ProtoStatus,
 )
 
-from opentelemetry.pyproto.common.v1.common_pypb2 import (
+from opentelemetry._proto.common.v1.common_pb2 import (
     AnyValue,
     InstrumentationScope,
     KeyValue,
 )
-from opentelemetry.pyproto.resource.v1.resource_pypb2 import Resource
-from opentelemetry.pyproto.trace.v1.trace_pypb2 import (
+from opentelemetry._proto.resource.v1.resource_pb2 import Resource
+from opentelemetry._proto.trace.v1.trace_pb2 import (
     ResourceSpans,
     ScopeSpans,
     Span,

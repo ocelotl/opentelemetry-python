@@ -6,11 +6,11 @@ from opentelemetry.proto.metrics.v1.metrics_pb2 import (
     ResourceMetrics as ProtoResourceMetrics,
 )
 
-from opentelemetry.pyproto.collector.metrics.v1.metrics_service_pypb2 import (
+from opentelemetry._proto.collector.metrics.v1.metrics_service_pb2 import (
     ExportMetricsServiceRequest,
     ExportMetricsServiceResponse,
 )
-from opentelemetry.pyproto.metrics.v1.metrics_pypb2 import ResourceMetrics
+from opentelemetry._proto.metrics.v1.metrics_pb2 import ResourceMetrics
 
 
 def test_export_response_empty() -> None:

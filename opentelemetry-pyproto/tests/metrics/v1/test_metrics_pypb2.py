@@ -20,12 +20,12 @@ from opentelemetry.proto.metrics.v1.metrics_pb2 import (
 )
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource as ProtoResource
 
-from opentelemetry.pyproto.common.v1.common_pypb2 import (
+from opentelemetry._proto.common.v1.common_pb2 import (
     AnyValue,
     InstrumentationScope,
     KeyValue,
 )
-from opentelemetry.pyproto.metrics.v1.metrics_pypb2 import (
+from opentelemetry._proto.metrics.v1.metrics_pb2 import (
     Exemplar,
     ExponentialHistogram,
     ExponentialHistogramDataPoint,
@@ -40,7 +40,7 @@ from opentelemetry.pyproto.metrics.v1.metrics_pypb2 import (
     Summary,
     SummaryDataPoint,
 )
-from opentelemetry.pyproto.resource.v1.resource_pypb2 import Resource
+from opentelemetry._proto.resource.v1.resource_pb2 import Resource
 
 
 # ── Exemplar ──────────────────────────────────────────────────────────────────

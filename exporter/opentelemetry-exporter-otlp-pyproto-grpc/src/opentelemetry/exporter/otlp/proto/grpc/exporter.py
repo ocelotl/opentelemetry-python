@@ -30,22 +30,22 @@ from opentelemetry.exporter.otlp.proto.grpc import (
     _OTLP_GRPC_CHANNEL_OPTIONS,
 )
 from opentelemetry.metrics import MeterProvider
-from opentelemetry.pyproto.collector.logs.v1.logs_service_pypb2 import (
+from opentelemetry._proto.collector.logs.v1.logs_service_pb2 import (
     ExportLogsServiceRequest,
 )
-from opentelemetry.pyproto.collector.logs.v1.logs_service_pypb2_grpc import (
+from opentelemetry._proto.collector.logs.v1.logs_service_pb2_grpc import (
     LogsServiceStub,
 )
-from opentelemetry.pyproto.collector.metrics.v1.metrics_service_pypb2 import (
+from opentelemetry._proto.collector.metrics.v1.metrics_service_pb2 import (
     ExportMetricsServiceRequest,
 )
-from opentelemetry.pyproto.collector.metrics.v1.metrics_service_pypb2_grpc import (
+from opentelemetry._proto.collector.metrics.v1.metrics_service_pb2_grpc import (
     MetricsServiceStub,
 )
-from opentelemetry.pyproto.collector.trace.v1.trace_service_pypb2 import (
+from opentelemetry._proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
-from opentelemetry.pyproto.collector.trace.v1.trace_service_pypb2_grpc import (
+from opentelemetry._proto.collector.trace.v1.trace_service_pb2_grpc import (
     TraceServiceStub,
 )
 from opentelemetry.sdk._logs import ReadableLogRecord

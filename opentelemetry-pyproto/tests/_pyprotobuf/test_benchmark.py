@@ -17,8 +17,8 @@
 from google.protobuf import descriptor_pb2, descriptor_pool, message_factory
 from pytest import mark
 
-from opentelemetry.pyproto._pyprotobuf import encode_varint
-from opentelemetry.pyproto._pyprotobuf.fields import (
+from opentelemetry._proto._pyprotobuf import encode_varint
+from opentelemetry._proto._pyprotobuf.fields import (
     bool_field,
     byt,
     dbl,

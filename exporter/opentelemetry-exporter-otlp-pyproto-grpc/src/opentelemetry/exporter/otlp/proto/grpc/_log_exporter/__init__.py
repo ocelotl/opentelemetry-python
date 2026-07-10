@@ -15,8 +15,8 @@ from opentelemetry.exporter.otlp.proto.grpc.exporter import (
     environ_to_compression,
 )
 from opentelemetry.metrics import MeterProvider
-from opentelemetry.pyproto.collector.logs.v1.logs_service_pypb2 import ExportLogsServiceRequest
-from opentelemetry.pyproto.collector.logs.v1.logs_service_pypb2_grpc import LogsServiceStub
+from opentelemetry._proto.collector.logs.v1.logs_service_pb2 import ExportLogsServiceRequest
+from opentelemetry._proto.collector.logs.v1.logs_service_pb2_grpc import LogsServiceStub
 from opentelemetry.sdk._logs import ReadableLogRecord
 from opentelemetry.sdk._logs.export import LogRecordExporter, LogRecordExportResult
 from opentelemetry.sdk.environment_variables import (

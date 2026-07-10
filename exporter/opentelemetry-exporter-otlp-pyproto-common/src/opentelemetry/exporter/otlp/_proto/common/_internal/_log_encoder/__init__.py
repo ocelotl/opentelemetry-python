@@ -11,10 +11,10 @@ from opentelemetry.exporter.otlp._proto.common._internal import (
     _encode_trace_id,
     _encode_value,
 )
-from opentelemetry.pyproto.collector.logs.v1.logs_service_pypb2 import (
+from opentelemetry._proto.collector.logs.v1.logs_service_pb2 import (
     ExportLogsServiceRequest,
 )
-from opentelemetry.pyproto.logs.v1.logs_pypb2 import (
+from opentelemetry._proto.logs.v1.logs_pb2 import (
     LogRecord,
     ResourceLogs,
     ScopeLogs,

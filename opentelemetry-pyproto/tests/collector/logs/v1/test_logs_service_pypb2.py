@@ -6,11 +6,11 @@ from opentelemetry.proto.logs.v1.logs_pb2 import (
     ResourceLogs as ProtoResourceLogs,
 )
 
-from opentelemetry.pyproto.collector.logs.v1.logs_service_pypb2 import (
+from opentelemetry._proto.collector.logs.v1.logs_service_pb2 import (
     ExportLogsServiceRequest,
     ExportLogsServiceResponse,
 )
-from opentelemetry.pyproto.logs.v1.logs_pypb2 import ResourceLogs
+from opentelemetry._proto.logs.v1.logs_pb2 import ResourceLogs
 
 
 def test_export_response_empty() -> None:

@@ -8,7 +8,7 @@
 from google.protobuf import descriptor_pb2, descriptor_pool, message_factory
 from pytest import mark
 
-from opentelemetry.pyproto._pyprotobuf import encode_enum, encode_int, encode_tag
+from opentelemetry._proto._pyprotobuf import encode_enum, encode_int, encode_tag
 
 
 def test_zero() -> None:

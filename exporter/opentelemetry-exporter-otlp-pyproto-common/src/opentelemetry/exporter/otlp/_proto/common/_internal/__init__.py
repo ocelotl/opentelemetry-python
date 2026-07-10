@@ -7,14 +7,14 @@ from logging import getLogger
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, TypeVar
 
-from opentelemetry.pyproto.common.v1.common_pypb2 import (
+from opentelemetry._proto.common.v1.common_pb2 import (
     AnyValue,
     ArrayValue,
     InstrumentationScope as PB2InstrumentationScope,
     KeyValue,
     KeyValueList,
 )
-from opentelemetry.pyproto.resource.v1.resource_pypb2 import Resource as PB2Resource
+from opentelemetry._proto.resource.v1.resource_pb2 import Resource as PB2Resource
 from opentelemetry.sdk.trace import Resource
 from opentelemetry.sdk.util.instrumentation import InstrumentationScope
 from opentelemetry.util.types import _ExtendedAttributes

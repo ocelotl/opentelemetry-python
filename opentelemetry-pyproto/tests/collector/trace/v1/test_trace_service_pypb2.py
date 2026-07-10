@@ -6,11 +6,11 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
     ResourceSpans as ProtoResourceSpans,
 )
 
-from opentelemetry.pyproto.collector.trace.v1.trace_service_pypb2 import (
+from opentelemetry._proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
     ExportTraceServiceResponse,
 )
-from opentelemetry.pyproto.trace.v1.trace_pypb2 import ResourceSpans
+from opentelemetry._proto.trace.v1.trace_pb2 import ResourceSpans
 
 
 def test_export_response_empty() -> None:
