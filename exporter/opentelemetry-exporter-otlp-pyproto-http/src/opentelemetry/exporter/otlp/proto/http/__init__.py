@@ -1,7 +1,10 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-import sys as _sys
-import opentelemetry.exporter.otlp._proto.http as _mod
+from opentelemetry.exporter.otlp._proto.http import *  # noqa: F401,F403
+import opentelemetry.exporter.otlp._proto.http as _src
 
-_sys.modules[__name__] = _mod
+for _n in dir(_src):
+    if not _n.startswith('__'):
+        globals().setdefault(_n, getattr(_src, _n))
+del _src, _n
