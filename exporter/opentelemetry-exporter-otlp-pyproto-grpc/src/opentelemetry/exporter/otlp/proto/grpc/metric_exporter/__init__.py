@@ -10,7 +10,7 @@ from os import environ
 
 from grpc import ChannelCredentials, Compression, StatusCode
 
-from opentelemetry.exporter.otlp.proto._common._internal.metrics_encoder import OTLPMetricExporterMixin, encode_metrics
+from opentelemetry.exporter.otlp._proto.common._internal.metrics_encoder import OTLPMetricExporterMixin, encode_metrics
 from opentelemetry.exporter.otlp.proto.grpc.exporter import (
     OTLPExporterMixin,
     _get_credentials,

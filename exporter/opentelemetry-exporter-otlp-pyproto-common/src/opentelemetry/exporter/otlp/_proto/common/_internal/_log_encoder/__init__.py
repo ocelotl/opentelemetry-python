@@ -3,7 +3,7 @@
 from collections import defaultdict
 from collections.abc import Sequence
 
-from opentelemetry.exporter.otlp.proto._common._internal import (
+from opentelemetry.exporter.otlp._proto.common._internal import (
     _encode_attributes,
     _encode_instrumentation_scope,
     _encode_resource,

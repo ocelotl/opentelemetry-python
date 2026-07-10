@@ -4,7 +4,7 @@
 from opentelemetry.exporter.otlp.proto.common.trace_encoder import (
     encode_spans as proto_encode_spans,
 )
-from opentelemetry.exporter.otlp.proto._common._internal.trace_encoder import (
+from opentelemetry.exporter.otlp._proto.common._internal.trace_encoder import (
     encode_spans as pyproto_encode_spans,
 )
 from opentelemetry.sdk.trace import Event as SDKEvent

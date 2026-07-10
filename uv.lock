@@ -21,7 +21,6 @@ members = [
     "opentelemetry-exporter-otlp-proto-common",
     "opentelemetry-exporter-otlp-proto-grpc",
     "opentelemetry-exporter-otlp-proto-http",
-    "opentelemetry-exporter-otlp-pyproto-common",
     "opentelemetry-exporter-prometheus",
     "opentelemetry-exporter-zipkin-json",
     "opentelemetry-propagator-b3",
@@ -1029,40 +1028,6 @@ requires-dist = [
     { name = "typing-extensions", specifier = ">=4.5.0" },
 ]
 provides-extras = ["gcp-auth"]
-
-[[package]]
-name = "opentelemetry-exporter-otlp-pyproto-common"
-source = { editable = "exporter/opentelemetry-exporter-otlp-pyproto-common" }
-dependencies = [
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-pyproto" },
-    { name = "opentelemetry-sdk" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "opentelemetry-exporter-otlp-proto-common" },
-    { name = "opentelemetry-proto" },
-    { name = "opentelemetry-test-utils" },
-    { name = "protobuf" },
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "opentelemetry-api", editable = "opentelemetry-api" },
-    { name = "opentelemetry-pyproto", editable = "opentelemetry-pyproto" },
-    { name = "opentelemetry-sdk", editable = "opentelemetry-sdk" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "opentelemetry-exporter-otlp-proto-common", editable = "exporter/opentelemetry-exporter-otlp-proto-common" },
-    { name = "opentelemetry-proto", editable = "opentelemetry-proto" },
-    { name = "opentelemetry-test-utils", editable = "tests/opentelemetry-test-utils" },
-    { name = "protobuf", specifier = ">=5.0" },
-    { name = "pytest", specifier = ">=7.0" },
-]
 
 [[package]]
 name = "opentelemetry-exporter-prometheus"

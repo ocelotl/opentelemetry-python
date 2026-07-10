@@ -14,10 +14,10 @@ from urllib.error import URLError
 from urllib.parse import urlparse
 from zlib import compress
 
-from opentelemetry.exporter.otlp.proto._common._exporter_metrics import (
+from opentelemetry.exporter.otlp._proto.common._exporter_metrics import (
     create_exporter_metrics,
 )
-from opentelemetry.exporter.otlp.proto._common._internal.trace_encoder import (
+from opentelemetry.exporter.otlp._proto.common._internal.trace_encoder import (
     encode_spans,
 )
 from opentelemetry.exporter.otlp.proto.http import (

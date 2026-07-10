@@ -4,7 +4,7 @@
 from opentelemetry.exporter.otlp.proto.common.metrics_encoder import (
     encode_metrics as proto_encode_metrics,
 )
-from opentelemetry.exporter.otlp.proto._common._internal.metrics_encoder import (
+from opentelemetry.exporter.otlp._proto.common._internal.metrics_encoder import (
     encode_metrics as pyproto_encode_metrics,
 )
 from opentelemetry.sdk.metrics import Exemplar

@@ -15,13 +15,13 @@ from urllib.error import URLError
 from urllib.parse import urlparse
 from zlib import compress
 
-from opentelemetry.exporter.otlp.proto._common._internal import (
+from opentelemetry.exporter.otlp._proto.common._internal import (
     _get_resource_data,
 )
-from opentelemetry.exporter.otlp.proto._common._exporter_metrics import (
+from opentelemetry.exporter.otlp._proto.common._exporter_metrics import (
     create_exporter_metrics,
 )
-from opentelemetry.exporter.otlp.proto._common._internal.metrics_encoder import (
+from opentelemetry.exporter.otlp._proto.common._internal.metrics_encoder import (
     OTLPMetricExporterMixin,
     encode_metrics,
 )

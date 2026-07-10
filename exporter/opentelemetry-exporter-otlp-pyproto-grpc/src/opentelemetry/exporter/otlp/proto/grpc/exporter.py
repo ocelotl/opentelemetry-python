@@ -23,7 +23,7 @@ from grpc import (
     ssl_channel_credentials,
 )
 
-from opentelemetry.exporter.otlp.proto._common._exporter_metrics import (
+from opentelemetry.exporter.otlp._proto.common._exporter_metrics import (
     create_exporter_metrics,
 )
 from opentelemetry.exporter.otlp.proto.grpc import (

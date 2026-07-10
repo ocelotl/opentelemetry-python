@@ -48,7 +48,6 @@ opentelemetry-propagator-jaeger = { workspace = true }
 opentelemetry-propagator-b3 = { workspace = true }
 opentelemetry-codegen-json = { workspace = true }
 opentelemetry-pyproto = { workspace = true }
-opentelemetry-exporter-otlp-pyproto-common = { workspace = true }
 
 [tool.uv.workspace]
 members = [
@@ -66,6 +65,7 @@ members = [
 ]
 
 exclude = [
+  "exporter/opentelemetry-exporter-otlp-pyproto-common",
   "exporter/opentelemetry-exporter-opencensus",
   "exporter/opentelemetry-exporter-otlp-pyproto-http",
   "exporter/opentelemetry-exporter-otlp-pyproto-grpc",
