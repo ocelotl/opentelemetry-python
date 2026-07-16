@@ -1,0 +1,2 @@
+Enforce a default metric aggregation cardinality limit of 2000, folding
+attribute sets beyond the limit into a single `otel.metric.overflow` series
