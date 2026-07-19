@@ -51,6 +51,23 @@ class MyExtendedSpanProcessor(MySpanProcessor):
         self.span_list.append(span_event_ending_fmt(self.name, span.name))
 
 
+class MutatingOnEndingSpanProcessor(trace.SpanProcessor):
+    """Span processor that mutates the span from inside ``on_ending``.
+
+    The attribute, event and link it adds must survive into the finalized,
+    read-only span; otherwise the ``on_ending`` hook is running too late (after
+    the span was frozen).
+    """
+
+    def _on_ending(self, span: "trace.Span") -> None:
+        span.set_attribute("on_ending.attribute", "added")
+        span.add_event("on_ending.event")
+        span.add_link(
+            trace_api.SpanContext(1, 2, is_remote=False),
+            attributes={"on_ending.link": "added"},
+        )
+
+
 class TestSpanProcessor(unittest.TestCase):
     def test_span_processor(self):
         tracer_provider = trace.TracerProvider()
@@ -254,6 +271,75 @@ class TestSpanProcessor(unittest.TestCase):
             self.fail("_on_ending() should not raise an exception")
 
         self.assertListEqual(spans_calls_list, expected_list)
+
+    def test_on_ending_mutation_survives_synchronous(self):
+        # The default TracerProvider uses SynchronousMultiSpanProcessor.
+        tracer_provider = trace.TracerProvider()
+        tracer_provider.add_span_processor(MutatingOnEndingSpanProcessor())
+        exporter = InMemorySpanExporter()
+        tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+        tracer = tracer_provider.get_tracer(__name__)
+
+        with tracer.start_as_current_span("foo"):
+            pass
+
+        finished_spans = exporter.get_finished_spans()
+        self.assertEqual(len(finished_spans), 1)
+        finished_span = finished_spans[0]
+
+        # The mutation performed inside on_ending must be reflected in the
+        # exported (read-only) span rather than silently dropped.
+        self.assertEqual(
+            finished_span.attributes.get("on_ending.attribute"), "added"
+        )
+        self.assertEqual(len(finished_span.events), 1)
+        self.assertEqual(finished_span.events[0].name, "on_ending.event")
+        self.assertEqual(len(finished_span.links), 1)
+        self.assertEqual(
+            finished_span.links[0].attributes.get("on_ending.link"), "added"
+        )
+
+    def test_on_ending_mutation_survives_concurrent(self):
+        concurrent_processor = trace.ConcurrentMultiSpanProcessor()
+        concurrent_processor.add_span_processor(
+            MutatingOnEndingSpanProcessor()
+        )
+        exporter = InMemorySpanExporter()
+        concurrent_processor.add_span_processor(SimpleSpanProcessor(exporter))
+
+        tracer_provider = trace.TracerProvider(
+            active_span_processor=concurrent_processor
+        )
+        tracer = tracer_provider.get_tracer(__name__)
+
+        with tracer.start_as_current_span("foo"):
+            pass
+
+        finished_spans = exporter.get_finished_spans()
+        self.assertEqual(len(finished_spans), 1)
+        finished_span = finished_spans[0]
+        self.assertEqual(
+            finished_span.attributes.get("on_ending.attribute"), "added"
+        )
+        self.assertEqual(len(finished_span.events), 1)
+        self.assertEqual(finished_span.events[0].name, "on_ending.event")
+        self.assertEqual(len(finished_span.links), 1)
+
+    def test_span_frozen_after_on_ending(self):
+        # A mutation attempted after the span has ended (outside on_ending)
+        # must still be rejected, i.e. the span is finalized once on_ending
+        # has completed.
+        tracer_provider = trace.TracerProvider()
+        tracer = tracer_provider.get_tracer(__name__)
+        span = tracer.start_span("bar")
+        span.end()
+
+        span.set_attribute("after_end.attribute", "rejected")
+        span.add_event("after_end.event")
+        self.assertNotIn("after_end.attribute", span.attributes)
+        self.assertFalse(
+            any(event.name == "after_end.event" for event in span.events)
+        )
 
 
 class MultiSpanProcessorTestBase(abc.ABC):

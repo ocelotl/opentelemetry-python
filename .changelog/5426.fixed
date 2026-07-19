@@ -1,0 +1,3 @@
+Run `SpanProcessor.on_ending` while the span is still mutable so
+attributes, events and links added in the hook are no longer dropped; the
+span is finalized (frozen) only after `on_ending` completes
