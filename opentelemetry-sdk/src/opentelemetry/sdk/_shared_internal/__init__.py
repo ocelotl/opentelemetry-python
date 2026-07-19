@@ -12,6 +12,8 @@ import threading
 import time
 import weakref
 from abc import abstractmethod
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from typing import (
     Generic,
     Protocol,
@@ -97,9 +99,21 @@ class BatchProcessor(Generic[Telemetry]):
         self._schedule_delay_millis = schedule_delay_millis
         self._schedule_delay = schedule_delay_millis / 1e3
         self._max_export_batch_size = max_export_batch_size
-        # Not used. No way currently to pass timeout to export.
-        # TODO(https://github.com/open-telemetry/opentelemetry-python/issues/4555): figure out what this should do.
+        # The maximum time a single export call is allowed to take. Exporters
+        # are synchronous and Python offers no way to cancel a running call, so
+        # the export is run on a dedicated single worker thread and awaited with
+        # this deadline. If the deadline is exceeded the batch worker stops
+        # waiting and moves on instead of blocking forever. See _run_export for
+        # the tradeoffs of this approach.
         self._export_timeout_millis = export_timeout_millis
+        self._export_timeout = export_timeout_millis / 1e3
+        # Single worker so exports are never run concurrently (the spec forbids
+        # concurrent Export calls for the same exporter); the _export_lock
+        # further serializes callers into this executor.
+        self._export_executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix=f"OtelBatch{exporting}Export",
+        )
         # Deque is thread safe.
         self._queue = collections.deque([], max_queue_size)
         self._worker_thread = threading.Thread(
@@ -140,6 +154,12 @@ class BatchProcessor(Generic[Telemetry]):
         self._export_lock = threading.Lock()
         self._worker_awaken = threading.Event()
         self._queue.clear()
+        # The executor's worker thread does not survive a fork, so replace it
+        # with a fresh one in the child process.
+        self._export_executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix=f"OtelBatch{self._exporting}Export",
+        )
         self._worker_thread = threading.Thread(
             name=f"OtelBatch{self._exporting}RecordProcessor",
             target=self.worker,
@@ -179,12 +199,20 @@ class BatchProcessor(Generic[Telemetry]):
                         self._max_export_batch_size,
                         len(self._queue),
                     )
-                    self._exporter.export(
-                        [
-                            # Oldest records are at the back, so pop from there.
-                            self._queue.pop()
-                            for _ in range(count)
-                        ]
+                    batch = [
+                        # Oldest records are at the back, so pop from there.
+                        self._queue.pop()
+                        for _ in range(count)
+                    ]
+                    self._run_export(batch)
+                except FutureTimeoutError as err:
+                    error = err
+                    _logger.warning(
+                        "Timed out (after %sms) while exporting %s. Export was "
+                        "abandoned; the export may still be running in the "
+                        "background.",
+                        self._export_timeout_millis,
+                        self._exporting,
                     )
                 except Exception as err:  # pylint: disable=broad-exception-caught
                     error = err
@@ -194,6 +222,36 @@ class BatchProcessor(Generic[Telemetry]):
                 finally:
                     self._metrics.finish_items(count, error)
                 detach(token)
+                # If an export timed out we stop draining the queue for this
+                # cycle instead of piling more work onto a stuck exporter.
+                if isinstance(error, FutureTimeoutError):
+                    break
+
+    def _run_export(self, batch: list[Telemetry]) -> None:
+        """Run a single export call bounded by the configured timeout.
+
+        The export is submitted to a dedicated single-threaded executor and
+        awaited with the export timeout as a deadline. This guarantees the
+        batch worker (and callers of force_flush) cannot be blocked
+        indefinitely by a hung exporter, satisfying the spec requirement that
+        Export MUST NOT block indefinitely.
+
+        A non-positive timeout is treated as "no deadline" (block until the
+        export returns), matching the previous behaviour and Go/Java where a
+        zero timeout disables the deadline.
+
+        Raises ``concurrent.futures.TimeoutError`` if the export does not
+        complete within the deadline. On timeout the export call itself is
+        abandoned but keeps running in the background on the executor thread
+        (Python offers no way to cancel a running synchronous call); the next
+        export will queue behind it on the single executor thread, which
+        naturally back-pressures against a permanently stuck exporter.
+        """
+        timeout = self._export_timeout if self._export_timeout > 0 else None
+        future = self._export_executor.submit(self._exporter.export, batch)
+        # result() re-raises any exception from the export call, and raises
+        # FutureTimeoutError if the deadline is exceeded.
+        future.result(timeout=timeout)
 
     def emit(self, data: Telemetry) -> None:
         if self._shutdown:
@@ -238,6 +296,11 @@ class BatchProcessor(Generic[Telemetry]):
         # and set shutdown_is_occuring to prevent further export calls. It's possible that a single export
         # call is ongoing and the thread isn't finished. In this case we will return instead of waiting on
         # the thread to finish.
+        # Release the export executor without waiting: if an export is hung we
+        # must not block shutdown on it (that is the whole point of the export
+        # timeout). Pending-but-unstarted work is cancelled; a running export is
+        # left to finish (or leak) on its daemon-like executor thread.
+        self._export_executor.shutdown(wait=False, cancel_futures=True)
 
     # TODO: Fix force flush so the timeout is used https://github.com/open-telemetry/opentelemetry-python/issues/4568.
     def force_flush(self, timeout_millis: int | None = None) -> bool:

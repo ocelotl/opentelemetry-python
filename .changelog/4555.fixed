@@ -1,0 +1,3 @@
+`BatchSpanProcessor`/`BatchLogRecordProcessor`: enforce `OTEL_BSP_EXPORT_TIMEOUT`
+as a real deadline on the export call so a hung exporter can no longer block the
+batch worker (and `force_flush`) indefinitely

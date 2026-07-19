@@ -1,0 +1,3 @@
+`SimpleSpanProcessor`: serialize calls to the exporter with a lock so concurrent
+`on_end` calls can no longer invoke `SpanExporter.export` concurrently, as
+required by the specification

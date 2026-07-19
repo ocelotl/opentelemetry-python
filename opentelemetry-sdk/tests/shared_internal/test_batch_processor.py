@@ -244,6 +244,52 @@ class TestBatchProcessor:
         assert exporter.sleep_interrupted is True
         assert 2 == exporter.num_export_calls
 
+    def test_hung_export_is_bounded_by_export_timeout(
+        self, batch_processor_class, telemetry
+    ):
+        # An exporter whose export() call would hang effectively forever.
+        export_released = threading.Event()
+
+        class HangingExporter:
+            def __init__(self):
+                self.export_started = threading.Event()
+
+            def export(self, _):
+                self.export_started.set()
+                # Would block ~forever if the deadline were not enforced.
+                export_released.wait(60)
+
+            def shutdown(self):
+                export_released.set()
+
+        exporter = HangingExporter()
+        processor = batch_processor_class(
+            exporter,
+            max_queue_size=15,
+            max_export_batch_size=15,
+            schedule_delay_millis=30000,
+            # Short deadline: a hung export must be abandoned after this.
+            export_timeout_millis=200,
+        )
+        try:
+            processor._batch_processor.emit(telemetry)
+            before = time.time()
+            # force_flush triggers _export; the hung export must not block it
+            # for longer than the configured timeout (plus a small margin).
+            processor.force_flush()
+            elapsed = time.time() - before
+            # The export was actually entered.
+            assert exporter.export_started.is_set()
+            # Bounded, not infinite: well under the 60s the exporter would hang.
+            assert elapsed < 5, (
+                f"force_flush blocked for {elapsed}s despite a 200ms export "
+                "timeout"
+            )
+        finally:
+            # Release the hung export thread so the process can exit cleanly.
+            export_released.set()
+            processor.shutdown()
+
 
 class TestCommonFuncs(unittest.TestCase):
     def test_duplicate_logs_filter_works(self):

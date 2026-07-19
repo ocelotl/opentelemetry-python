@@ -136,6 +136,66 @@ class TestSimpleSpanProcessor(unittest.TestCase):
 
         self.assertListEqual([], spans_names_list)
 
+    def test_export_is_serialized_across_concurrent_on_end(self):
+        """Concurrent on_end calls must never invoke export() concurrently.
+
+        The spec requires that Export MUST NOT be called concurrently for the
+        same exporter. This exporter records whether it is ever entered by more
+        than one thread at a time.
+        """
+
+        class ConcurrencyDetectingExporter(export.SpanExporter):
+            def __init__(self):
+                self._active = 0
+                self._active_lock = threading.Lock()
+                self.max_concurrency = 0
+                self.export_count = 0
+
+            def export(self, spans):
+                with self._active_lock:
+                    self._active += 1
+                    self.export_count += 1
+                    self.max_concurrency = max(
+                        self.max_concurrency, self._active
+                    )
+                # Sleep outside the lock so genuine overlap would be observed
+                # by another thread bumping _active before we decrement.
+                time.sleep(0.005)
+                with self._active_lock:
+                    self._active -= 1
+                return export.SpanExportResult.SUCCESS
+
+            def shutdown(self):
+                pass
+
+        exporter = ConcurrencyDetectingExporter()
+        span_processor = export.SimpleSpanProcessor(exporter)
+        tracer_provider = trace.TracerProvider()
+        tracer_provider.add_span_processor(span_processor)
+        tracer = tracer_provider.get_tracer(__name__)
+
+        num_threads = 8
+        spans_per_thread = 5
+        barrier = threading.Barrier(num_threads)
+
+        def end_spans():
+            barrier.wait()
+            for _ in range(spans_per_thread):
+                with tracer.start_as_current_span("concurrent"):
+                    pass
+
+        threads = [
+            threading.Thread(target=end_spans) for _ in range(num_threads)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        span_processor.shutdown()
+        self.assertEqual(exporter.export_count, num_threads * spans_per_thread)
+        self.assertEqual(exporter.max_concurrency, 1)
+
     @mock.patch.dict(
         "os.environ", {OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED: "true"}
     )
