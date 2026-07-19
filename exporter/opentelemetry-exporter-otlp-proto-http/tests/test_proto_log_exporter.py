@@ -3,6 +3,7 @@
 
 # pylint: disable=protected-access
 
+import logging
 import threading
 import time
 import unittest
@@ -27,6 +28,7 @@ from opentelemetry.exporter.otlp.proto.http._log_exporter import (
 from opentelemetry.exporter.otlp.proto.http.version import __version__
 from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
     ExportLogsServiceRequest,
+    ExportLogsServiceResponse,
 )
 from opentelemetry.sdk._logs import ReadWriteLogRecord
 from opentelemetry.sdk._logs.export import LogRecordExportResult
@@ -455,6 +457,43 @@ class TestOTLPHTTPLogExporter(unittest.TestCase):
             OTLPLogExporter().export(MagicMock()),
             LogRecordExportResult.SUCCESS,
         )
+
+    @patch.object(Session, "post")
+    def test_partial_success_logs_warning(self, mock_post):
+        """A partial-success response with rejected log records logs a warning."""
+        response = ExportLogsServiceResponse()
+        response.partial_success.rejected_log_records = 2
+        response.partial_success.error_message = "some logs were dropped"
+        resp = Response()
+        resp.status_code = 200
+        resp._content = response.SerializeToString()
+        mock_post.return_value = resp
+
+        with self.assertLogs(level=WARNING) as warning:
+            self.assertEqual(
+                OTLPLogExporter().export(self._get_sdk_log_data()),
+                LogRecordExportResult.SUCCESS,
+            )
+        self.assertIn("2 items rejected", warning.output[0])
+        self.assertIn("some logs were dropped", warning.output[0])
+
+    @patch.object(Session, "post")
+    def test_full_success_logs_nothing(self, mock_post):
+        """A fully successful (empty partial_success) response logs nothing."""
+        resp = Response()
+        resp.status_code = 200
+        resp._content = ExportLogsServiceResponse().SerializeToString()
+        mock_post.return_value = resp
+
+        logger = logging.getLogger(
+            "opentelemetry.exporter.otlp.proto.http._common"
+        )
+        with patch.object(logger, "warning") as mock_warning:
+            self.assertEqual(
+                OTLPLogExporter().export(self._get_sdk_log_data()),
+                LogRecordExportResult.SUCCESS,
+            )
+        mock_warning.assert_not_called()
 
     @patch.dict(
         "os.environ", {OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED: " true "}

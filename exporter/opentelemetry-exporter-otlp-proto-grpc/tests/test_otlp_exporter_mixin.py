@@ -110,12 +110,16 @@ class TraceServiceServicerWithExportParams(TraceServiceServicer):
         optional_retry_nanos: int | None = None,
         optional_export_sleep: float | None = None,
         optional_error_details: str | None = None,
+        optional_rejected_spans: int | None = None,
+        optional_partial_error_message: str | None = None,
     ):
         self.export_result = export_result
         self.optional_export_sleep = optional_export_sleep
         self.optional_retry_nanos = optional_retry_nanos
         self.num_requests = 0
         self.optional_error_details = optional_error_details
+        self.optional_rejected_spans = optional_rejected_spans
+        self.optional_partial_error_message = optional_partial_error_message
 
     # pylint: disable=invalid-name,unused-argument
     def Export(self, request, context):
@@ -139,7 +143,16 @@ class TraceServiceServicerWithExportParams(TraceServiceServicer):
         if self.optional_error_details:
             context.set_details(self.optional_error_details)
 
-        return ExportTraceServiceResponse()
+        response = ExportTraceServiceResponse()
+        if self.optional_rejected_spans is not None:
+            response.partial_success.rejected_spans = (
+                self.optional_rejected_spans
+            )
+        if self.optional_partial_error_message is not None:
+            response.partial_success.error_message = (
+                self.optional_partial_error_message
+            )
+        return response
 
 
 class ThreadWithReturnValue(threading.Thread):
@@ -426,6 +439,44 @@ class TestOTLPExporterMixin(TestCase):
                 warning.records[0].message,
                 "Exporter already shutdown, ignoring batch",
             )
+
+    def test_partial_success_logs_warning(self):
+        """A partial-success response with rejected spans logs a warning."""
+        add_TraceServiceServicer_to_server(
+            TraceServiceServicerWithExportParams(
+                StatusCode.OK,
+                optional_rejected_spans=4,
+                optional_partial_error_message="some spans were dropped",
+            ),
+            self.server,
+        )
+        exporter = OTLPSpanExporterForTesting(
+            insecure=True, meter_provider=self.meter_provider
+        )
+        with self.assertLogs(level=WARNING) as warning:
+            self.assertEqual(
+                exporter.export([self.span]), SpanExportResult.SUCCESS
+            )
+        self.assertIn("4 items rejected", warning.output[0])
+        self.assertIn("some spans were dropped", warning.output[0])
+
+    def test_full_success_logs_nothing(self):
+        """A fully successful (empty partial_success) response logs nothing."""
+        add_TraceServiceServicer_to_server(
+            TraceServiceServicerWithExportParams(StatusCode.OK),
+            self.server,
+        )
+        exporter = OTLPSpanExporterForTesting(
+            insecure=True, meter_provider=self.meter_provider
+        )
+        exporter_logger = getLogger(
+            "opentelemetry.exporter.otlp.proto.grpc.exporter"
+        )
+        with patch.object(exporter_logger, "warning") as mock_warning:
+            self.assertEqual(
+                exporter.export([self.span]), SpanExportResult.SUCCESS
+            )
+        mock_warning.assert_not_called()
 
     @unittest.skipIf(
         system() == "Windows",

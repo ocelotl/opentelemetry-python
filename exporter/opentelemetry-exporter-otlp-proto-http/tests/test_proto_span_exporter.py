@@ -1,6 +1,7 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+import logging
 import threading
 import time
 import unittest
@@ -21,6 +22,9 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
     OTLPSpanExporter,
 )
 from opentelemetry.exporter.otlp.proto.http.version import __version__
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+    ExportTraceServiceResponse,
+)
 from opentelemetry.sdk.environment_variables import (
     _OTEL_PYTHON_EXPORTER_OTLP_HTTP_TRACES_CREDENTIAL_PROVIDER,
     OTEL_EXPORTER_OTLP_CERTIFICATE,
@@ -276,6 +280,43 @@ class TestOTLPSpanExporter(unittest.TestCase):
         self.assertEqual(
             OTLPSpanExporter().export(MagicMock()), SpanExportResult.SUCCESS
         )
+
+    @patch.object(Session, "post")
+    def test_partial_success_logs_warning(self, mock_post):
+        """A partial-success response with rejected spans logs a warning."""
+        response = ExportTraceServiceResponse()
+        response.partial_success.rejected_spans = 3
+        response.partial_success.error_message = "some spans were dropped"
+        resp = Response()
+        resp.status_code = 200
+        resp._content = response.SerializeToString()
+        mock_post.return_value = resp
+
+        with self.assertLogs(level=WARNING) as warning:
+            self.assertEqual(
+                OTLPSpanExporter().export([BASIC_SPAN]),
+                SpanExportResult.SUCCESS,
+            )
+        self.assertIn("3 items rejected", warning.output[0])
+        self.assertIn("some spans were dropped", warning.output[0])
+
+    @patch.object(Session, "post")
+    def test_full_success_logs_nothing(self, mock_post):
+        """A fully successful (empty partial_success) response logs nothing."""
+        resp = Response()
+        resp.status_code = 200
+        resp._content = ExportTraceServiceResponse().SerializeToString()
+        mock_post.return_value = resp
+
+        logger = logging.getLogger(
+            "opentelemetry.exporter.otlp.proto.http._common"
+        )
+        with patch.object(logger, "warning") as mock_warning:
+            self.assertEqual(
+                OTLPSpanExporter().export([BASIC_SPAN]),
+                SpanExportResult.SUCCESS,
+            )
+        mock_warning.assert_not_called()
 
     @patch.dict("os.environ", {}, clear=True)
     @patch.object(OTLPSpanExporter, "_export", return_value=Mock(ok=True))
