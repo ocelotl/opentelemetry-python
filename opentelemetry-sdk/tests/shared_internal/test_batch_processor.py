@@ -19,6 +19,10 @@ import pytest
 from opentelemetry._logs import (
     LogRecord,
 )
+from opentelemetry.context import (
+    _SUPPRESS_INSTRUMENTATION_KEY,
+    get_value,
+)
 from opentelemetry.sdk._logs import (
     ReadWriteLogRecord,
 )
@@ -288,6 +292,41 @@ class TestBatchProcessor:
         finally:
             # Release the hung export thread so the process can exit cleanly.
             export_released.set()
+            processor.shutdown()
+
+    def test_export_runs_with_instrumentation_suppressed(
+        self, batch_processor_class, telemetry
+    ):
+        # The export now runs on a separate executor thread. The batch worker
+        # attaches _SUPPRESS_INSTRUMENTATION_KEY before exporting; the exporter
+        # must still observe it as True (otherwise the exporter's own network
+        # calls would be instrumented and fed back into the processor).
+
+        class SuppressionRecordingExporter:
+            def __init__(self):
+                self.suppressed_during_export = None
+
+            def export(self, _):
+                self.suppressed_during_export = get_value(
+                    _SUPPRESS_INSTRUMENTATION_KEY
+                )
+
+            def shutdown(self):
+                pass
+
+        exporter = SuppressionRecordingExporter()
+        processor = batch_processor_class(
+            exporter,
+            max_queue_size=15,
+            max_export_batch_size=15,
+            schedule_delay_millis=30000,
+            export_timeout_millis=500,
+        )
+        try:
+            processor._batch_processor.emit(telemetry)
+            processor.force_flush()
+            assert exporter.suppressed_during_export is True
+        finally:
             processor.shutdown()
 
 

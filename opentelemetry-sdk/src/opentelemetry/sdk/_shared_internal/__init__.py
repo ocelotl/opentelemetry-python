@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import collections
+import contextvars
 import enum
 import inspect
 import logging
@@ -248,7 +249,17 @@ class BatchProcessor(Generic[Telemetry]):
         naturally back-pressures against a permanently stuck exporter.
         """
         timeout = self._export_timeout if self._export_timeout > 0 else None
-        future = self._export_executor.submit(self._exporter.export, batch)
+        # The export runs on a separate executor thread, and
+        # ThreadPoolExecutor does not copy the caller's contextvars into it.
+        # Capture the current context here (on the caller/worker thread, where
+        # _SUPPRESS_INSTRUMENTATION_KEY has been attached) and run the export
+        # inside it, so instrumentation suppression is preserved during export
+        # and the exporter's own network calls do not generate telemetry that
+        # would feed back into the processor.
+        ctx = contextvars.copy_context()
+        future = self._export_executor.submit(
+            ctx.run, self._exporter.export, batch
+        )
         # result() re-raises any exception from the export call, and raises
         # FutureTimeoutError if the deadline is exceeded.
         future.result(timeout=timeout)
