@@ -30,8 +30,12 @@ from opentelemetry.exporter.otlp.proto.http._common import (
     _is_request_too_large,
     _is_retryable,
     _load_session_from_envvar,
+    _log_partial_success,
 )
 from opentelemetry.metrics import MeterProvider
+from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
+    ExportLogsServiceResponse,
+)
 from opentelemetry.sdk._logs import ReadableLogRecord
 from opentelemetry.sdk._logs.export import (
     LogRecordExporter,
@@ -232,6 +236,9 @@ class OTLPLogExporter(LogRecordExporter):
                 try:
                     resp = self._export(serialized_data, deadline_sec - time())
                     if resp.ok:
+                        _log_partial_success(
+                            resp.content, ExportLogsServiceResponse
+                        )
                         return LogRecordExportResult.SUCCESS
                 except requests.exceptions.RequestException as error:
                     reason = error
