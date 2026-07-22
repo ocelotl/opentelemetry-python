@@ -54,6 +54,7 @@ class MetricReaderStorage:
         sdk_config: SdkConfiguration,
         instrument_class_temporality: dict[type, AggregationTemporality],
         instrument_class_aggregation: dict[type, Aggregation],
+        cardinality_limit: int | None = None,
     ) -> None:
         self._lock = RLock()
         self._sdk_config = sdk_config
@@ -62,6 +63,7 @@ class MetricReaderStorage:
         ] = {}
         self._instrument_class_temporality = instrument_class_temporality
         self._instrument_class_aggregation = instrument_class_aggregation
+        self._cardinality_limit = cardinality_limit
 
     def _get_or_init_view_instrument_match(
         self, instrument: _Instrument
@@ -93,6 +95,7 @@ class MetricReaderStorage:
                         instrument_class_aggregation=(
                             self._instrument_class_aggregation
                         ),
+                        cardinality_limit=self._cardinality_limit,
                     )
                 )
             self._instrument_view_instrument_matches[instrument] = (
@@ -258,6 +261,7 @@ class MetricReaderStorage:
                 instrument_class_aggregation=(
                     self._instrument_class_aggregation
                 ),
+                cardinality_limit=self._cardinality_limit,
             )
 
             for (

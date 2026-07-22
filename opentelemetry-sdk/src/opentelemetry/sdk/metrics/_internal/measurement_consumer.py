@@ -58,6 +58,7 @@ class SynchronousMeasurementConsumer(MeasurementConsumer):
                 sdk_config,
                 reader._instrument_class_temporality,
                 reader._instrument_class_aggregation,
+                reader._cardinality_limit,
             )
             for reader in metric_readers
         }
@@ -150,6 +151,8 @@ class SynchronousMeasurementConsumer(MeasurementConsumer):
                 metric_reader._instrument_class_temporality,
                 # pylint: disable-next=protected-access
                 metric_reader._instrument_class_aggregation,
+                # pylint: disable-next=protected-access
+                metric_reader._cardinality_limit,
             )
             self._reader_storages = new_reader_storages
 

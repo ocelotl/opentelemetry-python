@@ -13,8 +13,11 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 
 class TestCardinalityLimit(TestCase):
     @staticmethod
-    def _record_distinct_attribute_sets(count):
-        reader = InMemoryMetricReader()
+    def _record_distinct_attribute_sets(count, cardinality_limit=None):
+        if cardinality_limit is None:
+            reader = InMemoryMetricReader()
+        else:
+            reader = InMemoryMetricReader(cardinality_limit=cardinality_limit)
         meter_provider = MeterProvider(metric_readers=[reader])
         meter = meter_provider.get_meter("testmeter")
         counter = meter.create_counter("testcounter")
@@ -73,3 +76,48 @@ class TestCardinalityLimit(TestCase):
             sum(data_point.value for data_point in data_points),
             total_measurements,
         )
+
+    def test_reader_cardinality_limit_overflows_at_reader_limit(self):
+        # A reader configured with a small cardinality limit overflows at that
+        # limit, independently of the base default.
+        reader_limit = 10
+        data_points = self._record_distinct_attribute_sets(
+            reader_limit + 20, cardinality_limit=reader_limit
+        )
+
+        self.assertEqual(len(data_points), reader_limit)
+
+        overflow_points = [
+            data_point
+            for data_point in data_points
+            if dict(data_point.attributes) == _OVERFLOW_ATTRIBUTES
+        ]
+        self.assertEqual(len(overflow_points), 1)
+
+    def test_reader_cardinality_limit_no_overflow_below_reader_limit(self):
+        # Below the reader's own limit no overflow series is produced.
+        reader_limit = 10
+        data_points = self._record_distinct_attribute_sets(
+            reader_limit - 1, cardinality_limit=reader_limit
+        )
+
+        self.assertEqual(len(data_points), reader_limit - 1)
+        self.assertNotIn(
+            _OVERFLOW_ATTRIBUTES,
+            [dict(data_point.attributes) for data_point in data_points],
+        )
+
+    def test_reader_cardinality_limit_unset_falls_back_to_default(self):
+        # When the reader does not set a cardinality limit, the base default
+        # applies (no regression to the base behavior).
+        data_points = self._record_distinct_attribute_sets(
+            _DEFAULT_CARDINALITY_LIMIT + 100
+        )
+
+        self.assertEqual(len(data_points), _DEFAULT_CARDINALITY_LIMIT)
+
+    def test_reader_cardinality_limit_rejects_non_positive(self):
+        for invalid in (0, -1):
+            with self.subTest(cardinality_limit=invalid):
+                with self.assertRaises(ValueError):
+                    InMemoryMetricReader(cardinality_limit=invalid)
