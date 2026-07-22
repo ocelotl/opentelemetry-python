@@ -1,0 +1,1 @@
+`ParentBased` sampler now forwards the incoming `trace_state` to its delegate sampler, and the SDK now passes the parent's `trace_state` into `should_sample`
