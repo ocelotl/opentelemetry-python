@@ -1,0 +1,1 @@
+B3 propagators now preserve and re-propagate a received debug flag (`d` in the single header, `x-b3-flags: 1` in the multi header)
