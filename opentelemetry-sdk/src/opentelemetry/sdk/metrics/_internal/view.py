@@ -88,6 +88,15 @@ class View:
         instrument_unit: This is an instrument matching attribute: the unit the
             instrument must have to match the view.
 
+        aggregation_cardinality_limit: This is a metric stream customizing
+            attribute: the maximum number of distinct attribute sets (metric
+            points) that will be tracked for streams matched by this view. Once
+            reached, additional attribute sets are aggregated under a single
+            overflow attribute set. When set, this value overrides both the
+            per-reader default cardinality limit and the SDK base default
+            (2000). If `None`, the per-reader default (and then the base
+            default) is used instead.
+
     This class is not intended to be subclassed by the user.
     """
 
@@ -109,6 +118,7 @@ class View:
         ]
         | None = None,
         instrument_unit: str | None = None,
+        aggregation_cardinality_limit: int | None = None,
     ):
         if (
             instrument_type
@@ -152,6 +162,7 @@ class View:
         self._exemplar_reservoir_factory = (
             exemplar_reservoir_factory or _default_reservoir_factory
         )
+        self._aggregation_cardinality_limit = aggregation_cardinality_limit
 
     # pylint: disable=too-many-return-statements
     # pylint: disable=too-many-branches
