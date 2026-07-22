@@ -12,7 +12,8 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 
 
 class TestCardinalityLimit(TestCase):
-    def _record_distinct_attribute_sets(self, count):
+    @staticmethod
+    def _record_distinct_attribute_sets(count):
         reader = InMemoryMetricReader()
         meter_provider = MeterProvider(metric_readers=[reader])
         meter = meter_provider.get_meter("testmeter")
@@ -22,20 +23,13 @@ class TestCardinalityLimit(TestCase):
             counter.add(1, {"index": index})
 
         metrics_data = reader.get_metrics_data()
-        return (
-            metrics_data.resource_metrics[0]
-            .scope_metrics[0]
-            .metrics[0]
-            .data.data_points
-        )
+        return metrics_data.resource_metrics[0].scope_metrics[0].metrics[0].data.data_points
 
     def test_no_overflow_below_limit(self):
         # One slot is reserved for the overflow series, so up to
         # ``limit - 1`` distinct attribute sets are aggregated independently
         # without producing an overflow series.
-        data_points = self._record_distinct_attribute_sets(
-            _DEFAULT_CARDINALITY_LIMIT - 1
-        )
+        data_points = self._record_distinct_attribute_sets(_DEFAULT_CARDINALITY_LIMIT - 1)
 
         self.assertEqual(len(data_points), _DEFAULT_CARDINALITY_LIMIT - 1)
         self.assertNotIn(
@@ -48,16 +42,12 @@ class TestCardinalityLimit(TestCase):
         # capped at the limit and the excess is folded into a single overflow
         # series.
         excess = 500
-        data_points = self._record_distinct_attribute_sets(
-            _DEFAULT_CARDINALITY_LIMIT + excess
-        )
+        data_points = self._record_distinct_attribute_sets(_DEFAULT_CARDINALITY_LIMIT + excess)
 
         self.assertEqual(len(data_points), _DEFAULT_CARDINALITY_LIMIT)
 
         overflow_points = [
-            data_point
-            for data_point in data_points
-            if dict(data_point.attributes) == _OVERFLOW_ATTRIBUTES
+            data_point for data_point in data_points if dict(data_point.attributes) == _OVERFLOW_ATTRIBUTES
         ]
         self.assertEqual(len(overflow_points), 1)
 
