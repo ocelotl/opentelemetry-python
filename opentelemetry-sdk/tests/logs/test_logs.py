@@ -21,6 +21,8 @@ from opentelemetry.sdk._logs import (
     ReadWriteLogRecord,
 )
 from opentelemetry.sdk._logs._internal import (
+    ConcurrentMultiLogRecordProcessor,
+    LogRecordProcessor,
     NoOpLogger,
     SynchronousMultiLogRecordProcessor,
     _disable_logger_configurator,
@@ -551,3 +553,85 @@ class TestLogger(unittest.TestCase):
         self.assertEqual(
             attributes[exception_attributes.EXCEPTION_TYPE], "RuntimeError"
         )
+
+
+class _RecordingProcessor(LogRecordProcessor):
+    def __init__(self, enabled: bool = True):
+        self._enabled = enabled
+
+    def on_emit(self, log_record) -> None:
+        pass
+
+    def shutdown(self) -> None:
+        pass
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return True
+
+    def enabled(
+        self, context=None, severity_number=None, event_name=None
+    ) -> bool:
+        return self._enabled
+
+
+class TestLoggerEnabled(unittest.TestCase):
+    def test_enabled_false_when_no_processors(self):
+        provider = LoggerProvider()
+        logger = provider.get_logger("test")
+        self.assertFalse(logger.enabled())
+
+    def test_enabled_true_with_default_processor(self):
+        provider = LoggerProvider()
+        provider.add_log_record_processor(_RecordingProcessor(enabled=True))
+        logger = provider.get_logger("test")
+        self.assertTrue(logger.enabled())
+
+    def test_enabled_false_when_processor_reports_disabled(self):
+        provider = LoggerProvider()
+        provider.add_log_record_processor(_RecordingProcessor(enabled=False))
+        logger = provider.get_logger("test")
+        self.assertFalse(logger.enabled())
+
+    def test_enabled_true_when_any_processor_enabled(self):
+        provider = LoggerProvider()
+        provider.add_log_record_processor(_RecordingProcessor(enabled=False))
+        provider.add_log_record_processor(_RecordingProcessor(enabled=True))
+        logger = provider.get_logger("test")
+        self.assertTrue(logger.enabled())
+
+    def test_enabled_false_when_logger_config_disabled(self):
+        provider = LoggerProvider(
+            _logger_configurator=_disable_logger_configurator
+        )
+        provider.add_log_record_processor(_RecordingProcessor(enabled=True))
+        logger = provider.get_logger("test")
+        self.assertFalse(logger.enabled())
+
+    def test_enabled_forwards_parameters_to_processor(self):
+        provider = LoggerProvider()
+        processor = Mock(spec=LogRecordProcessor)
+        processor.enabled.return_value = True
+        provider.add_log_record_processor(processor)
+        logger = provider.get_logger("test")
+
+        result = logger.enabled(
+            severity_number=SeverityNumber.ERROR, event_name="err.event"
+        )
+
+        self.assertTrue(result)
+        processor.enabled.assert_called_once_with(
+            context=None,
+            severity_number=SeverityNumber.ERROR,
+            event_name="err.event",
+        )
+
+    def test_default_processor_enabled_hook_returns_true(self):
+        self.assertTrue(_RecordingProcessor().enabled())
+
+    def test_concurrent_multi_processor_enabled(self):
+        multi = ConcurrentMultiLogRecordProcessor()
+        self.assertFalse(multi.enabled())
+        multi.add_log_record_processor(_RecordingProcessor(enabled=False))
+        self.assertFalse(multi.enabled())
+        multi.add_log_record_processor(_RecordingProcessor(enabled=True))
+        self.assertTrue(multi.enabled())

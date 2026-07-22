@@ -396,6 +396,29 @@ class LogRecordProcessor(abc.ABC):
             False if the timeout is exceeded, True otherwise.
         """
 
+    def enabled(
+        self,
+        context: Context | None = None,
+        severity_number: SeverityNumber | None = None,
+        event_name: str | None = None,
+    ) -> bool:
+        """Returns whether this processor would process a log record with the
+        given arguments.
+
+        This is an optional performance-optimization hook used by
+        :meth:`Logger.enabled`. Processors that can cheaply determine that a
+        log record will be dropped (for example, a severity-based filter) may
+        override this to return ``False``. The default implementation returns
+        ``True`` because a processor cannot generally determine ahead of time
+        whether a record will be processed.
+
+        Args:
+            context: The context associated with the log record.
+            severity_number: The severity number of the log record.
+            event_name: The event name of the log record.
+        """
+        return True
+
 
 # Temporary fix until https://github.com/PyCQA/pylint/issues/4098 is resolved
 # pylint:disable=no-member
@@ -423,6 +446,23 @@ class SynchronousMultiLogRecordProcessor(LogRecordProcessor):
     def on_emit(self, log_record: ReadWriteLogRecord) -> None:
         for lp in self._log_record_processors:
             lp.on_emit(log_record)
+
+    def enabled(
+        self,
+        context: Context | None = None,
+        severity_number: SeverityNumber | None = None,
+        event_name: str | None = None,
+    ) -> bool:
+        """Returns True if any registered processor is enabled for the given
+        arguments. Returns False when no processors are registered."""
+        for lp in self._log_record_processors:
+            if lp.enabled(
+                context=context,
+                severity_number=severity_number,
+                event_name=event_name,
+            ):
+                return True
+        return False
 
     def shutdown(self) -> None:
         """Shutdown the log processors one by one"""
@@ -497,6 +537,23 @@ class ConcurrentMultiLogRecordProcessor(LogRecordProcessor):
 
     def on_emit(self, log_record: ReadWriteLogRecord) -> None:
         self._submit_and_wait(lambda lp: lp.on_emit, log_record)
+
+    def enabled(
+        self,
+        context: Context | None = None,
+        severity_number: SeverityNumber | None = None,
+        event_name: str | None = None,
+    ) -> bool:
+        """Returns True if any registered processor is enabled for the given
+        arguments. Returns False when no processors are registered."""
+        for lp in self._log_record_processors:
+            if lp.enabled(
+                context=context,
+                severity_number=severity_number,
+                event_name=event_name,
+            ):
+                return True
+        return False
 
     def shutdown(self) -> None:
         self._submit_and_wait(lambda lp: lp.shutdown)
@@ -718,6 +775,29 @@ class Logger(APILogger):
 
     def _is_enabled(self) -> bool:
         return self._logger_config.is_enabled
+
+    def enabled(
+        self,
+        context: Context | None = None,
+        severity_number: SeverityNumber | None = None,
+        event_name: str | None = None,
+    ) -> bool:
+        """Returns whether this `Logger` is enabled for the given arguments.
+
+        The `Logger` is enabled when it has not been disabled by the logger
+        configuration and at least one registered log record processor is
+        enabled for the provided arguments. Processors that do not override
+        their :meth:`LogRecordProcessor.enabled` hook report enabled by
+        default, so this returns ``True`` whenever at least one processor is
+        registered and the logger is not disabled.
+        """
+        if not self._is_enabled():
+            return False
+        return self._multi_log_record_processor.enabled(
+            context=context,
+            severity_number=severity_number,
+            event_name=event_name,
+        )
 
     def _set_logger_config(self, logger_config: _LoggerConfig) -> None:
         self._logger_config = logger_config
