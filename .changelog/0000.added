@@ -1,0 +1,3 @@
+Add optional `max_export_batch_size` to `PeriodicExportingMetricReader` to
+chunk collected metrics into batches whose data point count never exceeds the
+configured limit
