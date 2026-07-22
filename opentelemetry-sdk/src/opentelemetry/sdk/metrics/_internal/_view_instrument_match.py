@@ -39,13 +39,16 @@ class _ViewInstrumentMatch:
         view: View,
         instrument: _Instrument,
         instrument_class_aggregation: dict[type, Aggregation],
+        cardinality_limit: int | None = None,
     ):
         self._view = view
         self._instrument = instrument
         self._attributes_aggregation: dict[frozenset, _Aggregation] = {}
         self._lock = Lock()
         self._instrument_class_aggregation = instrument_class_aggregation
-        self._cardinality_limit = _DEFAULT_CARDINALITY_LIMIT
+        if cardinality_limit is None:
+            cardinality_limit = _DEFAULT_CARDINALITY_LIMIT
+        self._cardinality_limit = cardinality_limit
         self._name = self._view._name or self._instrument.name
         self._description = (
             self._view._description or self._instrument.description
