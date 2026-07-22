@@ -223,11 +223,7 @@ class AbstractB3FormatTestCase:
 
     def test_debug_flag_roundtrip(self):
         """A received debug flag is preserved and re-propagated on inject."""
-        new_carrier = self.roundtrip(
-            self.debug_carrier(
-                self.serialized_trace_id, self.serialized_span_id
-            )
-        )
+        new_carrier = self.roundtrip(self.debug_carrier(self.serialized_trace_id, self.serialized_span_id))
         self.assertDebug(new_carrier)
 
     def test_non_debug_context_does_not_emit_debug(self):
@@ -443,11 +439,7 @@ class AbstractB3FormatTestCase:
 
         # The debug flag is only injected when a debug context was extracted,
         # so exercise that path as well to cover every possible field.
-        debug_ctx = propagator.extract(
-            self.debug_carrier(
-                self.serialized_trace_id, self.serialized_span_id
-            )
-        )
+        debug_ctx = propagator.extract(self.debug_carrier(self.serialized_trace_id, self.serialized_span_id))
         propagator.inject({}, context=debug_ctx, setter=mock_setter)
 
         inject_fields = set()
