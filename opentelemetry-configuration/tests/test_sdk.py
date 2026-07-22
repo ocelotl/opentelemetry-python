@@ -84,9 +84,7 @@ class TestConfigureSdk(unittest.TestCase):
         configure_sdk(config)
 
         mock_create_resource.assert_called_once_with(resource_cfg)
-        mock_create_tracer.assert_called_once_with(
-            tracer_cfg, sentinel_resource
-        )
+        mock_create_tracer.assert_called_once_with(tracer_cfg, sentinel_resource)
         mock_set_tracer.assert_called_once_with(sentinel_tracer)
         # Absent meter/logger sections are not built or installed.
         mock_create_meter.assert_not_called()
@@ -152,32 +150,18 @@ class TestCreate(unittest.TestCase):
         config = _config(
             tracer_provider=TracerProviderConfig(
                 processors=[
-                    SpanProcessorConfig(
-                        simple=SimpleSpanProcessorConfig(
-                            exporter=SpanExporterConfig(console={})
-                        )
-                    )
+                    SpanProcessorConfig(simple=SimpleSpanProcessorConfig(exporter=SpanExporterConfig(console={})))
                 ]
             ),
             propagator=PropagatorConfig(),
         )
 
         with (
-            patch(
-                "opentelemetry.configuration._sdk.trace.set_tracer_provider"
-            ) as set_tracer,
-            patch(
-                "opentelemetry.configuration._sdk.metrics.set_meter_provider"
-            ) as set_meter,
-            patch(
-                "opentelemetry.configuration._sdk.set_logger_provider"
-            ) as set_logger,
-            patch(
-                "opentelemetry.configuration._sdk.set_global_textmap"
-            ) as set_textmap,
-            patch(
-                "opentelemetry.configuration._sdk.set_config_provider"
-            ) as set_config,
+            patch("opentelemetry.configuration._sdk.trace.set_tracer_provider") as set_tracer,
+            patch("opentelemetry.configuration._sdk.metrics.set_meter_provider") as set_meter,
+            patch("opentelemetry.configuration._sdk.set_logger_provider") as set_logger,
+            patch("opentelemetry.configuration._sdk.set_global_textmap") as set_textmap,
+            patch("opentelemetry.configuration._sdk.set_config_provider") as set_config,
         ):
             providers = create(config)
 
@@ -203,17 +187,13 @@ class TestCreate(unittest.TestCase):
     def test_exposes_instrumentation_config(self):
         config = _config(
             instrumentation_development=ExperimentalInstrumentation(
-                general=ExperimentalGeneralInstrumentation(
-                    stability_opt_in_list="http"
-                )
+                general=ExperimentalGeneralInstrumentation(stability_opt_in_list="http")
             )
         )
 
         providers = create(config)
 
-        instrumentation = (
-            providers.config_provider.get_instrumentation_config()
-        )
+        instrumentation = providers.config_provider.get_instrumentation_config()
         general = instrumentation.get_config("general")
         self.assertIsNotNone(general)
         self.assertEqual(general.get_string("stability_opt_in_list"), "http")
@@ -222,9 +202,7 @@ class TestCreate(unittest.TestCase):
         config_provider_module._CONFIG_PROVIDER = None
         config = _config(
             instrumentation_development=ExperimentalInstrumentation(
-                general=ExperimentalGeneralInstrumentation(
-                    stability_opt_in_list="db"
-                )
+                general=ExperimentalGeneralInstrumentation(stability_opt_in_list="db")
             )
         )
 
@@ -233,9 +211,7 @@ class TestCreate(unittest.TestCase):
         provider = config_provider_module.get_config_provider()
         self.assertIsNotNone(provider)
         self.assertEqual(
-            provider.get_instrumentation_config()
-            .get_config("general")
-            .get_string("stability_opt_in_list"),
+            provider.get_instrumentation_config().get_config("general").get_string("stability_opt_in_list"),
             "db",
         )
 

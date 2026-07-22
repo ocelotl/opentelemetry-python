@@ -114,11 +114,7 @@ class TestConfigPropertiesStructured(unittest.TestCase):
 
 class TestNodeToMapping(unittest.TestCase):
     def test_dataclass_node_converted_recursively(self):
-        node = ExperimentalInstrumentation(
-            general=ExperimentalGeneralInstrumentation(
-                stability_opt_in_list="http"
-            )
-        )
+        node = ExperimentalInstrumentation(general=ExperimentalGeneralInstrumentation(stability_opt_in_list="http"))
         mapping = _node_to_mapping(node)
         self.assertEqual(mapping["general"]["stability_opt_in_list"], "http")
 
@@ -126,11 +122,7 @@ class TestNodeToMapping(unittest.TestCase):
         self.assertEqual(_node_to_mapping(None), {})
 
     def test_config_properties_over_instrumentation_node(self):
-        node = ExperimentalInstrumentation(
-            general=ExperimentalGeneralInstrumentation(
-                stability_opt_in_list="http"
-            )
-        )
+        node = ExperimentalInstrumentation(general=ExperimentalGeneralInstrumentation(stability_opt_in_list="http"))
         props = ConfigProperties(_node_to_mapping(node))
         general = props.get_config("general")
         self.assertIsInstance(general, ConfigProperties)

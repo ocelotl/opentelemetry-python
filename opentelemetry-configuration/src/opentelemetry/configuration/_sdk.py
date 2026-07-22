@@ -123,26 +123,16 @@ def create(config: OpenTelemetryConfiguration) -> Providers:
     resource = create_resource(config.resource)
     return Providers(
         tracer_provider=(
-            create_tracer_provider(config.tracer_provider, resource)
-            if config.tracer_provider is not None
-            else None
+            create_tracer_provider(config.tracer_provider, resource) if config.tracer_provider is not None else None
         ),
         meter_provider=(
-            create_meter_provider(config.meter_provider, resource)
-            if config.meter_provider is not None
-            else None
+            create_meter_provider(config.meter_provider, resource) if config.meter_provider is not None else None
         ),
         logger_provider=(
-            create_logger_provider(config.logger_provider, resource)
-            if config.logger_provider is not None
-            else None
+            create_logger_provider(config.logger_provider, resource) if config.logger_provider is not None else None
         ),
         propagator=create_propagator(config.propagator),
-        config_provider=ConfigProvider(
-            ConfigProperties(
-                _node_to_mapping(config.instrumentation_development)
-            )
-        ),
+        config_provider=ConfigProvider(ConfigProperties(_node_to_mapping(config.instrumentation_development))),
     )
 
 

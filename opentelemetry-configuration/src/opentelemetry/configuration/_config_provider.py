@@ -51,9 +51,7 @@ class ConfigProperties:
     """
 
     def __init__(self, properties: Mapping[str, Any] | None = None) -> None:
-        self._properties: dict[str, Any] = (
-            dict(properties) if properties is not None else {}
-        )
+        self._properties: dict[str, Any] = dict(properties) if properties is not None else {}
 
     def get_string(self, name: str) -> str | None:
         """Return the value of ``name`` as a ``str``, or ``None``."""
@@ -133,11 +131,7 @@ class ConfigProperties:
         for item in value:
             if scalar_type is int and isinstance(item, bool):
                 continue
-            if (
-                scalar_type is float
-                and isinstance(item, int)
-                and not isinstance(item, bool)
-            ):
+            if scalar_type is float and isinstance(item, int) and not isinstance(item, bool):
                 result.append(float(item))
                 continue
             if isinstance(item, scalar_type):
@@ -178,8 +172,7 @@ def set_config_provider(config_provider: ConfigProvider) -> None:
     global _CONFIG_PROVIDER  # pylint: disable=global-statement
     if _CONFIG_PROVIDER is not None:
         _logger.warning(
-            "Overriding of current ConfigProvider is not allowed once set; "
-            "overwriting the existing instance."
+            "Overriding of current ConfigProvider is not allowed once set; overwriting the existing instance."
         )
     _CONFIG_PROVIDER = config_provider
 
