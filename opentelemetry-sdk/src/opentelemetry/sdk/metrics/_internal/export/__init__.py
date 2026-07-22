@@ -197,6 +197,12 @@ class MetricReader(ABC):
             default aggregations. The aggregation defined here will be
             overridden by an aggregation defined by a view that is not
             `DefaultAggregation`.
+        cardinality_limit: The default maximum number of distinct attribute
+            sets aggregated per metric stream produced through this reader's
+            pipeline. Once the limit is reached, additional attribute sets are
+            folded into a single overflow series identified by the attribute
+            ``otel.metric.overflow=true``. When ``None`` (the default), the
+            SDK's base default cardinality limit is used.
 
     .. document protected _receive_metrics which is a intended to be overridden by subclass
     .. automethod:: _receive_metrics
@@ -208,6 +214,7 @@ class MetricReader(ABC):
         preferred_aggregation: dict[type, opentelemetry.sdk.metrics.view.Aggregation] | None = None,
         *,
         otel_component_type: OtelComponentTypeValues | None = None,
+        cardinality_limit: int | None = None,
     ) -> None:
         self._collect: (
             Callable[
@@ -286,6 +293,10 @@ class MetricReader(ABC):
                     self._instrument_class_aggregation[_ObservableGauge] = aggregation
                 else:
                     raise Exception(f"Invalid instrument class found {typ}")
+
+        if cardinality_limit is not None and cardinality_limit <= 0:
+            raise ValueError(f"cardinality_limit must be a positive integer, got {cardinality_limit}")
+        self._cardinality_limit = cardinality_limit
 
         self._otel_component_type = otel_component_type.value if otel_component_type else type(self).__qualname__
         self._metrics = create_metric_reader_metrics(
@@ -382,10 +393,13 @@ class InMemoryMetricReader(MetricReader):
         self,
         preferred_temporality: dict[type, AggregationTemporality] | None = None,
         preferred_aggregation: dict[type, opentelemetry.sdk.metrics.view.Aggregation] | None = None,
+        *,
+        cardinality_limit: int | None = None,
     ) -> None:
         super().__init__(
             preferred_temporality=preferred_temporality,
             preferred_aggregation=preferred_aggregation,
+            cardinality_limit=cardinality_limit,
         )
         self._lock = RLock()
         self._metrics_data: MetricsData | None = None
@@ -428,12 +442,15 @@ class PeriodicExportingMetricReader(MetricReader):
         exporter: MetricExporter,
         export_interval_millis: float | None = None,
         export_timeout_millis: float | None = None,
+        *,
+        cardinality_limit: int | None = None,
     ) -> None:
         # PeriodicExportingMetricReader defers to exporter for configuration
         super().__init__(
             preferred_temporality=exporter._preferred_temporality,
             preferred_aggregation=exporter._preferred_aggregation,
             otel_component_type=OtelComponentTypeValues.PERIODIC_METRIC_READER,
+            cardinality_limit=cardinality_limit,
         )
 
         # This lock is held whenever calling self._exporter.export() to prevent concurrent

@@ -54,12 +54,14 @@ class MetricReaderStorage:
         sdk_config: SdkConfiguration,
         instrument_class_temporality: dict[type, AggregationTemporality],
         instrument_class_aggregation: dict[type, Aggregation],
+        cardinality_limit: int | None = None,
     ) -> None:
         self._lock = RLock()
         self._sdk_config = sdk_config
         self._instrument_view_instrument_matches: dict[_Instrument, list[_ViewInstrumentMatch]] = {}
         self._instrument_class_temporality = instrument_class_temporality
         self._instrument_class_aggregation = instrument_class_aggregation
+        self._cardinality_limit = cardinality_limit
 
     def _get_or_init_view_instrument_match(self, instrument: _Instrument) -> list[_ViewInstrumentMatch]:
         # Optimistically get the relevant views for the given instrument. Once set for a given
@@ -85,6 +87,7 @@ class MetricReaderStorage:
                         view=_DEFAULT_VIEW,
                         instrument=instrument,
                         instrument_class_aggregation=(self._instrument_class_aggregation),
+                        cardinality_limit=self._cardinality_limit,
                     )
                 )
             self._instrument_view_instrument_matches[instrument] = view_instrument_matches
@@ -222,6 +225,7 @@ class MetricReaderStorage:
                 view=view,
                 instrument=instrument,
                 instrument_class_aggregation=(self._instrument_class_aggregation),
+                cardinality_limit=self._cardinality_limit,
             )
 
             for existing_view_instrument_matches in self._instrument_view_instrument_matches.values():
