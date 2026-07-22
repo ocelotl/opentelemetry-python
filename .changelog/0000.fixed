@@ -1,0 +1,3 @@
+W3C Baggage: preserve entry metadata (`;`-delimited properties) across
+extract/inject and percent-encode spaces as `%20` instead of `+`.
+`set_baggage` gains an optional `metadata` parameter.
