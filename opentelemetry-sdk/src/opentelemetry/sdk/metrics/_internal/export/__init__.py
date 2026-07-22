@@ -55,7 +55,12 @@ from opentelemetry.sdk.metrics._internal.instrument import (
     _ObservableUpDownCounter,
     _UpDownCounter,
 )
-from opentelemetry.sdk.metrics._internal.point import MetricsData
+from opentelemetry.sdk.metrics._internal.point import (
+    Metric,
+    MetricsData,
+    ResourceMetrics,
+    ScopeMetrics,
+)
 from opentelemetry.semconv._incubating.attributes.otel_attributes import (
     OtelComponentTypeValues,
 )
@@ -64,6 +69,85 @@ from opentelemetry.util._once import Once
 from ._metric_reader_metrics import create_metric_reader_metrics
 
 _logger = getLogger(__name__)
+
+
+def _batch_metrics_data(
+    metrics_data: MetricsData, max_export_batch_size: int
+) -> Iterable[MetricsData]:
+    """Split a `MetricsData` into a sequence of `MetricsData` batches where no
+    single batch contains more than ``max_export_batch_size`` data points.
+
+    The resource/scope/metric grouping structure is preserved: every emitted
+    batch reproduces the resource and scope objects that own the data points it
+    carries. Metrics whose data point count on its own exceeds
+    ``max_export_batch_size`` are emitted whole in their own batch rather than
+    being split across the metric boundary, so no data point is dropped or
+    duplicated.
+    """
+    current_resource_metrics: list[ResourceMetrics] = []
+    current_scope_metrics: list[ScopeMetrics] = []
+    current_metrics: list[Metric] = []
+    current_count = 0
+
+    def _build_batch() -> MetricsData:
+        scope_metrics = current_scope_metrics
+        if current_metrics:
+            scope_metrics = [
+                *scope_metrics,
+                ScopeMetrics(
+                    scope=scope_metrics_source.scope,
+                    metrics=current_metrics,
+                    schema_url=scope_metrics_source.schema_url,
+                ),
+            ]
+        resource_metrics = current_resource_metrics
+        if scope_metrics:
+            resource_metrics = [
+                *resource_metrics,
+                ResourceMetrics(
+                    resource=resource_metrics_source.resource,
+                    scope_metrics=scope_metrics,
+                    schema_url=resource_metrics_source.schema_url,
+                ),
+            ]
+        return MetricsData(resource_metrics=resource_metrics)
+
+    for resource_metrics_source in metrics_data.resource_metrics:
+        for scope_metrics_source in resource_metrics_source.scope_metrics:
+            for metric in scope_metrics_source.metrics:
+                metric_count = len(metric.data.data_points)
+                if (
+                    current_count
+                    and current_count + metric_count > max_export_batch_size
+                ):
+                    yield _build_batch()
+                    current_resource_metrics = []
+                    current_scope_metrics = []
+                    current_metrics = []
+                    current_count = 0
+                current_metrics.append(metric)
+                current_count += metric_count
+            if current_metrics:
+                current_scope_metrics.append(
+                    ScopeMetrics(
+                        scope=scope_metrics_source.scope,
+                        metrics=current_metrics,
+                        schema_url=scope_metrics_source.schema_url,
+                    )
+                )
+                current_metrics = []
+        if current_scope_metrics:
+            current_resource_metrics.append(
+                ResourceMetrics(
+                    resource=resource_metrics_source.resource,
+                    scope_metrics=current_scope_metrics,
+                    schema_url=resource_metrics_source.schema_url,
+                )
+            )
+            current_scope_metrics = []
+
+    if current_resource_metrics:
+        yield MetricsData(resource_metrics=current_resource_metrics)
 
 
 class MetricExportResult(Enum):
@@ -471,6 +555,19 @@ class PeriodicExportingMetricReader(MetricReader):
 
     The configured exporter's :py:meth:`~MetricExporter.export` method will not be called
     concurrently.
+
+    Args:
+        exporter: The exporter used to send the collected metrics.
+        export_interval_millis: The time interval in milliseconds between two
+            consecutive collections.
+        export_timeout_millis: The maximum amount of time in milliseconds a
+            collection is allowed to take.
+        max_export_batch_size: The maximum number of data points to include in
+            a single :py:meth:`~MetricExporter.export` call. When set, the
+            collected metrics are split into batches so that no single export
+            call carries more than this many data points, preserving the
+            resource/scope/metric grouping. When ``None`` (the default) the
+            whole collection is exported in a single call.
     """
 
     def __init__(
@@ -478,6 +575,7 @@ class PeriodicExportingMetricReader(MetricReader):
         exporter: MetricExporter,
         export_interval_millis: float | None = None,
         export_timeout_millis: float | None = None,
+        max_export_batch_size: int | None = None,
     ) -> None:
         # PeriodicExportingMetricReader defers to exporter for configuration
         super().__init__(
@@ -514,6 +612,12 @@ class PeriodicExportingMetricReader(MetricReader):
                 export_timeout_millis = 30000
         self._export_interval_millis = export_interval_millis
         self._export_timeout_millis = export_timeout_millis
+        if max_export_batch_size is not None and max_export_batch_size <= 0:
+            raise ValueError(
+                f"max_export_batch_size value {max_export_batch_size} is "
+                "invalid and needs to be larger than zero."
+            )
+        self._max_export_batch_size = max_export_batch_size
         self._shutdown = False
         self._shutdown_event = Event()
         self._shutdown_once = Once()
@@ -578,9 +682,17 @@ class PeriodicExportingMetricReader(MetricReader):
         # pylint: disable=broad-exception-caught,invalid-name
         try:
             with self._export_lock:
-                self._exporter.export(
-                    metrics_data, timeout_millis=timeout_millis
-                )
+                if self._max_export_batch_size is None:
+                    self._exporter.export(
+                        metrics_data, timeout_millis=timeout_millis
+                    )
+                else:
+                    for batch in _batch_metrics_data(
+                        metrics_data, self._max_export_batch_size
+                    ):
+                        self._exporter.export(
+                            batch, timeout_millis=timeout_millis
+                        )
         except Exception:
             _logger.exception("Exception while exporting metrics")
         detach(token)

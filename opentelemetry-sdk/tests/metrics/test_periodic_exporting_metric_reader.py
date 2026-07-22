@@ -22,6 +22,7 @@ from opentelemetry.sdk.metrics import (
     MetricsTimeoutError,
 )
 from opentelemetry.sdk.metrics._internal import _Counter
+from opentelemetry.sdk.metrics._internal.export import _batch_metrics_data
 from opentelemetry.sdk.metrics._internal.point import (
     HistogramDataPoint,
     MetricsData,
@@ -145,6 +146,25 @@ metrics = MetricsData(
         )
     ]
 )
+
+
+def _metrics_data_point_count(metrics_data: MetricsData) -> int:
+    return sum(
+        len(metric.data.data_points)
+        for resource_metrics in metrics_data.resource_metrics
+        for scope_metrics in resource_metrics.scope_metrics
+        for metric in scope_metrics.metrics
+    )
+
+
+def _flattened_metric_names(batches) -> list:
+    return [
+        metric.name
+        for batch in batches
+        for resource_metrics in batch.resource_metrics
+        for scope_metrics in resource_metrics.scope_metrics
+        for metric in scope_metrics.metrics
+    ]
 
 
 class TestPeriodicExportingMetricReader(ConcurrencyTestBase):
@@ -306,6 +326,166 @@ class TestPeriodicExportingMetricReader(ConcurrencyTestBase):
             weak_ref(),
             "The PeriodicExportingMetricReader object created by this test wasn't garbage collected",
         )
+
+    def test_no_batching_by_default(self):
+        exporter = FakeMetricsExporter()
+        pmr = self._create_periodic_reader(metrics, exporter)
+        pmr._receive_metrics(metrics)
+        self.assertEqual(len(exporter.metrics), 1)
+        self.assertEqual(exporter.metrics[0], metrics)
+        pmr.shutdown()
+
+    def test_max_export_batch_size_none_single_export(self):
+        exporter = FakeMetricsExporter()
+        pmr = PeriodicExportingMetricReader(
+            exporter, max_export_batch_size=None
+        )
+        pmr._set_collect_callback(lambda reader, timeout_millis: metrics)
+        pmr._receive_metrics(metrics)
+        self.assertEqual(len(exporter.metrics), 1)
+        self.assertEqual(exporter.metrics[0], metrics)
+        pmr.shutdown()
+
+    def test_max_export_batch_size_invalid(self):
+        for invalid in (0, -1):
+            with self.assertRaises(ValueError):
+                PeriodicExportingMetricReader(
+                    FakeMetricsExporter(),
+                    max_export_batch_size=invalid,
+                )
+
+    def test_max_export_batch_size_chunks_data_points(self):
+        # metrics contains one sum and one gauge, each with a single data point
+        # (two data points total in a single scope of a single resource).
+        exporter = FakeMetricsExporter()
+        pmr = PeriodicExportingMetricReader(exporter, max_export_batch_size=1)
+        pmr._set_collect_callback(lambda reader, timeout_millis: metrics)
+        pmr._receive_metrics(metrics)
+
+        # Two data points with a batch size of 1 -> two export calls.
+        self.assertEqual(len(exporter.metrics), 2)
+        for exported in exporter.metrics:
+            self.assertEqual(_metrics_data_point_count(exported), 1)
+
+        # No dropped or duplicated data points, structure preserved.
+        self.assertEqual(
+            _flattened_metric_names(exporter.metrics),
+            [
+                "sum_name",
+                "gauge_name",
+            ],
+        )
+        for exported in exporter.metrics:
+            resource_metrics = exported.resource_metrics[0]
+            self.assertEqual(
+                resource_metrics.resource,
+                metrics.resource_metrics[0].resource,
+            )
+            scope_metrics = resource_metrics.scope_metrics[0]
+            self.assertEqual(
+                scope_metrics.scope,
+                metrics.resource_metrics[0].scope_metrics[0].scope,
+            )
+        pmr.shutdown()
+
+    def test_max_export_batch_size_larger_than_total(self):
+        exporter = FakeMetricsExporter()
+        pmr = PeriodicExportingMetricReader(
+            exporter, max_export_batch_size=100
+        )
+        pmr._set_collect_callback(lambda reader, timeout_millis: metrics)
+        pmr._receive_metrics(metrics)
+        self.assertEqual(len(exporter.metrics), 1)
+        self.assertEqual(_metrics_data_point_count(exporter.metrics[0]), 2)
+        pmr.shutdown()
+
+    def test_batch_metrics_data_many_points_multiple_scopes(self):
+        # Build a MetricsData with multiple resources, scopes and metrics,
+        # each metric carrying several data points, then verify batching
+        # preserves every data point exactly once and never exceeds the limit.
+        def _number_metric(name, num_points):
+            return Metric(
+                name=name,
+                description="",
+                unit="",
+                data=Sum(
+                    data_points=[
+                        NumberDataPoint(
+                            attributes={"i": i},
+                            start_time_unix_nano=time_ns(),
+                            time_unix_nano=time_ns(),
+                            value=i,
+                        )
+                        for i in range(num_points)
+                    ],
+                    aggregation_temporality=1,
+                    is_monotonic=True,
+                ),
+            )
+
+        source = MetricsData(
+            resource_metrics=[
+                ResourceMetrics(
+                    resource=Resource.create({"r": 0}),
+                    scope_metrics=[
+                        ScopeMetrics(
+                            scope=InstrumentationScope(name="scope_a"),
+                            metrics=[
+                                _number_metric("m_a1", 3),
+                                _number_metric("m_a2", 4),
+                            ],
+                            schema_url="",
+                        ),
+                        ScopeMetrics(
+                            scope=InstrumentationScope(name="scope_b"),
+                            metrics=[_number_metric("m_b1", 5)],
+                            schema_url="",
+                        ),
+                    ],
+                    schema_url="",
+                ),
+                ResourceMetrics(
+                    resource=Resource.create({"r": 1}),
+                    scope_metrics=[
+                        ScopeMetrics(
+                            scope=InstrumentationScope(name="scope_c"),
+                            metrics=[_number_metric("m_c1", 2)],
+                            schema_url="",
+                        ),
+                    ],
+                    schema_url="",
+                ),
+            ]
+        )
+
+        total_points = _metrics_data_point_count(source)
+        self.assertEqual(total_points, 3 + 4 + 5 + 2)
+
+        batches = list(_batch_metrics_data(source, 3))
+
+        # Total data points preserved.
+        self.assertEqual(
+            sum(_metrics_data_point_count(b) for b in batches),
+            total_points,
+        )
+        # All metric names present exactly once, in original order.
+        self.assertEqual(
+            _flattened_metric_names(batches),
+            ["m_a1", "m_a2", "m_b1", "m_c1"],
+        )
+        # No batch exceeds the limit unless a single metric already does.
+        for batch in batches:
+            count = _metrics_data_point_count(batch)
+            metric_counts = [
+                len(metric.data.data_points)
+                for rm in batch.resource_metrics
+                for sm in rm.scope_metrics
+                for metric in sm.metrics
+            ]
+            self.assertTrue(
+                count <= 3 or (len(metric_counts) == 1),
+                f"batch with {count} points and metric_counts {metric_counts}",
+            )
 
     @patch.dict(
         "os.environ", {OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED: "true"}
