@@ -82,6 +82,25 @@ class AbstractB3FormatTestCase:
     def assertNotSampled(self, carrier):
         pass
 
+    def assertDebug(self, carrier):
+        pass
+
+    def assertNotDebug(self, carrier):
+        pass
+
+    @classmethod
+    @abstractmethod
+    def debug_carrier(cls, trace_id, span_id):
+        """Return a carrier that carries the b3 debug flag."""
+
+    def roundtrip(self, carrier):
+        """Extract then inject, preserving the extracted context."""
+        propagator = self.get_propagator()
+        ctx = propagator.extract(carrier)
+        new_carrier = {}
+        propagator.inject(new_carrier, context=ctx)
+        return new_carrier
+
     def test_extract_multi_header(self):
         """Test the extraction of B3 headers."""
         propagator = self.get_propagator()
@@ -213,6 +232,28 @@ class AbstractB3FormatTestCase:
         )
 
         self.assertSampled(new_carrier)
+
+    def test_debug_flag_roundtrip(self):
+        """A received debug flag is preserved and re-propagated on inject."""
+        new_carrier = self.roundtrip(
+            self.debug_carrier(
+                self.serialized_trace_id, self.serialized_span_id
+            )
+        )
+        self.assertDebug(new_carrier)
+
+    def test_non_debug_context_does_not_emit_debug(self):
+        """A normal sampled context does not emit the debug flag on inject."""
+        propagator = self.get_propagator()
+        new_carrier = self.roundtrip(
+            {
+                propagator.TRACE_ID_KEY: self.serialized_trace_id,
+                propagator.SPAN_ID_KEY: self.serialized_span_id,
+                propagator.SAMPLED_KEY: "1",
+            }
+        )
+        self.assertSampled(new_carrier)
+        self.assertNotDebug(new_carrier)
 
     def test_derived_ctx_is_returned_for_success(self):
         """Ensure returned context is derived from the given context."""
@@ -414,6 +455,15 @@ class AbstractB3FormatTestCase:
             with tracer.start_as_current_span("child"):
                 propagator.inject({}, setter=mock_setter)
 
+        # The debug flag is only injected when a debug context was extracted,
+        # so exercise that path as well to cover every possible field.
+        debug_ctx = propagator.extract(
+            self.debug_carrier(
+                self.serialized_trace_id, self.serialized_span_id
+            )
+        )
+        propagator.inject({}, context=debug_ctx, setter=mock_setter)
+
         inject_fields = set()
 
         for call in mock_setter.mock_calls:
@@ -445,6 +495,23 @@ class TestB3MultiFormat(AbstractB3FormatTestCase, unittest.TestCase):
     def assertNotSampled(self, carrier):
         self.assertEqual(carrier[self.get_propagator().SAMPLED_KEY], "0")
 
+    def assertDebug(self, carrier):
+        self.assertEqual(carrier[self.get_propagator().FLAGS_KEY], "1")
+        # Debug implies sampling, so the sampled header is omitted.
+        self.assertNotIn(self.get_propagator().SAMPLED_KEY, carrier)
+
+    def assertNotDebug(self, carrier):
+        self.assertNotIn(self.get_propagator().FLAGS_KEY, carrier)
+
+    @classmethod
+    def debug_carrier(cls, trace_id, span_id):
+        propagator = cls.get_propagator()
+        return {
+            propagator.TRACE_ID_KEY: trace_id,
+            propagator.SPAN_ID_KEY: span_id,
+            propagator.FLAGS_KEY: "1",
+        }
+
 
 class TestB3SingleFormat(AbstractB3FormatTestCase, unittest.TestCase):
     @classmethod
@@ -464,3 +531,20 @@ class TestB3SingleFormat(AbstractB3FormatTestCase, unittest.TestCase):
         self.assertEqual(
             carrier[self.get_propagator().SINGLE_HEADER_KEY].split("-")[2], "0"
         )
+
+    def assertDebug(self, carrier):
+        self.assertEqual(
+            carrier[self.get_propagator().SINGLE_HEADER_KEY].split("-")[2], "d"
+        )
+
+    def assertNotDebug(self, carrier):
+        self.assertNotEqual(
+            carrier[self.get_propagator().SINGLE_HEADER_KEY].split("-")[2], "d"
+        )
+
+    @classmethod
+    def debug_carrier(cls, trace_id, span_id):
+        propagator = cls.get_propagator()
+        return {
+            propagator.SINGLE_HEADER_KEY: f"{trace_id}-{span_id}-d",
+        }
