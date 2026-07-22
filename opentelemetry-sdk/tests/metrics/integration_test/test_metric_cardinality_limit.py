@@ -12,7 +12,8 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 
 
 class TestCardinalityLimit(TestCase):
-    def _record_distinct_attribute_sets(self, count):
+    @staticmethod
+    def _record_distinct_attribute_sets(count):
         reader = InMemoryMetricReader()
         meter_provider = MeterProvider(metric_readers=[reader])
         meter = meter_provider.get_meter("testmeter")
