@@ -4,12 +4,17 @@
 # Tests access private members of SDK classes to assert correct configuration.
 # pylint: disable=protected-access
 
+import logging
 import unittest
 from unittest.mock import patch
 
 from opentelemetry.configuration._sdk import configure_sdk
 from opentelemetry.configuration.models import (
+    AttributeLimits as AttributeLimitsConfig,
+)
+from opentelemetry.configuration.models import (
     OpenTelemetryConfiguration,
+    SeverityNumber,
 )
 from opentelemetry.configuration.models import (
     Propagator as PropagatorConfig,
@@ -68,7 +73,9 @@ class TestConfigureSdk(unittest.TestCase):
         configure_sdk(config)
 
         mock_create_resource.assert_called_once_with(resource_cfg)
-        mock_tracer.assert_called_once_with(tracer_cfg, sentinel_resource)
+        mock_tracer.assert_called_once_with(
+            tracer_cfg, sentinel_resource, None
+        )
         mock_meter.assert_called_once_with(None, sentinel_resource)
         mock_logger.assert_called_once_with(None, sentinel_resource)
         mock_propagator.assert_called_once_with(propagator_cfg)
@@ -147,3 +154,83 @@ class TestConfigureSdkIntegration(unittest.TestCase):
         self.assertIsInstance(
             mock_set_tracer.call_args[0][0], SdkTracerProvider
         )
+
+
+class TestConfigureSdkLogLevel(unittest.TestCase):
+    """Top-level ``log_level`` is applied to the SDK's internal logger."""
+
+    def setUp(self):
+        self._otel_logger = logging.getLogger("opentelemetry")
+        self._original_level = self._otel_logger.level
+        self.addCleanup(self._otel_logger.setLevel, self._original_level)
+
+    @patch("opentelemetry.configuration._sdk.configure_propagator")
+    @patch("opentelemetry.configuration._sdk.configure_logger_provider")
+    @patch("opentelemetry.configuration._sdk.configure_meter_provider")
+    @patch("opentelemetry.configuration._sdk.configure_tracer_provider")
+    @patch("opentelemetry.configuration._sdk.create_resource")
+    def test_log_level_sets_internal_logger_level(self, *_mocks):
+        configure_sdk(_config(log_level=SeverityNumber.debug))
+        self.assertEqual(self._otel_logger.level, logging.DEBUG)
+
+    @patch("opentelemetry.configuration._sdk.configure_propagator")
+    @patch("opentelemetry.configuration._sdk.configure_logger_provider")
+    @patch("opentelemetry.configuration._sdk.configure_meter_provider")
+    @patch("opentelemetry.configuration._sdk.configure_tracer_provider")
+    @patch("opentelemetry.configuration._sdk.create_resource")
+    def test_log_level_error_maps_to_logging_error(self, *_mocks):
+        configure_sdk(_config(log_level=SeverityNumber.error))
+        self.assertEqual(self._otel_logger.level, logging.ERROR)
+
+    @patch("opentelemetry.configuration._sdk.configure_propagator")
+    @patch("opentelemetry.configuration._sdk.configure_logger_provider")
+    @patch("opentelemetry.configuration._sdk.configure_meter_provider")
+    @patch("opentelemetry.configuration._sdk.configure_tracer_provider")
+    @patch("opentelemetry.configuration._sdk.create_resource")
+    def test_log_level_absent_leaves_internal_logger_untouched(self, *_mocks):
+        self._otel_logger.setLevel(logging.WARNING)
+        configure_sdk(_config())
+        self.assertEqual(self._otel_logger.level, logging.WARNING)
+
+
+class TestConfigureSdkAttributeLimits(unittest.TestCase):
+    """Top-level ``attribute_limits`` are threaded to the tracer provider."""
+
+    @patch("opentelemetry.configuration._sdk.configure_propagator")
+    @patch("opentelemetry.configuration._sdk.configure_logger_provider")
+    @patch("opentelemetry.configuration._sdk.configure_meter_provider")
+    @patch("opentelemetry.configuration._sdk.configure_tracer_provider")
+    @patch("opentelemetry.configuration._sdk.create_resource")
+    def test_attribute_limits_passed_to_tracer_provider(
+        self,
+        mock_create_resource,
+        mock_tracer,
+        _mock_meter,
+        _mock_logger,
+        _mock_propagator,
+    ):
+        sentinel_resource = object()
+        mock_create_resource.return_value = sentinel_resource
+        limits = AttributeLimitsConfig(
+            attribute_count_limit=7, attribute_value_length_limit=42
+        )
+
+        configure_sdk(_config(attribute_limits=limits))
+
+        mock_tracer.assert_called_once_with(None, sentinel_resource, limits)
+
+    def test_attribute_limits_applied_to_span_limits(self):
+        from opentelemetry.configuration._tracer_provider import (  # noqa: PLC0415
+            create_tracer_provider,
+        )
+
+        provider = create_tracer_provider(
+            None,
+            None,
+            AttributeLimitsConfig(
+                attribute_count_limit=9, attribute_value_length_limit=11
+            ),
+        )
+        span_limits = provider._span_limits
+        self.assertEqual(span_limits.max_span_attributes, 9)
+        self.assertEqual(span_limits.max_attribute_length, 11)

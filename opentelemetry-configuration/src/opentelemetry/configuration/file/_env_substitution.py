@@ -23,7 +23,10 @@ def substitute_env_vars(text: str) -> str:
 
     Supports the following syntax:
     - ${VAR}: Substitute with environment variable VAR. Raises error if not found.
-    - ${VAR:-default}: Substitute with VAR if set, otherwise use default value.
+    - ${env:VAR}: Prefixed form of ${VAR}; the ``env:`` prefix is optional per
+      the spec grammar and behaves identically.
+    - ${VAR:-default}: Substitute with VAR if set and non-empty, otherwise use
+      the default value.
     - $$: Escape sequence for literal $.
 
     Args:
@@ -39,14 +42,18 @@ def substitute_env_vars(text: str) -> str:
         >>> os.environ['SERVICE_NAME'] = 'my-service'
         >>> substitute_env_vars('name: ${SERVICE_NAME}')
         'name: my-service'
+        >>> substitute_env_vars('name: ${env:SERVICE_NAME}')
+        'name: my-service'
         >>> substitute_env_vars('name: ${MISSING:-default}')
         'name: default'
         >>> substitute_env_vars('price: $$100')
         'price: $100'
     """
-    # Pattern matches $$ (escape sequence) or ${VAR_NAME} / ${VAR_NAME:-default_value}
-    # Handling both in a single pass ensures $$ followed by ${VAR} works correctly
-    pattern = r"\$\$|\$\{([A-Za-z_][A-Za-z0-9_]*)(:-([^}]*))?\}"
+    # Pattern matches $$ (escape sequence) or
+    # ${[env:]VAR_NAME} / ${[env:]VAR_NAME:-default_value}.
+    # The optional ``env:`` prefix is part of the spec grammar for references.
+    # Handling both in a single pass ensures $$ followed by ${VAR} works correctly.
+    pattern = r"\$\$|\$\{(?:env:)?([A-Za-z_][A-Za-z0-9_]*)(:-([^}]*))?\}"
 
     def replace_var(match) -> str:
         if match.group(1) is None:
@@ -59,9 +66,16 @@ def substitute_env_vars(text: str) -> str:
 
         value = os.environ.get(var_name)
 
+        # Per spec (configuration/data-model.md): when a default value is
+        # provided via ``:-``, it applies when the referenced variable is
+        # null, empty, or undefined. Treat a set-but-empty variable the same
+        # as an unset one for the purpose of applying the default.
+        if has_default and (value is None or value == ""):
+            return default_value or ""
+
+        # No default provided. An undefined variable is an error; a
+        # set-but-empty variable substitutes to its (empty) value.
         if value is None:
-            if has_default:
-                return default_value or ""
             _logger.error(
                 "Environment variable '%s' not found and no default provided",
                 var_name,

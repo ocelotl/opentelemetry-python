@@ -1,0 +1,4 @@
+Declarative configuration: support the `${env:VAR}` prefixed environment
+variable reference form, apply `${VAR:-default}` defaults when the referenced
+variable is set-but-empty (not only when unset), and honor the top-level
+`log_level` and `attribute_limits` fields in `configure_sdk`
