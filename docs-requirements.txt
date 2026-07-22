@@ -13,6 +13,7 @@ sphinx-jekyll-builder==0.3.0
 ./opentelemetry-proto-json
 ./shim/opentelemetry-opencensus-shim
 ./shim/opentelemetry-opentracing-shim
+./exporter/opentelemetry-exporter-opencensus
 ./exporter/opentelemetry-exporter-otlp-proto-common
 ./exporter/opentelemetry-exporter-otlp-proto-http
 ./exporter/opentelemetry-exporter-otlp-proto-grpc

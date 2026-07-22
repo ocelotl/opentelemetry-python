@@ -18,6 +18,14 @@ import sys
 from os import listdir
 from os.path import isdir, join
 
+# The zipkin-proto-http exporter pins protobuf ~= 3.12, but the docs build
+# installs a modern protobuf (see docs-requirements.txt). Generated *_pb2.py
+# modules built against the old runtime raise "Descriptors cannot be created
+# directly" when imported under the C++ implementation of the newer runtime,
+# which makes autodoc silently skip the module. Forcing the pure-Python
+# protobuf implementation avoids that error so the module can be documented.
+os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "python")
+
 # configure django to avoid the following exception:
 # django.core.exceptions.ImproperlyConfigured: Requested settings, but settings
 # are not configured. You must either define the environment variable

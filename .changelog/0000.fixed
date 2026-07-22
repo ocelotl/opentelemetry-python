@@ -1,0 +1,4 @@
+Fix the Sphinx docs build: force the pure-Python protobuf implementation in
+`docs/conf.py` so the zipkin-proto-http exporter can be documented, and add
+`opentelemetry-exporter-opencensus` to the docs requirements (widening its
+`protobuf` constraint to allow protobuf 5) so its API reference renders
