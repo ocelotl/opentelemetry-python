@@ -530,6 +530,42 @@ class TestOTLPHTTPLogExporter(unittest.TestCase):
         )
 
     @patch.object(Session, "post")
+    def test_429_is_retryable(self, mock_post):
+        exporter = OTLPLogExporter(timeout=1.5)
+
+        resp = Response()
+        resp.status_code = 429
+        resp.reason = "TOO_MANY_REQUESTS"
+        mock_post.return_value = resp
+        with self.assertLogs(level=WARNING) as warning:
+            self.assertEqual(
+                exporter.export(self._get_sdk_log_data()),
+                LogRecordExportResult.FAILURE,
+            )
+            self.assertGreater(mock_post.call_count, 1)
+            self.assertIn(
+                "Transient error TOO_MANY_REQUESTS encountered while "
+                "exporting logs batch, retrying in",
+                warning.records[0].message,
+            )
+
+    @patch.object(Session, "post")
+    def test_retry_after_header_seconds_is_honored(self, mock_post):
+        exporter = OTLPLogExporter(timeout=10)
+
+        resp = Response()
+        resp.status_code = 429
+        resp.reason = "TOO_MANY_REQUESTS"
+        resp.headers["Retry-After"] = "2"
+        mock_post.return_value = resp
+        with self.assertLogs(level=WARNING) as warning:
+            exporter.export(self._get_sdk_log_data())
+            self.assertIn(
+                "retrying in 2.00s",
+                warning.records[0].message,
+            )
+
+    @patch.object(Session, "post")
     def test_export_no_collector_available_retryable(self, mock_post):
         exporter = OTLPLogExporter(timeout=1.5)
         msg = "Server not available."

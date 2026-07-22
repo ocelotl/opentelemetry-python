@@ -1,0 +1,5 @@
+OTLP HTTP exporters now retry on HTTP `429 Too Many Requests`, honor the
+`Retry-After` response header (both delay-seconds and HTTP-date forms) when
+choosing the delay before the next retry, and clamp the exponential backoff to
+a maximum interval. The gRPC exporter backoff is now clamped to the same
+maximum.

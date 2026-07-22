@@ -4,6 +4,7 @@
 import threading
 import time
 import unittest
+from datetime import datetime, timedelta, timezone
 from logging import WARNING
 from unittest.mock import MagicMock, Mock, patch
 
@@ -13,6 +14,11 @@ from requests.exceptions import ConnectionError
 from requests.models import Response
 
 from opentelemetry.exporter.otlp.proto.http import Compression
+from opentelemetry.exporter.otlp.proto.http._common import (
+    _MAX_BACKOFF,
+    _is_retryable,
+    _parse_retry_after_header,
+)
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
     DEFAULT_COMPRESSION,
     DEFAULT_ENDPOINT,
@@ -486,6 +492,94 @@ class TestOTLPSpanExporter(unittest.TestCase):
 
             assert after - before < 0.2
 
+    @patch.object(Session, "post")
+    def test_429_is_retryable(self, mock_post):
+        exporter = OTLPSpanExporter(timeout=1.5)
+
+        resp = Response()
+        resp.status_code = 429
+        resp.reason = "TOO_MANY_REQUESTS"
+        mock_post.return_value = resp
+        with self.assertLogs(level=WARNING) as warning:
+            self.assertEqual(
+                exporter.export([BASIC_SPAN]),
+                SpanExportResult.FAILURE,
+            )
+            # A 429 must be retried, so more than a single POST is expected.
+            self.assertGreater(mock_post.call_count, 1)
+            self.assertIn(
+                "Transient error TOO_MANY_REQUESTS encountered while "
+                "exporting span batch, retrying in",
+                warning.records[0].message,
+            )
+
+    @patch.object(Session, "post")
+    def test_retry_after_header_seconds_is_honored(self, mock_post):
+        exporter = OTLPSpanExporter(timeout=10)
+
+        resp = Response()
+        resp.status_code = 429
+        resp.reason = "TOO_MANY_REQUESTS"
+        resp.headers["Retry-After"] = "2"
+        mock_post.return_value = resp
+        with self.assertLogs(level=WARNING) as warning:
+            exporter.export([BASIC_SPAN])
+            self.assertIn(
+                "retrying in 2.00s",
+                warning.records[0].message,
+            )
+
+    @patch.object(Session, "post")
+    def test_retry_after_header_http_date_is_honored(self, mock_post):
+        exporter = OTLPSpanExporter(timeout=100)
+
+        resp = Response()
+        resp.status_code = 503
+        resp.reason = "UNAVAILABLE"
+        retry_at = datetime.now(timezone.utc) + timedelta(seconds=3)
+        resp.headers["Retry-After"] = retry_at.strftime(
+            "%a, %d %b %Y %H:%M:%S GMT"
+        )
+        mock_post.return_value = resp
+        with self.assertLogs(level=WARNING) as warning:
+            exporter.export([BASIC_SPAN])
+            message = warning.records[0].message
+            self.assertIn("retrying in", message)
+            reported = float(
+                message.split("retrying in ")[1].rstrip("s.").rstrip("s")
+            )
+            # The HTTP-date is ~3 seconds in the future.
+            self.assertTrue(1.5 < reported <= 3.0)
+
+    @patch("opentelemetry.exporter.otlp.proto.http.trace_exporter.random")
+    @patch.object(Session, "post")
+    def test_backoff_is_clamped_to_max(self, mock_post, mock_random):
+        # No jitter, so the raw backoff is a clean power of two.
+        mock_random.uniform.return_value = 1.0
+
+        resp = Response()
+        resp.status_code = 503
+        resp.reason = "UNAVAILABLE"
+        mock_post.return_value = resp
+        exporter = OTLPSpanExporter(timeout=1000)
+        with self.assertLogs(level=WARNING) as warning:
+            exporter.export([BASIC_SPAN])
+            reported_backoffs = []
+            for record in warning.records:
+                if "retrying in" in record.message:
+                    reported_backoffs.append(
+                        float(
+                            record.message.split("retrying in ")[1]
+                            .rstrip("s.")
+                            .rstrip("s")
+                        )
+                    )
+            # Uncapped, retry #5 would ask for 2**5 == 32 and #6 would be
+            # larger; every reported backoff must be clamped at _MAX_BACKOFF.
+            self.assertTrue(reported_backoffs)
+            for backoff in reported_backoffs:
+                self.assertLessEqual(backoff, _MAX_BACKOFF)
+
     def assert_standard_metric_attrs(self, attributes):
         self.assertEqual(
             attributes["otel.component.type"], "otlp_http_span_exporter"
@@ -497,3 +591,55 @@ class TestOTLPSpanExporter(unittest.TestCase):
         )
         self.assertEqual(attributes["server.address"], "localhost")
         self.assertEqual(attributes["server.port"], 4318)
+
+
+class TestCommonRetryHelpers(unittest.TestCase):
+    def _response(self, status_code, headers=None):
+        resp = Response()
+        resp.status_code = status_code
+        if headers:
+            resp.headers.update(headers)
+        return resp
+
+    def test_is_retryable_status_codes(self):
+        for code in (408, 429, 500, 502, 503, 504):
+            self.assertTrue(_is_retryable(self._response(code)), code)
+        for code in (200, 400, 401, 403, 404):
+            self.assertFalse(_is_retryable(self._response(code)), code)
+
+    def test_parse_retry_after_missing(self):
+        self.assertIsNone(_parse_retry_after_header(self._response(429)))
+
+    def test_parse_retry_after_seconds(self):
+        self.assertEqual(
+            _parse_retry_after_header(
+                self._response(429, {"Retry-After": "120"})
+            ),
+            120.0,
+        )
+
+    def test_parse_retry_after_http_date(self):
+        retry_at = datetime.now(timezone.utc) + timedelta(seconds=30)
+        header = retry_at.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        delay = _parse_retry_after_header(
+            self._response(503, {"Retry-After": header})
+        )
+        self.assertIsNotNone(delay)
+        self.assertTrue(25 < delay <= 30)
+
+    def test_parse_retry_after_http_date_in_past(self):
+        retry_at = datetime.now(timezone.utc) - timedelta(seconds=30)
+        header = retry_at.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        self.assertEqual(
+            _parse_retry_after_header(
+                self._response(503, {"Retry-After": header})
+            ),
+            0.0,
+        )
+
+    def test_parse_retry_after_invalid(self):
+        self.assertIsNone(
+            _parse_retry_after_header(
+                self._response(429, {"Retry-After": "not-a-date"})
+            )
+        )
