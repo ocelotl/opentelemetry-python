@@ -27,8 +27,10 @@ from opentelemetry.exporter.otlp.proto.http import (
     Compression,
 )
 from opentelemetry.exporter.otlp.proto.http._common import (
+    _MAX_BACKOFF,
     _is_retryable,
     _load_session_from_envvar,
+    _parse_retry_after_header,
 )
 from opentelemetry.metrics import MeterProvider
 from opentelemetry.sdk.environment_variables import (
@@ -196,7 +198,10 @@ class OTLPSpanExporter(SpanExporter):
             deadline_sec = time() + self._timeout
             for retry_num in range(_MAX_RETRYS):
                 # multiplying by a random number between .8 and 1.2 introduces a +/20% jitter to each backoff.
-                backoff_seconds = 2**retry_num * random.uniform(0.8, 1.2)
+                # The backoff is clamped to _MAX_BACKOFF so it cannot grow without bound.
+                backoff_seconds = min(
+                    2**retry_num * random.uniform(0.8, 1.2), _MAX_BACKOFF
+                )
                 export_error: Exception | None = None
                 try:
                     resp = self._export(serialized_data, deadline_sec - time())
@@ -211,6 +216,11 @@ class OTLPSpanExporter(SpanExporter):
                     reason = resp.reason
                     retryable = _is_retryable(resp)
                     status_code = resp.status_code
+                    # Honor a Retry-After header when present, overriding the
+                    # computed backoff with the server-requested delay.
+                    retry_after_seconds = _parse_retry_after_header(resp)
+                    if retry_after_seconds is not None:
+                        backoff_seconds = retry_after_seconds
 
                 if not retryable:
                     _logger.error(

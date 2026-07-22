@@ -1351,6 +1351,42 @@ class TestOTLPMetricExporter(TestCase):
             exporter._preferred_aggregation[Histogram], histogram_aggregation
         )
 
+    @patch.object(Session, "post")
+    def test_429_is_retryable(self, mock_post):
+        exporter = OTLPMetricExporter(timeout=1.5)
+
+        resp = Response()
+        resp.status_code = 429
+        resp.reason = "TOO_MANY_REQUESTS"
+        mock_post.return_value = resp
+        with self.assertLogs(level=WARNING) as warning:
+            self.assertEqual(
+                exporter.export(self.metrics["sum_int"]),
+                MetricExportResult.FAILURE,
+            )
+            self.assertGreater(mock_post.call_count, 1)
+            self.assertIn(
+                "Transient error TOO_MANY_REQUESTS encountered while "
+                "exporting metrics batch, retrying in",
+                warning.records[0].message,
+            )
+
+    @patch.object(Session, "post")
+    def test_retry_after_header_seconds_is_honored(self, mock_post):
+        exporter = OTLPMetricExporter(timeout=10)
+
+        resp = Response()
+        resp.status_code = 429
+        resp.reason = "TOO_MANY_REQUESTS"
+        resp.headers["Retry-After"] = "2"
+        mock_post.return_value = resp
+        with self.assertLogs(level=WARNING) as warning:
+            exporter.export(self.metrics["sum_int"])
+            self.assertIn(
+                "retrying in 2.00s",
+                warning.records[0].message,
+            )
+
     @patch.dict(
         "os.environ", {OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED: "true"}
     )

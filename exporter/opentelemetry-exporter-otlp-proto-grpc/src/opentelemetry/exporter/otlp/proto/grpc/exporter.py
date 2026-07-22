@@ -119,6 +119,10 @@ _RETRYABLE_ERROR_CODES = frozenset(
     ]
 )
 _MAX_RETRYS = 6
+# Upper bound (in seconds) applied to the exponential backoff between retries so
+# it cannot grow without limit. This mirrors the behavior of the Go and Java
+# OTLP exporters, which both cap the backoff interval.
+_MAX_BACKOFF = 32
 logger = getLogger(__name__)
 # This prevents logs generated when a log fails to be written to generate another log which fails to be written etc. etc.
 logger.addFilter(DuplicateFilter())
@@ -473,7 +477,10 @@ class OTLPExporterMixin(
                         "google.rpc.retryinfo-bin"  # type: ignore [reportArgumentType]
                     )
                     # multiplying by a random number between .8 and 1.2 introduces a +/20% jitter to each backoff.
-                    backoff_seconds = 2**retry_num * random.uniform(0.8, 1.2)
+                    # The backoff is clamped to _MAX_BACKOFF so it cannot grow without bound.
+                    backoff_seconds = min(
+                        2**retry_num * random.uniform(0.8, 1.2), _MAX_BACKOFF
+                    )
                     if retry_info_bin is not None:
                         retry_info = RetryInfo()
                         retry_info.ParseFromString(retry_info_bin)
