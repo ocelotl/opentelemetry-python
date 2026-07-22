@@ -327,12 +327,16 @@ class ReadWriteLogRecord:
         record: LogRecord,
         resource: Resource,
         instrumentation_scope: InstrumentationScope | None = None,
+        limits: LogRecordLimits | None = None,
     ) -> ReadWriteLogRecord:
-        return cls(
-            log_record=record,
-            resource=resource,
-            instrumentation_scope=instrumentation_scope,
-        )
+        kwargs = {
+            "log_record": record,
+            "resource": resource,
+            "instrumentation_scope": instrumentation_scope,
+        }
+        if limits is not None:
+            kwargs["limits"] = limits
+        return cls(**kwargs)
 
 
 class LogRecordProcessor(abc.ABC):
@@ -703,6 +707,7 @@ class Logger(APILogger):
         *,
         logger_metrics: LoggerMetricsT,
         _logger_config: _LoggerConfig,
+        limits: LogRecordLimits | None = None,
     ):
         super().__init__(
             instrumentation_scope.name,
@@ -715,6 +720,7 @@ class Logger(APILogger):
         self._instrumentation_scope = instrumentation_scope
         self._logger_metrics = logger_metrics
         self._logger_config = _logger_config
+        self._limits = limits or LogRecordLimits()
 
     def _is_enabled(self) -> bool:
         return self._logger_config.is_enabled
@@ -763,6 +769,7 @@ class Logger(APILogger):
                     record=record,
                     resource=self._resource,
                     instrumentation_scope=self._instrumentation_scope,
+                    limits=self._limits,
                 )
             else:
                 _set_log_record_exception_attributes(record.log_record)
@@ -785,6 +792,7 @@ class Logger(APILogger):
                 record=log_record,
                 resource=self._resource,
                 instrumentation_scope=self._instrumentation_scope,
+                limits=self._limits,
             )
 
         self._logger_metrics.emit_log()
@@ -816,6 +824,7 @@ class LoggerProvider(APILoggerProvider):
         | ConcurrentMultiLogRecordProcessor
         | None = None,
         *,
+        limits: LogRecordLimits | None = None,
         meter_provider: MeterProvider | None = None,
         _logger_configurator: _LoggerConfiguratorT | None = None,
     ):
@@ -823,6 +832,7 @@ class LoggerProvider(APILoggerProvider):
             self._resource = Resource.create({})
         else:
             self._resource = resource
+        self._limits = limits or LogRecordLimits()
         self._multi_log_record_processor = (
             multi_log_record_processor or SynchronousMultiLogRecordProcessor()
         )
@@ -884,6 +894,7 @@ class LoggerProvider(APILoggerProvider):
             scope,
             logger_metrics=self._logger_metrics,
             _logger_config=self._apply_logger_configurator(scope),
+            limits=self._limits,
         )
 
     def _get_logger_cached(

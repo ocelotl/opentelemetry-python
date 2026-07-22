@@ -4,9 +4,15 @@
 import unittest
 from unittest.mock import patch
 
-from opentelemetry.sdk._logs import LogRecordLimits
+from opentelemetry._logs import LogRecord as APILogRecord
+from opentelemetry._logs import SeverityNumber
+from opentelemetry.sdk._logs import LoggerProvider, LogRecordLimits
 from opentelemetry.sdk._logs._internal import (
     _DEFAULT_OTEL_ATTRIBUTE_COUNT_LIMIT,
+)
+from opentelemetry.sdk._logs.export import (
+    InMemoryLogRecordExporter,
+    SimpleLogRecordProcessor,
 )
 from opentelemetry.sdk.environment_variables import (
     OTEL_ATTRIBUTE_COUNT_LIMIT,
@@ -140,3 +146,72 @@ class TestLogLimits(unittest.TestCase):
                     str(error.exception),
                     f"Unexpected error message for {env_var}={bad_value}",
                 )
+
+
+class TestLoggerProviderLimits(unittest.TestCase):
+    @staticmethod
+    def _emit_and_get_record(provider, attributes):
+        exporter = InMemoryLogRecordExporter()
+        provider.add_log_record_processor(SimpleLogRecordProcessor(exporter))
+        logger = provider.get_logger("test_logger_provider_limits")
+        logger.emit(
+            APILogRecord(
+                body="body",
+                severity_number=SeverityNumber.WARN,
+                attributes=attributes,
+            )
+        )
+        finished = exporter.get_finished_logs()
+        assert len(finished) == 1
+        return finished[0]
+
+    def test_default_provider_uses_default_attribute_count_limit(self):
+        provider = LoggerProvider()
+        attributes = {
+            f"key_{index}": index
+            for index in range(_DEFAULT_OTEL_ATTRIBUTE_COUNT_LIMIT + 5)
+        }
+
+        record = self._emit_and_get_record(provider, attributes)
+
+        self.assertEqual(
+            len(record.log_record.attributes),
+            _DEFAULT_OTEL_ATTRIBUTE_COUNT_LIMIT,
+        )
+        self.assertEqual(record.dropped_attributes, 5)
+
+    def test_programmatic_limits_bound_attribute_count(self):
+        provider = LoggerProvider(
+            limits=LogRecordLimits(max_log_record_attributes=2)
+        )
+        attributes = {"a": 1, "b": 2, "c": 3, "d": 4}
+
+        record = self._emit_and_get_record(provider, attributes)
+
+        self.assertEqual(len(record.log_record.attributes), 2)
+        self.assertEqual(record.dropped_attributes, 2)
+
+    def test_programmatic_limits_bound_attribute_value_length(self):
+        provider = LoggerProvider(
+            limits=LogRecordLimits(max_log_record_attribute_length=3)
+        )
+        attributes = {"key": "abcdefgh"}
+
+        record = self._emit_and_get_record(provider, attributes)
+
+        self.assertEqual(record.log_record.attributes["key"], "abc")
+
+    def test_programmatic_limits_via_global_fallbacks(self):
+        provider = LoggerProvider(
+            limits=LogRecordLimits(max_attributes=1, max_attribute_length=2)
+        )
+        attributes = {"first": "abcd", "second": "efgh"}
+
+        record = self._emit_and_get_record(provider, attributes)
+
+        # max_attributes / max_attribute_length act as global fallbacks for the
+        # log-record-specific limits when the latter are unset.
+        self.assertEqual(len(record.log_record.attributes), 1)
+        # BoundedAttributes evicts the oldest key when full, so "second"
+        # survives and its value is truncated to the length limit.
+        self.assertEqual(record.log_record.attributes["second"], "ef")
