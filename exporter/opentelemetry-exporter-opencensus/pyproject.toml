@@ -33,7 +33,7 @@ dependencies = [
   "opencensus-proto >= 0.1.0, < 1.0.0",
   "opentelemetry-api >= 1.45.0.dev",
   "opentelemetry-sdk >= 1.15",
-  "protobuf ~= 3.13",
+  "protobuf >= 3.13, < 8.0",
   "setuptools >= 16.0",
 ]
 
