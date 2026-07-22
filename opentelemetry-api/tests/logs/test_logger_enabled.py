@@ -31,9 +31,7 @@ class TestLoggerEnabled(unittest.TestCase):
         real_logger.enabled.return_value = True
         logger._real_logger = real_logger
 
-        result = logger.enabled(
-            severity_number=SeverityNumber.WARN, event_name="warn.event"
-        )
+        result = logger.enabled(severity_number=SeverityNumber.WARN, event_name="warn.event")
 
         self.assertTrue(result)
         real_logger.enabled.assert_called_once_with(

@@ -500,9 +500,7 @@ class _RecordingProcessor(LogRecordProcessor):
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         return True
 
-    def enabled(
-        self, context=None, severity_number=None, event_name=None
-    ) -> bool:
+    def enabled(self, context=None, severity_number=None, event_name=None) -> bool:
         return self._enabled
 
 
@@ -532,9 +530,7 @@ class TestLoggerEnabled(unittest.TestCase):
         self.assertTrue(logger.enabled())
 
     def test_enabled_false_when_logger_config_disabled(self):
-        provider = LoggerProvider(
-            _logger_configurator=_disable_logger_configurator
-        )
+        provider = LoggerProvider(_logger_configurator=_disable_logger_configurator)
         provider.add_log_record_processor(_RecordingProcessor(enabled=True))
         logger = provider.get_logger("test")
         self.assertFalse(logger.enabled())
@@ -546,9 +542,7 @@ class TestLoggerEnabled(unittest.TestCase):
         provider.add_log_record_processor(processor)
         logger = provider.get_logger("test")
 
-        result = logger.enabled(
-            severity_number=SeverityNumber.ERROR, event_name="err.event"
-        )
+        result = logger.enabled(severity_number=SeverityNumber.ERROR, event_name="err.event")
 
         self.assertTrue(result)
         processor.enabled.assert_called_once_with(
