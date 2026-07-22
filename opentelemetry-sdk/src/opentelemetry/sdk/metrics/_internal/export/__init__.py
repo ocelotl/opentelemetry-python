@@ -71,9 +71,7 @@ from ._metric_reader_metrics import create_metric_reader_metrics
 _logger = getLogger(__name__)
 
 
-def _batch_metrics_data(
-    metrics_data: MetricsData, max_export_batch_size: int
-) -> Iterable[MetricsData]:
+def _batch_metrics_data(metrics_data: MetricsData, max_export_batch_size: int) -> Iterable[MetricsData]:
     """Split a `MetricsData` into a sequence of `MetricsData` batches where no
     single batch contains more than ``max_export_batch_size`` data points.
 
@@ -116,10 +114,7 @@ def _batch_metrics_data(
         for scope_metrics_source in resource_metrics_source.scope_metrics:
             for metric in scope_metrics_source.metrics:
                 metric_count = len(metric.data.data_points)
-                if (
-                    current_count
-                    and current_count + metric_count > max_export_batch_size
-                ):
+                if current_count and current_count + metric_count > max_export_batch_size:
                     yield _build_batch()
                     current_resource_metrics = []
                     current_scope_metrics = []
@@ -556,8 +551,7 @@ class PeriodicExportingMetricReader(MetricReader):
         self._export_timeout_millis = export_timeout_millis
         if max_export_batch_size is not None and max_export_batch_size <= 0:
             raise ValueError(
-                f"max_export_batch_size value {max_export_batch_size} is "
-                "invalid and needs to be larger than zero."
+                f"max_export_batch_size value {max_export_batch_size} is invalid and needs to be larger than zero."
             )
         self._max_export_batch_size = max_export_batch_size
         self._shutdown = False

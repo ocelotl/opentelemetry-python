@@ -325,9 +325,7 @@ class TestPeriodicExportingMetricReader(ConcurrencyTestBase):
 
     def test_max_export_batch_size_none_single_export(self):
         exporter = FakeMetricsExporter()
-        pmr = PeriodicExportingMetricReader(
-            exporter, max_export_batch_size=None
-        )
+        pmr = PeriodicExportingMetricReader(exporter, max_export_batch_size=None)
         pmr._set_collect_callback(lambda reader, timeout_millis: metrics)
         pmr._receive_metrics(metrics)
         self.assertEqual(len(exporter.metrics), 1)
@@ -378,9 +376,7 @@ class TestPeriodicExportingMetricReader(ConcurrencyTestBase):
 
     def test_max_export_batch_size_larger_than_total(self):
         exporter = FakeMetricsExporter()
-        pmr = PeriodicExportingMetricReader(
-            exporter, max_export_batch_size=100
-        )
+        pmr = PeriodicExportingMetricReader(exporter, max_export_batch_size=100)
         pmr._set_collect_callback(lambda reader, timeout_millis: metrics)
         pmr._receive_metrics(metrics)
         self.assertEqual(len(exporter.metrics), 1)
