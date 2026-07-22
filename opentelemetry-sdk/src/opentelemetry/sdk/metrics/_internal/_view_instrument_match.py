@@ -22,6 +22,16 @@ from opentelemetry.sdk.metrics._internal.view import View
 
 _logger = getLogger(__name__)
 
+# Default aggregation cardinality limit as mandated by the specification:
+# https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/metrics/sdk.md#cardinality-limits
+_DEFAULT_CARDINALITY_LIMIT = 2000
+
+# Synthetic attribute set used to aggregate measurements whose own attribute set
+# could not be independently aggregated because the cardinality limit was
+# reached.
+_OVERFLOW_ATTRIBUTES = {"otel.metric.overflow": True}
+_OVERFLOW_ATTRIBUTES_KEY = frozenset(_OVERFLOW_ATTRIBUTES.items())
+
 
 class _ViewInstrumentMatch:
     def __init__(
@@ -35,6 +45,7 @@ class _ViewInstrumentMatch:
         self._attributes_aggregation: dict[frozenset, _Aggregation] = {}
         self._lock = Lock()
         self._instrument_class_aggregation = instrument_class_aggregation
+        self._cardinality_limit = _DEFAULT_CARDINALITY_LIMIT
         self._name = self._view._name or self._instrument.name
         self._description = (
             self._view._description or self._instrument.description
@@ -103,6 +114,30 @@ class _ViewInstrumentMatch:
         if aggr_key not in self._attributes_aggregation:
             with self._lock:
                 if aggr_key not in self._attributes_aggregation:
+                    # Enforce the cardinality limit. Once the number of tracked
+                    # attribute sets would exceed the limit, any previously
+                    # unseen attribute set is aggregated into a single overflow
+                    # series instead of allocating a new one. One slot is
+                    # reserved for the overflow series so that the total number
+                    # of metric points never exceeds the limit, matching the
+                    # reference implementations (Go, Java).
+                    if (
+                        len(self._attributes_aggregation)
+                        >= self._cardinality_limit - 1
+                    ):
+                        aggr_key = _OVERFLOW_ATTRIBUTES_KEY
+                        attributes = _OVERFLOW_ATTRIBUTES
+
+                if aggr_key not in self._attributes_aggregation:
+                    if aggr_key is _OVERFLOW_ATTRIBUTES_KEY:
+                        _logger.warning(
+                            "Metric cardinality limit (%s) reached for "
+                            "instrument %s. Further attribute sets are being "
+                            "aggregated under the overflow attribute set "
+                            "{'otel.metric.overflow': True}.",
+                            self._cardinality_limit,
+                            self._name,
+                        )
                     if not isinstance(
                         self._view._aggregation, DefaultAggregation
                     ):
