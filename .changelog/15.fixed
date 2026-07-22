@@ -1,3 +1,6 @@
 `BatchSpanProcessor`/`BatchLogRecordProcessor`: enforce `OTEL_BSP_EXPORT_TIMEOUT`
 as a real deadline on the export call so a hung exporter can no longer block the
 batch worker (and `force_flush`) indefinitely
+`SimpleSpanProcessor`: serialize calls to the exporter with a lock so concurrent
+`on_end` calls can no longer invoke `SpanExporter.export` concurrently, as
+required by the specification

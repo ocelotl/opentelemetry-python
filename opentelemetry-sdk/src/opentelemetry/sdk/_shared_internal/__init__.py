@@ -248,9 +248,7 @@ class BatchProcessor(Generic[Telemetry]):
         # and the exporter's own network calls do not generate telemetry that
         # would feed back into the processor.
         ctx = contextvars.copy_context()
-        future = self._export_executor.submit(
-            ctx.run, self._exporter.export, batch
-        )
+        future = self._export_executor.submit(ctx.run, self._exporter.export, batch)
         # result() re-raises any exception from the export call, and raises
         # FutureTimeoutError if the deadline is exceeded.
         future.result(timeout=timeout)

@@ -148,9 +148,7 @@ class TestSimpleSpanProcessor(unittest.TestCase):
                 with self._active_lock:
                     self._active += 1
                     self.export_count += 1
-                    self.max_concurrency = max(
-                        self.max_concurrency, self._active
-                    )
+                    self.max_concurrency = max(self.max_concurrency, self._active)
                 # Sleep outside the lock so genuine overlap would be observed
                 # by another thread bumping _active before we decrement.
                 time.sleep(0.005)
@@ -177,9 +175,7 @@ class TestSimpleSpanProcessor(unittest.TestCase):
                 with tracer.start_as_current_span("concurrent"):
                     pass
 
-        threads = [
-            threading.Thread(target=end_spans) for _ in range(num_threads)
-        ]
+        threads = [threading.Thread(target=end_spans) for _ in range(num_threads)]
         for thread in threads:
             thread.start()
         for thread in threads:

@@ -234,9 +234,7 @@ class TestBatchProcessor:
         assert exporter.sleep_interrupted is True
         assert 2 == exporter.num_export_calls
 
-    def test_hung_export_is_bounded_by_export_timeout(
-        self, batch_processor_class, telemetry
-    ):
+    def test_hung_export_is_bounded_by_export_timeout(self, batch_processor_class, telemetry):
         # An exporter whose export() call would hang effectively forever.
         export_released = threading.Event()
 
@@ -271,18 +269,13 @@ class TestBatchProcessor:
             # The export was actually entered.
             assert exporter.export_started.is_set()
             # Bounded, not infinite: well under the 60s the exporter would hang.
-            assert elapsed < 5, (
-                f"force_flush blocked for {elapsed}s despite a 200ms export "
-                "timeout"
-            )
+            assert elapsed < 5, f"force_flush blocked for {elapsed}s despite a 200ms export timeout"
         finally:
             # Release the hung export thread so the process can exit cleanly.
             export_released.set()
             processor.shutdown()
 
-    def test_export_runs_with_instrumentation_suppressed(
-        self, batch_processor_class, telemetry
-    ):
+    def test_export_runs_with_instrumentation_suppressed(self, batch_processor_class, telemetry):
         # The export now runs on a separate executor thread. The batch worker
         # attaches _SUPPRESS_INSTRUMENTATION_KEY before exporting; the exporter
         # must still observe it as True (otherwise the exporter's own network
@@ -293,9 +286,7 @@ class TestBatchProcessor:
                 self.suppressed_during_export = None
 
             def export(self, _):
-                self.suppressed_during_export = get_value(
-                    _SUPPRESS_INSTRUMENTATION_KEY
-                )
+                self.suppressed_during_export = get_value(_SUPPRESS_INSTRUMENTATION_KEY)
 
             def shutdown(self):
                 pass
