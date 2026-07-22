@@ -285,27 +285,19 @@ class TestSpanProcessor(unittest.TestCase):
 
         # The mutation performed inside on_ending must be reflected in the
         # exported (read-only) span rather than silently dropped.
-        self.assertEqual(
-            finished_span.attributes.get("on_ending.attribute"), "added"
-        )
+        self.assertEqual(finished_span.attributes.get("on_ending.attribute"), "added")
         self.assertEqual(len(finished_span.events), 1)
         self.assertEqual(finished_span.events[0].name, "on_ending.event")
         self.assertEqual(len(finished_span.links), 1)
-        self.assertEqual(
-            finished_span.links[0].attributes.get("on_ending.link"), "added"
-        )
+        self.assertEqual(finished_span.links[0].attributes.get("on_ending.link"), "added")
 
     def test_on_ending_mutation_survives_concurrent(self):
         concurrent_processor = trace.ConcurrentMultiSpanProcessor()
-        concurrent_processor.add_span_processor(
-            MutatingOnEndingSpanProcessor()
-        )
+        concurrent_processor.add_span_processor(MutatingOnEndingSpanProcessor())
         exporter = InMemorySpanExporter()
         concurrent_processor.add_span_processor(SimpleSpanProcessor(exporter))
 
-        tracer_provider = trace.TracerProvider(
-            active_span_processor=concurrent_processor
-        )
+        tracer_provider = trace.TracerProvider(active_span_processor=concurrent_processor)
         tracer = tracer_provider.get_tracer(__name__)
 
         with tracer.start_as_current_span("foo"):
@@ -314,9 +306,7 @@ class TestSpanProcessor(unittest.TestCase):
         finished_spans = exporter.get_finished_spans()
         self.assertEqual(len(finished_spans), 1)
         finished_span = finished_spans[0]
-        self.assertEqual(
-            finished_span.attributes.get("on_ending.attribute"), "added"
-        )
+        self.assertEqual(finished_span.attributes.get("on_ending.attribute"), "added")
         self.assertEqual(len(finished_span.events), 1)
         self.assertEqual(finished_span.events[0].name, "on_ending.event")
         self.assertEqual(len(finished_span.links), 1)
@@ -333,9 +323,7 @@ class TestSpanProcessor(unittest.TestCase):
         span.set_attribute("after_end.attribute", "rejected")
         span.add_event("after_end.event")
         self.assertNotIn("after_end.attribute", span.attributes)
-        self.assertFalse(
-            any(event.name == "after_end.event" for event in span.events)
-        )
+        self.assertFalse(any(event.name == "after_end.event" for event in span.events))
 
 
 class MultiSpanProcessorTestBase(abc.ABC):
