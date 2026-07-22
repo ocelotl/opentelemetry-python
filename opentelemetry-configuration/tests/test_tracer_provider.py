@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from opentelemetry import trace as trace_api
+from opentelemetry.configuration._conversion import _dict_to_dataclass
 from opentelemetry.configuration._tracer_provider import (
     configure_tracer_provider,
     create_tracer_provider,
@@ -568,6 +569,27 @@ class TestCreateSpanExporterAndProcessor(unittest.TestCase):
         procs = provider._active_span_processor._span_processors
         self.assertIsInstance(procs[0], SimpleSpanProcessor)
         self.assertIsInstance(procs[0].span_exporter, ConsoleSpanExporter)
+
+    def test_present_null_console_exporter_builds_with_defaults(self):
+        # A present-but-null console exporter (``console:`` with no value in
+        # YAML) is carried through conversion as an empty mapping and must
+        # build a ConsoleSpanExporter with defaults instead of raising.
+        exporter_config = _dict_to_dataclass(
+            {"console": None}, SpanExporterConfig
+        )
+        config = self._make_batch_config(exporter_config)
+        provider = create_tracer_provider(config)
+        procs = provider._active_span_processor._span_processors
+        self.assertEqual(len(procs), 1)
+        self.assertIsInstance(procs[0].span_exporter, ConsoleSpanExporter)
+
+    def test_absent_exporter_type_raises(self):
+        # An absent exporter (empty mapping, no key present) must still raise
+        # "no exporter type specified".
+        exporter_config = _dict_to_dataclass({}, SpanExporterConfig)
+        config = self._make_batch_config(exporter_config)
+        with self.assertRaises(ConfigurationError):
+            create_tracer_provider(config)
 
     def test_otlp_http_missing_package_raises(self):
         config = self._make_batch_config(
