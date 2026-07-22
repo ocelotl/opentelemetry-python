@@ -1,0 +1,3 @@
+Add a per-`View` `aggregation_cardinality_limit` option that overrides both the
+per-`MetricReader` default and the base default cardinality limit for the metric
+streams matched by that view
