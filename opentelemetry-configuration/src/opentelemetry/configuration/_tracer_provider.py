@@ -17,6 +17,9 @@ from opentelemetry.configuration._exceptions import (
     MissingDependencyError,
 )
 from opentelemetry.configuration.models import (
+    AttributeLimits as AttributeLimitsConfig,
+)
+from opentelemetry.configuration.models import (
     ExperimentalComposableRuleBasedSampler as RuleBasedSamplerConfig,
 )
 from opentelemetry.configuration.models import (
@@ -400,45 +403,64 @@ def _create_parent_based_sampler(config: ParentBasedSamplerConfig) -> Sampler:
     return ParentBased(**kwargs)
 
 
-def _create_span_limits(config: SpanLimitsConfig) -> SpanLimits:
+def _create_span_limits(
+    config: SpanLimitsConfig | None,
+    attribute_limits: AttributeLimitsConfig | None = None,
+) -> SpanLimits:
     """Create SpanLimits from config.
 
-    Absent fields use the OTel spec defaults (128 for counts, unlimited for lengths).
+    Precedence for the generic per-attribute limits (``attribute_count_limit``
+    and ``attribute_value_length_limit``): the tracer provider's own
+    ``limits`` override the top-level ``attribute_limits``, which in turn
+    override the OTel spec defaults (128 for counts, unlimited for lengths).
     Explicit values suppress env-var reading — matching Java SDK behavior.
     """
+    span_attribute_count = None
+    span_attribute_length = None
+    if config is not None:
+        span_attribute_count = config.attribute_count_limit
+        span_attribute_length = config.attribute_value_length_limit
+    if span_attribute_count is None and attribute_limits is not None:
+        span_attribute_count = attribute_limits.attribute_count_limit
+    if span_attribute_length is None and attribute_limits is not None:
+        span_attribute_length = attribute_limits.attribute_value_length_limit
+
     return SpanLimits(
         max_span_attributes=(
-            config.attribute_count_limit
-            if config.attribute_count_limit is not None
+            span_attribute_count
+            if span_attribute_count is not None
             else _DEFAULT_OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT
         ),
         max_events=(
             config.event_count_limit
-            if config.event_count_limit is not None
+            if config is not None and config.event_count_limit is not None
             else _DEFAULT_OTEL_SPAN_EVENT_COUNT_LIMIT
         ),
         max_links=(
             config.link_count_limit
-            if config.link_count_limit is not None
+            if config is not None and config.link_count_limit is not None
             else _DEFAULT_OTEL_SPAN_LINK_COUNT_LIMIT
         ),
         max_event_attributes=(
             config.event_attribute_count_limit
-            if config.event_attribute_count_limit is not None
+            if config is not None
+            and config.event_attribute_count_limit is not None
             else _DEFAULT_OTEL_EVENT_ATTRIBUTE_COUNT_LIMIT
         ),
         max_link_attributes=(
             config.link_attribute_count_limit
-            if config.link_attribute_count_limit is not None
+            if config is not None
+            and config.link_attribute_count_limit is not None
             else _DEFAULT_OTEL_LINK_ATTRIBUTE_COUNT_LIMIT
         ),
-        max_attribute_length=config.attribute_value_length_limit,
+        max_attribute_length=span_attribute_length,
     )
 
 
 def create_tracer_provider(
     config: TracerProviderConfig | None,
     resource: Resource | None = None,
+    attribute_limits: AttributeLimitsConfig | None = None,
 ) -> TracerProvider:
     """Create an SDK TracerProvider from declarative config.
 
@@ -449,6 +471,9 @@ def create_tracer_provider(
     Args:
         config: TracerProvider config from the parsed config file, or None.
         resource: Resource to attach to the provider.
+        attribute_limits: Top-level ``attribute_limits`` from the parsed config,
+            used as the default for span attribute count/length limits when the
+            tracer provider does not specify its own.
 
     Returns:
         A configured TracerProvider.
@@ -463,16 +488,9 @@ def create_tracer_provider(
         if config is not None and config.id_generator is not None
         else None
     )
-    span_limits = (
-        _create_span_limits(config.limits)
-        if config is not None and config.limits is not None
-        else SpanLimits(
-            max_span_attributes=_DEFAULT_OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT,
-            max_events=_DEFAULT_OTEL_SPAN_EVENT_COUNT_LIMIT,
-            max_links=_DEFAULT_OTEL_SPAN_LINK_COUNT_LIMIT,
-            max_event_attributes=_DEFAULT_OTEL_EVENT_ATTRIBUTE_COUNT_LIMIT,
-            max_link_attributes=_DEFAULT_OTEL_LINK_ATTRIBUTE_COUNT_LIMIT,
-        )
+    span_limits = _create_span_limits(
+        config.limits if config is not None else None,
+        attribute_limits,
     )
 
     provider = TracerProvider(
@@ -492,6 +510,7 @@ def create_tracer_provider(
 def configure_tracer_provider(
     config: TracerProviderConfig | None,
     resource: Resource | None = None,
+    attribute_limits: AttributeLimitsConfig | None = None,
 ) -> None:
     """Configure the global TracerProvider from declarative config.
 
@@ -502,7 +521,11 @@ def configure_tracer_provider(
     Args:
         config: TracerProvider config from the parsed config file, or None.
         resource: Resource to attach to the provider.
+        attribute_limits: Top-level ``attribute_limits`` from the parsed config,
+            applied as the default span attribute count/length limits.
     """
     if config is None:
         return
-    trace.set_tracer_provider(create_tracer_provider(config, resource))
+    trace.set_tracer_provider(
+        create_tracer_provider(config, resource, attribute_limits)
+    )

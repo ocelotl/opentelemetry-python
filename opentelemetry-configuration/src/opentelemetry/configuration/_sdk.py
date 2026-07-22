@@ -10,6 +10,7 @@ entry point for "apply this config" on the declarative path.
 
 from __future__ import annotations
 
+import logging
 from logging import getLogger
 
 from opentelemetry.configuration._logger_provider import (
@@ -26,9 +27,43 @@ from opentelemetry.configuration._tracer_provider import (
 from opentelemetry.configuration.instrumentation import (
     configure_instrumentation,
 )
-from opentelemetry.configuration.models import OpenTelemetryConfiguration
+from opentelemetry.configuration.models import (
+    OpenTelemetryConfiguration,
+    SeverityNumber,
+)
 
 _logger = getLogger(__name__)
+
+# Maps the declarative-config ``log_level`` severity onto the closest Python
+# stdlib logging level for the SDK's own internal logging. The config field
+# uses the log severity vocabulary, so severities are bucketed into the five
+# standard Python levels.
+_SEVERITY_TO_LOGGING_LEVEL: dict[SeverityNumber, int] = {
+    SeverityNumber.trace: logging.DEBUG,
+    SeverityNumber.trace2: logging.DEBUG,
+    SeverityNumber.trace3: logging.DEBUG,
+    SeverityNumber.trace4: logging.DEBUG,
+    SeverityNumber.debug: logging.DEBUG,
+    SeverityNumber.debug2: logging.DEBUG,
+    SeverityNumber.debug3: logging.DEBUG,
+    SeverityNumber.debug4: logging.DEBUG,
+    SeverityNumber.info: logging.INFO,
+    SeverityNumber.info2: logging.INFO,
+    SeverityNumber.info3: logging.INFO,
+    SeverityNumber.info4: logging.INFO,
+    SeverityNumber.warn: logging.WARNING,
+    SeverityNumber.warn2: logging.WARNING,
+    SeverityNumber.warn3: logging.WARNING,
+    SeverityNumber.warn4: logging.WARNING,
+    SeverityNumber.error: logging.ERROR,
+    SeverityNumber.error2: logging.ERROR,
+    SeverityNumber.error3: logging.ERROR,
+    SeverityNumber.error4: logging.ERROR,
+    SeverityNumber.fatal: logging.CRITICAL,
+    SeverityNumber.fatal2: logging.CRITICAL,
+    SeverityNumber.fatal3: logging.CRITICAL,
+    SeverityNumber.fatal4: logging.CRITICAL,
+}
 
 
 def configure_sdk(config: OpenTelemetryConfiguration) -> None:
@@ -60,8 +95,26 @@ def configure_sdk(config: OpenTelemetryConfiguration) -> None:
         )
         return
 
+    if config.log_level is not None:
+        # Apply the top-level ``log_level`` to the OpenTelemetry SDK's own
+        # internal logger so its diagnostic output honors the configured
+        # verbosity, per the spec's top-level ``log_level`` field.
+        logging.getLogger("opentelemetry").setLevel(
+            _SEVERITY_TO_LOGGING_LEVEL[config.log_level]
+        )
+
+    if config.attribute_limits is not None:
+        _logger.warning(
+            "Top-level attribute_limits are only applied to spans (via "
+            "SpanLimits); the Python SDK LoggerProvider and MeterProvider "
+            "constructors do not accept attribute limits, so they are ignored "
+            "for logs and metrics."
+        )
+
     resource = create_resource(config.resource)
-    configure_tracer_provider(config.tracer_provider, resource)
+    configure_tracer_provider(
+        config.tracer_provider, resource, config.attribute_limits
+    )
     configure_meter_provider(config.meter_provider, resource)
     configure_logger_provider(config.logger_provider, resource)
     configure_propagator(config.propagator)
