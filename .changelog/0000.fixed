@@ -1,0 +1,5 @@
+Prometheus exporter: improve Prometheus/OpenMetrics compatibility by merging
+attributes that sanitize to the same label, emitting exemplars on counters and
+histograms, adding a `without_counter_suffixes` option, dropping same-name
+families with conflicting types, and skipping scope attributes that collide
+with reserved `otel_scope_*` labels
