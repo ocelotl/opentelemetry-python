@@ -542,9 +542,7 @@ class TestCreateSpanExporterAndProcessor(unittest.TestCase):
         # A present-but-null console exporter (``console:`` with no value in
         # YAML) is carried through conversion as an empty mapping and must
         # build a ConsoleSpanExporter with defaults instead of raising.
-        exporter_config = _dict_to_dataclass(
-            {"console": None}, SpanExporterConfig
-        )
+        exporter_config = _dict_to_dataclass({"console": None}, SpanExporterConfig)
         config = self._make_batch_config(exporter_config)
         provider = create_tracer_provider(config)
         procs = provider._active_span_processor._span_processors
