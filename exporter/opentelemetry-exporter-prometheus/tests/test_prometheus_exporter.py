@@ -22,14 +22,18 @@ from opentelemetry.exporter.prometheus import (
 )
 from opentelemetry.metrics import NoOpMeterProvider
 from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics._internal.point import Exemplar
 from opentelemetry.sdk.metrics.export import (
     AggregationTemporality,
+    Gauge,
     Histogram,
     HistogramDataPoint,
     Metric,
     MetricsData,
+    NumberDataPoint,
     ResourceMetrics,
     ScopeMetrics,
+    Sum,
 )
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.util.instrumentation import InstrumentationScope
@@ -920,3 +924,253 @@ class TestPrometheusMetricReader(TestCase):  # pylint: disable=too-many-public-m
                 """
             ),
         )
+
+    def _collect_single_metric(self, metric, **collector_kwargs):
+        metrics_data = MetricsData(
+            resource_metrics=[
+                ResourceMetrics(
+                    resource=Mock(),
+                    scope_metrics=[
+                        ScopeMetrics(
+                            scope=Mock(),
+                            metrics=[metric],
+                            schema_url="schema_url",
+                        )
+                    ],
+                    schema_url="schema_url",
+                )
+            ]
+        )
+        collector = _CustomCollector(
+            disable_target_info=True,
+            scope_info_enabled=False,
+            **collector_kwargs,
+        )
+        collector.add_metrics_data(metrics_data)
+        return list(collector.collect())
+
+    def test_colliding_sanitized_attribute_keys_are_merged(self):
+        # "foo.bar" and "foo/bar" both sanitize to "foo_bar" and must be
+        # merged into a single semicolon-joined label sorted by original key.
+        metric = Metric(
+            name="test_counter",
+            description="desc",
+            unit="",
+            data=Sum(
+                data_points=[
+                    NumberDataPoint(
+                        attributes={"foo/bar": "second", "foo.bar": "first"},
+                        start_time_unix_nano=0,
+                        time_unix_nano=0,
+                        value=1,
+                    )
+                ],
+                aggregation_temporality=AggregationTemporality.CUMULATIVE,
+                is_monotonic=True,
+            ),
+        )
+        families = self._collect_single_metric(metric)
+        self.assertEqual(len(families), 1)
+        sample = families[0].samples[0]
+        # Sorted by original key: "foo.bar" (first) then "foo/bar" (second).
+        self.assertEqual(sample.labels["foo_bar"], "first;second")
+
+    def test_exemplars_emitted_on_counter(self):
+        exemplar = Exemplar(
+            filtered_attributes={},
+            value=1.0,
+            time_unix_nano=1_000_000_000,
+            span_id=42,
+            trace_id=1234567890,
+        )
+        metric = Metric(
+            name="test_counter",
+            description="desc",
+            unit="",
+            data=Sum(
+                data_points=[
+                    NumberDataPoint(
+                        attributes={},
+                        start_time_unix_nano=0,
+                        time_unix_nano=0,
+                        value=5,
+                        exemplars=[exemplar],
+                    )
+                ],
+                aggregation_temporality=AggregationTemporality.CUMULATIVE,
+                is_monotonic=True,
+            ),
+        )
+        families = self._collect_single_metric(metric)
+        sample = families[0].samples[0]
+        self.assertIsNotNone(sample.exemplar)
+        self.assertEqual(sample.exemplar.value, 1.0)
+        self.assertEqual(sample.exemplar.labels["span_id"], "000000000000002a")
+        self.assertEqual(
+            sample.exemplar.labels["trace_id"],
+            "000000000000000000000000499602d2",
+        )
+
+    def test_exemplars_emitted_on_histogram(self):
+        exemplar = Exemplar(
+            filtered_attributes={},
+            value=2.0,
+            time_unix_nano=1_000_000_000,
+            span_id=42,
+            trace_id=1234567890,
+        )
+        metric = Metric(
+            name="test_histogram",
+            description="desc",
+            unit="",
+            data=Histogram(
+                data_points=[
+                    HistogramDataPoint(
+                        attributes={},
+                        start_time_unix_nano=0,
+                        time_unix_nano=0,
+                        count=6,
+                        sum=579.0,
+                        bucket_counts=[1, 3, 2],
+                        explicit_bounds=[123.0, 456.0],
+                        min=1,
+                        max=457,
+                        exemplars=[exemplar],
+                    )
+                ],
+                aggregation_temporality=AggregationTemporality.CUMULATIVE,
+            ),
+        )
+        families = self._collect_single_metric(metric)
+        inf_bucket = [
+            sample
+            for sample in families[0].samples
+            if sample.name.endswith("_bucket")
+            and sample.labels.get("le") == "+Inf"
+        ][0]
+        self.assertIsNotNone(inf_bucket.exemplar)
+        self.assertEqual(inf_bucket.exemplar.value, 2.0)
+
+    def test_without_counter_suffixes_drops_total(self):
+        metric = _generate_sum(name="test_counter", value=1, unit="")
+        families = self._collect_single_metric(
+            metric, without_counter_suffixes=True
+        )
+        sample_names = {sample.name for sample in families[0].samples}
+        self.assertIn("test_counter", sample_names)
+        self.assertNotIn("test_counter_total", sample_names)
+
+    def test_counter_suffix_present_by_default(self):
+        metric = _generate_sum(name="test_counter", value=1, unit="")
+        families = self._collect_single_metric(metric)
+        sample_names = {sample.name for sample in families[0].samples}
+        self.assertIn("test_counter_total", sample_names)
+
+    def test_conflicting_type_same_name_family_dropped(self):
+        counter = Metric(
+            name="conflict",
+            description="desc",
+            unit="",
+            data=Sum(
+                data_points=[
+                    NumberDataPoint(
+                        attributes={},
+                        start_time_unix_nano=0,
+                        time_unix_nano=0,
+                        value=1,
+                    )
+                ],
+                aggregation_temporality=AggregationTemporality.CUMULATIVE,
+                is_monotonic=True,
+            ),
+        )
+        gauge = Metric(
+            name="conflict",
+            description="desc",
+            unit="",
+            data=Gauge(
+                data_points=[
+                    NumberDataPoint(
+                        attributes={},
+                        start_time_unix_nano=0,
+                        time_unix_nano=0,
+                        value=2,
+                    )
+                ],
+            ),
+        )
+        metrics_data = MetricsData(
+            resource_metrics=[
+                ResourceMetrics(
+                    resource=Mock(),
+                    scope_metrics=[
+                        ScopeMetrics(
+                            scope=Mock(),
+                            metrics=[counter, gauge],
+                            schema_url="schema_url",
+                        )
+                    ],
+                    schema_url="schema_url",
+                )
+            ]
+        )
+        collector = _CustomCollector(
+            disable_target_info=True, scope_info_enabled=False
+        )
+        collector.add_metrics_data(metrics_data)
+        with self.assertLogs(
+            "opentelemetry.exporter.prometheus", level="WARNING"
+        ) as log_ctx:
+            families = list(collector.collect())
+        # Only the first (counter) family survives.
+        self.assertEqual(len(families), 1)
+        self.assertEqual(families[0].type, "counter")
+        self.assertTrue(
+            any("conflicting type" in msg for msg in log_ctx.output)
+        )
+
+    def test_scope_attribute_colliding_with_reserved_label_skipped(self):
+        scope = InstrumentationScope(
+            name="library.test",
+            version="1.0",
+            schema_url="schema_url",
+        )
+        # A data point attribute that sanitizes to a reserved otel_scope_*
+        # label must be dropped in favor of the scope-provided value.
+        metric = Metric(
+            name="test_gauge",
+            description="desc",
+            unit="",
+            data=Gauge(
+                data_points=[
+                    NumberDataPoint(
+                        attributes={"otel_scope_name": "attacker"},
+                        start_time_unix_nano=0,
+                        time_unix_nano=0,
+                        value=1,
+                    )
+                ],
+            ),
+        )
+        metrics_data = MetricsData(
+            resource_metrics=[
+                ResourceMetrics(
+                    resource=Mock(),
+                    scope_metrics=[
+                        ScopeMetrics(
+                            scope=scope,
+                            metrics=[metric],
+                            schema_url="schema_url",
+                        )
+                    ],
+                    schema_url="schema_url",
+                )
+            ]
+        )
+        collector = _CustomCollector(
+            disable_target_info=True, scope_info_enabled=True
+        )
+        collector.add_metrics_data(metrics_data)
+        families = list(collector.collect())
+        sample = families[0].samples[0]
+        self.assertEqual(sample.labels["otel_scope_name"], "library.test")
