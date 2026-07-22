@@ -12,7 +12,7 @@ corresponding dataclass types.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import fields, is_dataclass
+from dataclasses import MISSING, fields, is_dataclass
 from enum import Enum
 from types import UnionType
 from typing import Any, TypeVar, Union, get_args, get_origin, get_type_hints
@@ -39,12 +39,46 @@ def _convert_value(value: Any, type_hint: Any) -> Any:
     Recursively converts dicts to dataclasses and lists of dicts to lists of
     dataclasses. Other values (primitives, enums, ``dict[str, Any]`` aliases)
     pass through unchanged.
-    """
-    if value is None:
-        return None
 
+    Present-but-null handling: this function is only called for keys that are
+    actually present in the parsed mapping (absent keys fall through to the
+    dataclass field defaults in ``_dict_to_dataclass``). A present key whose
+    value is ``None`` therefore means "present but null", which the
+    configuration spec requires be treated as "create this component with all
+    defaults" rather than "not configured". To keep that distinguishable from
+    an absent key when a component factory later selects on
+    ``value is not None``:
+
+    - A present-null field typed as a dataclass becomes a defaults-only
+      instance of that dataclass (e.g. ``otlp_http:`` -> ``OtlpHttpExporter()``
+      with every field ``None``, so the exporter reads its own defaults).
+    - A present-null field typed as a mapping alias (e.g. the ``console``
+      exporter, ``dict[str, Any] | None``) becomes an empty mapping ``{}`` so
+      the selecting factory still fires.
+    - A present-null primitive (e.g. ``endpoint:``) stays ``None``, which is
+      already the "use default" value for such fields.
+    """
     unwrapped = _unwrap_optional(type_hint)
     origin = get_origin(unwrapped)
+
+    if value is None:
+        # Present-but-null: build the component with defaults where the field
+        # is a component (dataclass or mapping-alias); leave primitives None.
+        # A dataclass can only be built here if every field is optional (has a
+        # default or default_factory); otherwise ``unwrapped()`` would raise.
+        if (
+            isinstance(unwrapped, type)
+            and is_dataclass(unwrapped)
+            and all(
+                field.default is not MISSING
+                or field.default_factory is not MISSING
+                for field in fields(unwrapped)
+            )
+        ):
+            return unwrapped()
+        if origin is dict:
+            return {}
+        return None
 
     # list[X] — recurse on each element
     if origin is list and isinstance(value, list):

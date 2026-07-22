@@ -1,0 +1,4 @@
+`opentelemetry-configuration`: treat a present-but-null component value (e.g.
+`console:` with no value) as "create the component with defaults" instead of
+raising a `ConfigurationError`, per the declarative configuration spec's
+requirement to distinguish a missing key from a present-null one

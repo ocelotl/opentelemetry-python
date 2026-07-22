@@ -10,7 +10,7 @@ from typing import Any, ClassVar
 
 from opentelemetry.configuration._common import _additional_properties
 from opentelemetry.configuration._conversion import _dict_to_dataclass
-from opentelemetry.configuration.models import ExemplarFilter
+from opentelemetry.configuration.models import ExemplarFilter, SpanExporter
 
 
 @dataclass
@@ -72,15 +72,51 @@ class TestDictToDataclass(unittest.TestCase):
         self.assertEqual(result.middle.items[0].value, 1)
         self.assertEqual(result.middle.items[1].value, 2)
 
-    def test_none_value_preserved(self):
+    def test_present_null_dataclass_becomes_defaults_instance(self):
+        # A present-but-null value for a dataclass-typed field must build that
+        # dataclass with all defaults, so it is distinguishable from an absent
+        # key. Primitives present-null stay None (their "use default" value).
         result = _dict_to_dataclass({"middle": None, "name": "test"}, _Outer)
-        self.assertIsNone(result.middle)
+        self.assertIsInstance(result.middle, _Middle)
+        self.assertIsNone(result.middle.inner)
+        self.assertIsNone(result.middle.items)
         self.assertEqual(result.name, "test")
 
+    def test_present_null_primitive_stays_none(self):
+        result = _dict_to_dataclass({"name": None}, _Outer)
+        self.assertIsNone(result.name)
+
     def test_missing_optional_fields_default_to_none(self):
+        # Absent keys stay None; this is what "not configured" looks like and
+        # must remain distinguishable from present-null.
         result = _dict_to_dataclass({}, _Outer)
         self.assertIsNone(result.middle)
         self.assertIsNone(result.name)
+
+    def test_present_null_mapping_alias_becomes_empty_dict(self):
+        # The console exporter field is typed as ``dict[str, Any] | None``.
+        # A present-null value must become an empty mapping so a component
+        # factory selecting on ``value is not None`` still fires and builds
+        # the console exporter with defaults.
+        result = _dict_to_dataclass({"console": None}, SpanExporter)
+        self.assertEqual(result.console, {})
+
+    def test_absent_component_stays_none(self):
+        # Absent component keys must remain None ("not configured").
+        result = _dict_to_dataclass({}, SpanExporter)
+        self.assertIsNone(result.console)
+        self.assertIsNone(result.otlp_http)
+
+    def test_populated_component_mapping_still_converts(self):
+        # A populated component mapping must still convert into a typed
+        # dataclass instance with its values carried through.
+        result = _dict_to_dataclass(
+            {"otlp_http": {"endpoint": "http://localhost:4318"}}, SpanExporter
+        )
+        self.assertIsNone(result.console)
+        self.assertEqual(
+            result.otlp_http.endpoint, "http://localhost:4318"
+        )
 
     def test_unknown_keys_routed_to_additional_properties(self):
         result = _dict_to_dataclass(
