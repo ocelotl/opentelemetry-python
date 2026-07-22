@@ -139,13 +139,9 @@ class TraceServiceServicerWithExportParams(TraceServiceServicer):
 
         response = ExportTraceServiceResponse()
         if self.optional_rejected_spans is not None:
-            response.partial_success.rejected_spans = (
-                self.optional_rejected_spans
-            )
+            response.partial_success.rejected_spans = self.optional_rejected_spans
         if self.optional_partial_error_message is not None:
-            response.partial_success.error_message = (
-                self.optional_partial_error_message
-            )
+            response.partial_success.error_message = self.optional_partial_error_message
         return response
 
 
@@ -400,13 +396,9 @@ class TestOTLPExporterMixin(TestCase):
             ),
             self.server,
         )
-        exporter = OTLPSpanExporterForTesting(
-            insecure=True, meter_provider=self.meter_provider
-        )
+        exporter = OTLPSpanExporterForTesting(insecure=True, meter_provider=self.meter_provider)
         with self.assertLogs(level=WARNING) as warning:
-            self.assertEqual(
-                exporter.export([self.span]), SpanExportResult.SUCCESS
-            )
+            self.assertEqual(exporter.export([self.span]), SpanExportResult.SUCCESS)
         self.assertIn("4 items rejected", warning.output[0])
         self.assertIn("some spans were dropped", warning.output[0])
 
@@ -416,16 +408,10 @@ class TestOTLPExporterMixin(TestCase):
             TraceServiceServicerWithExportParams(StatusCode.OK),
             self.server,
         )
-        exporter = OTLPSpanExporterForTesting(
-            insecure=True, meter_provider=self.meter_provider
-        )
-        exporter_logger = getLogger(
-            "opentelemetry.exporter.otlp.proto.grpc.exporter"
-        )
+        exporter = OTLPSpanExporterForTesting(insecure=True, meter_provider=self.meter_provider)
+        exporter_logger = getLogger("opentelemetry.exporter.otlp.proto.grpc.exporter")
         with patch.object(exporter_logger, "warning") as mock_warning:
-            self.assertEqual(
-                exporter.export([self.span]), SpanExportResult.SUCCESS
-            )
+            self.assertEqual(exporter.export([self.span]), SpanExportResult.SUCCESS)
         mock_warning.assert_not_called()
 
     @unittest.skipIf(

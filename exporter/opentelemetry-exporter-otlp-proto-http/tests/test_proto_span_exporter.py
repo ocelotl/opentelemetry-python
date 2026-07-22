@@ -317,9 +317,7 @@ class TestOTLPSpanExporter(unittest.TestCase):
         resp._content = ExportTraceServiceResponse().SerializeToString()
         mock_post.return_value = resp
 
-        logger = logging.getLogger(
-            "opentelemetry.exporter.otlp.proto.http._common"
-        )
+        logger = logging.getLogger("opentelemetry.exporter.otlp.proto.http._common")
         with patch.object(logger, "warning") as mock_warning:
             self.assertEqual(
                 OTLPSpanExporter().export([BASIC_SPAN]),

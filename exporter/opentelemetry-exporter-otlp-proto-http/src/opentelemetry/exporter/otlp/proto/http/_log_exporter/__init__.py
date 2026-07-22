@@ -236,9 +236,7 @@ class OTLPLogExporter(LogRecordExporter):
                 try:
                     resp = self._export(serialized_data, deadline_sec - time())
                     if resp.ok:
-                        _log_partial_success(
-                            resp.content, ExportLogsServiceResponse
-                        )
+                        _log_partial_success(resp.content, ExportLogsServiceResponse)
                         return LogRecordExportResult.SUCCESS
                 except requests.exceptions.RequestException as error:
                     reason = error

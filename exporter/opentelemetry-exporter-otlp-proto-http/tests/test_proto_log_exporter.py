@@ -460,9 +460,7 @@ class TestOTLPHTTPLogExporter(unittest.TestCase):
         resp._content = ExportLogsServiceResponse().SerializeToString()
         mock_post.return_value = resp
 
-        logger = logging.getLogger(
-            "opentelemetry.exporter.otlp.proto.http._common"
-        )
+        logger = logging.getLogger("opentelemetry.exporter.otlp.proto.http._common")
         with patch.object(logger, "warning") as mock_warning:
             self.assertEqual(
                 OTLPLogExporter().export(self._get_sdk_log_data()),
