@@ -1,0 +1,1 @@
+Declarative configuration: add a pure `create(model)` that builds providers without mutating global state, and a `ConfigProvider`/`ConfigProperties` read view over the instrumentation config
