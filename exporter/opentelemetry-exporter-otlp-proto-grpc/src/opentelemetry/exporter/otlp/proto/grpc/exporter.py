@@ -152,6 +152,35 @@ _ENVIRON_TO_COMPRESSION = {
 }
 
 
+def _log_partial_success(response) -> None:
+    """Log a warning if an OTLP export response reports a partial success.
+
+    A partial success is signalled by the collector either rejecting some
+    items (``rejected_spans`` / ``rejected_data_points`` / ``rejected_log_records``
+    != 0) or by returning a non-empty ``error_message``. The request itself was
+    still accepted, so this only logs; it does not change the export result.
+    """
+    if response is None or not response.HasField("partial_success"):
+        return
+    partial_success = response.partial_success
+    rejected = 0
+    for field_name in (
+        "rejected_spans",
+        "rejected_data_points",
+        "rejected_log_records",
+    ):
+        if hasattr(partial_success, field_name):
+            rejected = getattr(partial_success, field_name)
+            break
+    error_message = partial_success.error_message
+    if rejected != 0 or error_message:
+        logger.warning(
+            "Partial success received from collector: %s items rejected. %s",
+            rejected,
+            error_message,
+        )
+
+
 class InvalidCompressionValueException(Exception):
     def __init__(self, environ_key: str, environ_value: str):
         super().__init__(
@@ -462,11 +491,12 @@ class OTLPExporterMixin(
                 try:
                     if self._client is None:
                         return self._result.FAILURE
-                    self._client.Export(
+                    response = self._client.Export(
                         request=self._translate_data(data),
                         metadata=self._headers,
                         timeout=deadline_sec - time(),
                     )
+                    _log_partial_success(response)
                     return self._result.SUCCESS  # type: ignore [reportReturnType]
                 except RpcError as error:
                     retry_info_bin = dict(error.trailing_metadata()).get(  # type: ignore [reportAttributeAccessIssue]

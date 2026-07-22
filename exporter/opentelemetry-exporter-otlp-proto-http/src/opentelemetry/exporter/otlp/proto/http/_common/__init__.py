@@ -1,6 +1,7 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+import logging
 from os import environ
 from typing import Literal
 
@@ -10,6 +11,43 @@ from opentelemetry.sdk.environment_variables import (
     _OTEL_PYTHON_EXPORTER_OTLP_HTTP_CREDENTIAL_PROVIDER,
 )
 from opentelemetry.util._importlib_metadata import entry_points
+
+_logger = logging.getLogger(__name__)
+
+
+def _log_partial_success(response_bytes: bytes, response_class) -> None:
+    """Deserialize an OTLP export response and log a warning if it reports a
+    partial success.
+
+    A partial success is signalled by the collector either rejecting some
+    items (``rejected_spans`` / ``rejected_data_points`` / ``rejected_log_records``
+    != 0) or by returning a non-empty ``error_message``. The request itself was
+    still accepted, so this only logs; it does not change the export result.
+    """
+    try:
+        response = response_class.FromString(response_bytes)
+    except Exception:  # pylint: disable=broad-except
+        # An unparseable body must not turn a successful export into a failure.
+        return
+    if not response.HasField("partial_success"):
+        return
+    partial_success = response.partial_success
+    rejected = 0
+    for field_name in (
+        "rejected_spans",
+        "rejected_data_points",
+        "rejected_log_records",
+    ):
+        if hasattr(partial_success, field_name):
+            rejected = getattr(partial_success, field_name)
+            break
+    error_message = partial_success.error_message
+    if rejected != 0 or error_message:
+        _logger.warning(
+            "Partial success received from collector: %s items rejected. %s",
+            rejected,
+            error_message,
+        )
 
 
 def _is_retryable(resp: requests.Response) -> bool:

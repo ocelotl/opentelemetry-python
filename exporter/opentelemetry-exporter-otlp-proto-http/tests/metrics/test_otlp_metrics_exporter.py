@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # pylint: disable=too-many-lines
+import logging
 import threading
 import time
 from logging import WARNING
@@ -30,6 +31,7 @@ from opentelemetry.exporter.otlp.proto.http.metric_exporter import (
 from opentelemetry.exporter.otlp.proto.http.version import __version__
 from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import (
     ExportMetricsServiceRequest,
+    ExportMetricsServiceResponse,
 )
 from opentelemetry.proto.common.v1.common_pb2 import (
     InstrumentationScope,
@@ -1320,6 +1322,43 @@ class TestOTLPMetricExporter(TestCase):
             OTLPMetricExporter().export(MagicMock()),
             MetricExportResult.SUCCESS,
         )
+
+    @patch.object(Session, "post")
+    def test_partial_success_logs_warning(self, mock_post):
+        """A partial-success response with rejected data points logs a warning."""
+        response = ExportMetricsServiceResponse()
+        response.partial_success.rejected_data_points = 5
+        response.partial_success.error_message = "some points were dropped"
+        resp = Response()
+        resp.status_code = 200
+        resp._content = response.SerializeToString()
+        mock_post.return_value = resp
+
+        with self.assertLogs(level=WARNING) as warning:
+            self.assertEqual(
+                OTLPMetricExporter().export(self.metrics["sum_int"]),
+                MetricExportResult.SUCCESS,
+            )
+        self.assertIn("5 items rejected", warning.output[0])
+        self.assertIn("some points were dropped", warning.output[0])
+
+    @patch.object(Session, "post")
+    def test_full_success_logs_nothing(self, mock_post):
+        """A fully successful (empty partial_success) response logs nothing."""
+        resp = Response()
+        resp.status_code = 200
+        resp._content = ExportMetricsServiceResponse().SerializeToString()
+        mock_post.return_value = resp
+
+        logger = logging.getLogger(
+            "opentelemetry.exporter.otlp.proto.http._common"
+        )
+        with patch.object(logger, "warning") as mock_warning:
+            self.assertEqual(
+                OTLPMetricExporter().export(self.metrics["sum_int"]),
+                MetricExportResult.SUCCESS,
+            )
+        mock_warning.assert_not_called()
 
     @patch.dict("os.environ", {}, clear=True)
     @patch.object(OTLPMetricExporter, "_export", return_value=Mock(ok=True))

@@ -41,10 +41,12 @@ from opentelemetry.exporter.otlp.proto.http import (
 from opentelemetry.exporter.otlp.proto.http._common import (
     _is_retryable,
     _load_session_from_envvar,
+    _log_partial_success,
 )
 from opentelemetry.metrics import MeterProvider
 from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import (  # noqa: F401
     ExportMetricsServiceRequest,
+    ExportMetricsServiceResponse,
 )
 from opentelemetry.proto.common.v1.common_pb2 import (  # noqa: F401
     AnyValue,
@@ -279,6 +281,9 @@ class OTLPMetricExporter(MetricExporter, OTLPMetricExporterMixin):
                 try:
                     resp = self._export(serialized_data, deadline_sec - time())
                     if resp.ok:
+                        _log_partial_success(
+                            resp.content, ExportMetricsServiceResponse
+                        )
                         return MetricExportResult.SUCCESS
                 except requests.exceptions.RequestException as error:
                     reason = error
