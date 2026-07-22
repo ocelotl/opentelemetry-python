@@ -5,6 +5,7 @@ from __future__ import annotations
 import collections.abc
 import logging
 import sys
+import threading
 import typing
 from enum import Enum
 from os import environ, linesep
@@ -103,6 +104,11 @@ class SimpleSpanProcessor(SpanProcessor):
         meter_provider: MeterProvider | None = None,
     ):
         self.span_exporter = span_exporter
+        # Serializes calls to the exporter. The spec requires that Export MUST
+        # NOT be called concurrently for the same exporter, so concurrent
+        # on_end calls (e.g. two threads ending sampled spans) must not invoke
+        # span_exporter.export at the same time.
+        self._export_lock = threading.Lock()
         self._metrics = create_processor_metrics(
             "traces",
             OtelComponentTypeValues.SIMPLE_SPAN_PROCESSOR,
@@ -126,7 +132,10 @@ class SimpleSpanProcessor(SpanProcessor):
         token = attach(set_value(_SUPPRESS_INSTRUMENTATION_KEY, True))
         error: Exception | None = None
         try:
-            self.span_exporter.export((span,))
+            # Hold the lock across the export call so that concurrent on_end
+            # calls cannot invoke the exporter concurrently.
+            with self._export_lock:
+                self.span_exporter.export((span,))
         # pylint: disable=broad-exception-caught
         except Exception as err:
             error = err
@@ -183,7 +192,6 @@ class BatchSpanProcessor(SpanProcessor):
                 BatchSpanProcessor._default_max_export_batch_size()
             )
 
-        # Not used. No way currently to pass timeout to export.
         if export_timeout_millis is None:
             export_timeout_millis = (
                 BatchSpanProcessor._default_export_timeout_millis()
