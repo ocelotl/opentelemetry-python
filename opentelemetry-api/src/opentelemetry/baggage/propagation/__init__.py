@@ -4,9 +4,14 @@
 from collections.abc import Iterable, Iterator, Mapping
 from logging import getLogger
 from re import split
-from urllib.parse import quote_plus, unquote_plus
+from urllib.parse import quote, unquote
 
-from opentelemetry.baggage import _is_valid_pair, get_all, set_baggage
+from opentelemetry.baggage import (
+    _is_valid_pair,
+    get_all,
+    get_baggage_metadata,
+    set_baggage,
+)
 from opentelemetry.context import get_current
 from opentelemetry.context.context import Context
 from opentelemetry.propagators import textmap
@@ -125,13 +130,20 @@ class W3CBaggagePropagator(textmap.TextMapPropagator):
                 _logger.warning("Invalid baggage entry: `%s`", entry)
                 continue
 
-            name = unquote_plus(name).strip()
-            value = unquote_plus(value).strip()
+            # A value may carry ;-delimited metadata (properties). The value
+            # is everything before the first `;`; the remainder is preserved
+            # verbatim so it can be re-appended on inject.
+            value, _, metadata = value.partition(";")
+
+            name = unquote(name).strip()
+            value = unquote(value).strip()
+            metadata = metadata.strip() or None
 
             context = set_baggage(
                 name,
                 value,
                 context=context,
+                metadata=metadata,
             )
 
         return context
@@ -153,7 +165,7 @@ class W3CBaggagePropagator(textmap.TextMapPropagator):
 
         baggage_string = ",".join(
             _apply_baggage_limits(
-                _encode_baggage_pairs(baggage_entries),
+                _encode_baggage_pairs(baggage_entries, context=context),
                 max_pairs=self._MAX_PAIRS,
                 max_pair_length=self._MAX_PAIR_LENGTH,
                 max_header_length=self._MAX_HEADER_LENGTH,
@@ -171,10 +183,20 @@ class W3CBaggagePropagator(textmap.TextMapPropagator):
 
 def _encode_baggage_pairs(
     baggage_entries: Mapping[str, object],
+    context: Context | None = None,
 ) -> Iterator[str]:
-    """Yield URL-encoded 'key=value' pairs from baggage entries."""
+    """Yield URL-encoded 'key=value' pairs from baggage entries.
+
+    Spaces are encoded as ``%20`` (per RFC 3986 / the W3C Baggage format)
+    rather than ``+``. Any metadata associated with an entry is re-appended
+    verbatim after a ``;`` separator.
+    """
     for key, value in baggage_entries.items():
-        yield quote_plus(str(key)) + "=" + quote_plus(str(value))
+        pair = quote(str(key), safe="") + "=" + quote(str(value), safe="")
+        metadata = get_baggage_metadata(str(key), context=context)
+        if metadata:
+            pair += ";" + metadata
+        yield pair
 
 
 def _extract_first_element(
