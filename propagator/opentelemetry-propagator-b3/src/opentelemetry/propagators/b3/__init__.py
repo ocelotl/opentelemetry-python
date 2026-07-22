@@ -7,7 +7,7 @@ from re import compile as re_compile
 from typing_extensions import deprecated
 
 from opentelemetry import trace
-from opentelemetry.context import Context
+from opentelemetry.context import Context, create_key, get_value, set_value
 from opentelemetry.propagators.textmap import (
     CarrierT,
     Getter,
@@ -17,6 +17,8 @@ from opentelemetry.propagators.textmap import (
     default_setter,
 )
 from opentelemetry.trace import format_span_id, format_trace_id
+
+_DEBUG_FLAG_KEY = create_key("b3-debug-flag")
 
 
 class B3MultiFormat(TextMapPropagator):
@@ -102,6 +104,14 @@ class B3MultiFormat(TextMapPropagator):
         if sampled in self._SAMPLE_PROPAGATE_VALUES or flags == "1":
             options |= trace.TraceFlags.SAMPLED
 
+        # The b3 debug flag ("d" in the single header, "x-b3-flags: 1" in
+        # the multi header) implies sampling but is distinct from it and,
+        # per the b3 spec, must be preserved and re-propagated. The trace
+        # flags cannot carry it, so store it in the context to be re-emitted
+        # on inject.
+        if sampled == "d" or flags == "1":
+            context = set_value(_DEBUG_FLAG_KEY, True, context)
+
         return trace.set_span_in_context(
             trace.NonRecordingSpan(
                 trace.SpanContext(
@@ -137,7 +147,13 @@ class B3MultiFormat(TextMapPropagator):
         setter.set(
             carrier, self.SPAN_ID_KEY, format_span_id(span_context.span_id)
         )
-        setter.set(carrier, self.SAMPLED_KEY, "1" if sampled else "0")
+        # A received debug flag must be preserved and re-propagated as
+        # "x-b3-flags: 1". Debug implies sampling, so the sampled header is
+        # omitted, matching the b3 spec and other implementations.
+        if get_value(_DEBUG_FLAG_KEY, context):
+            setter.set(carrier, self.FLAGS_KEY, "1")
+        else:
+            setter.set(carrier, self.SAMPLED_KEY, "1" if sampled else "0")
 
     @property
     def fields(self) -> set[str]:
@@ -145,6 +161,7 @@ class B3MultiFormat(TextMapPropagator):
             self.TRACE_ID_KEY,
             self.SPAN_ID_KEY,
             self.SAMPLED_KEY,
+            self.FLAGS_KEY,
         }
 
 
@@ -169,10 +186,17 @@ class B3SingleFormat(B3MultiFormat):
 
         sampled = (trace.TraceFlags.SAMPLED & span_context.trace_flags) != 0
 
+        # A received debug flag must be preserved and re-propagated as the
+        # "d" value in the sampling position of the single header.
+        if get_value(_DEBUG_FLAG_KEY, context):
+            sampling_field = "d"
+        else:
+            sampling_field = "1" if sampled else "0"
+
         fields = [
             format_trace_id(span_context.trace_id),
             format_span_id(span_context.span_id),
-            "1" if sampled else "0",
+            sampling_field,
         ]
 
         setter.set(carrier, self.SINGLE_HEADER_KEY, "-".join(fields))
