@@ -93,14 +93,14 @@ class TestJaegerPropagator(TestCase):
         )
         self.assertEqual(1, sample_flag_value)
 
-    def test_debug_flag_set(self):
+    def test_debug_flag_not_set_for_sampled_span(self):
+        # Injecting a normally-sampled span must set only the SAMPLED bit and
+        # must never force the Jaeger DEBUG (forced-keep) flag.
         old_carrier = {FORMAT.TRACE_ID_KEY: self.serialized_uber_trace_id}
         _, new_carrier = get_context_new_carrier(old_carrier)
-        debug_flag_value = (
-            int(new_carrier[FORMAT.TRACE_ID_KEY].split(":")[3])
-            & FORMAT.DEBUG_FLAG
-        )
-        self.assertEqual(FORMAT.DEBUG_FLAG, debug_flag_value)
+        flags = int(new_carrier[FORMAT.TRACE_ID_KEY].split(":")[3])
+        self.assertEqual(1, flags & 0x01)
+        self.assertEqual(0, flags & FORMAT.DEBUG_FLAG)
 
     def test_sample_debug_flags_unset(self):
         uber_trace_id = jaeger._format_uber_trace_id(  # pylint: disable=protected-access

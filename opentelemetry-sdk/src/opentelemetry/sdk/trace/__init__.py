@@ -1221,8 +1221,19 @@ class Tracer(trace_api.Tracer):
         # The sampler may also add attributes to the newly-created span, e.g.
         # to include information about the sampling result.
         # The sampler may also modify the parent span context's tracestate
+        trace_state = (
+            parent_span_context.trace_state
+            if parent_span_context is not None
+            else None
+        )
         sampling_result = self.sampler.should_sample(
-            context, trace_id, name, kind, attributes, links
+            context,
+            trace_id,
+            name,
+            kind,
+            attributes,
+            links,
+            trace_state,
         )
 
         trace_flags = (

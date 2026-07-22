@@ -524,3 +524,52 @@ class TestSampler(unittest.TestCase):
             context_api.detach(token)
 
         self.exec_parent_based(implicit_parent_context)
+
+    def test_parent_based_forwards_trace_state_to_delegate(self):
+        # ParentBased must forward the trace_state it receives to the delegate
+        # sampler it selects, so that custom delegate samplers can act on it.
+        class _RecordingSampler(sampling.Sampler):
+            def __init__(self):
+                self.received_trace_state = "not-called"
+
+            def should_sample(
+                self,
+                parent_context,
+                trace_id,
+                name,
+                kind=None,
+                attributes=None,
+                links=None,
+                trace_state=None,
+            ):
+                self.received_trace_state = trace_state
+                return sampling.ALWAYS_ON.should_sample(
+                    parent_context,
+                    trace_id,
+                    name,
+                    kind,
+                    attributes,
+                    links,
+                    trace_state,
+                )
+
+            def get_description(self):
+                return "RecordingSampler"
+
+        trace_state = trace.TraceState([("key", "value")])
+        delegate = _RecordingSampler()
+        sampler = sampling.ParentBased(
+            root=sampling.ALWAYS_OFF,
+            remote_parent_sampled=delegate,
+        )
+        context = self._create_parent(
+            TO_SAMPLED, is_remote=True, trace_state=trace_state
+        )
+        sampler.should_sample(
+            context,
+            0x8000000000000000,
+            "remote sampled parent",
+            trace.SpanKind.INTERNAL,
+            trace_state=trace_state,
+        )
+        self.assertEqual(delegate.received_trace_state, trace_state)

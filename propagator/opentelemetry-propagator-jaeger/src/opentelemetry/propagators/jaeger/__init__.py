@@ -73,9 +73,12 @@ class JaegerPropagator(TextMapPropagator):
         span_parent_id = (
             span.parent.span_id if span.is_recording() and span.parent else 0
         )
-        trace_flags = span_context.trace_flags
-        if trace_flags.sampled:
-            trace_flags |= self.DEBUG_FLAG
+        # Only propagate the SAMPLED flag. The DEBUG flag must not be set on
+        # inject for a normally-sampled span, since that would force downstream
+        # Jaeger components into a forced-keep decision.
+        trace_flags = trace.TraceFlags(
+            span_context.trace_flags & trace.TraceFlags.SAMPLED
+        )
 
         # set span identity
         setter.set(
