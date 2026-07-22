@@ -289,8 +289,16 @@ class ConcurrentMultiSpanProcessor(SpanProcessor):
         )
 
     def _on_ending(self, span: "Span") -> None:
-        # pylint: disable=protected-access
-        self._submit_and_await(lambda sp: sp._on_ending, span)
+        # ``on_ending`` runs while the span is still mutable, but only from the
+        # thread that is ending it. Fanning the hooks out to the thread pool
+        # would let them mutate the span from worker threads, which is both
+        # racy and rejected by the span's ending-thread guard. The hooks are
+        # therefore invoked sequentially on the ending thread. This matches the
+        # documented contract that ``on_ending`` is called synchronously on the
+        # thread that ends the span.
+        for sp in self._span_processors:
+            # pylint: disable=protected-access
+            sp._on_ending(span)
 
     def on_end(self, span: "ReadableSpan") -> None:
         self._submit_and_await(lambda sp: sp.on_end, span)
@@ -387,7 +395,8 @@ def _check_span_ended(func):
     def wrapper(self, *args, **kwargs):
         already_ended = False
         with self._lock:  # pylint: disable=protected-access
-            if self._end_time is None:  # pylint: disable=protected-access
+            # pylint: disable=protected-access
+            if self._is_writable_by_current_thread():
                 func(self, *args, **kwargs)
             else:
                 already_ended = True
@@ -840,6 +849,13 @@ class Span(trace_api.Span, ReadableSpan):
         self._span_processor = span_processor
         self._limits = limits
         self._lock = threading.Lock()
+        # ``_ending`` marks the intermediate state (see the ``end()`` method):
+        # the span has an ``_end_time`` but is not yet finalized. While in this
+        # state the ``on_ending`` hooks run and the ending thread is still
+        # allowed to mutate the span. ``_ending_thread_id`` records which thread
+        # is permitted to do so.
+        self._ending = False
+        self._ending_thread_id: int | None = None
         self._attributes = BoundedAttributes(
             self._limits.max_span_attributes,
             attributes,
@@ -886,11 +902,23 @@ class Span(trace_api.Span, ReadableSpan):
     def get_span_context(self) -> trace_api.SpanContext:
         return typing.cast(trace_api.SpanContext, self._context)
 
+    def _is_writable_by_current_thread(self) -> bool:
+        """Whether the span may currently be mutated.
+
+        Must be called while holding ``self._lock``. A span is writable while it
+        has not been ended at all, and also during the intermediate "ending"
+        state (while ``on_ending`` hooks run) but only from the thread that is
+        ending the span.
+        """
+        if self._end_time is None:
+            return True
+        return self._ending and self._ending_thread_id == threading.get_ident()
+
     def set_attributes(
         self, attributes: Mapping[str, types.AttributeValue]
     ) -> None:
         with self._lock:
-            if self._end_time is not None:
+            if not self._is_writable_by_current_thread():
                 logger.warning("Setting attribute on ended span.")
                 return
 
@@ -898,7 +926,7 @@ class Span(trace_api.Span, ReadableSpan):
 
     def set_attribute(self, key: str, value: types.AttributeValue) -> None:
         with self._lock:
-            if self._end_time is not None:
+            if not self._is_writable_by_current_thread():
                 logger.warning("Setting attribute on ended span.")
                 return
 
@@ -991,13 +1019,28 @@ class Span(trace_api.Span, ReadableSpan):
                 logger.warning("Calling end() on an ended span.")
                 return
 
+            # Enter the intermediate "ending" state: the span has an end time
+            # but is not frozen yet. The ``on_ending`` hooks run in this state
+            # and this thread is still allowed to mutate the span, so its
+            # attributes are intentionally left mutable for now.
             self._end_time = end_time if end_time is not None else time_ns()
-            self._attributes._immutable = True  # pylint: disable=protected-access
+            self._ending = True
+            self._ending_thread_id = threading.get_ident()
 
         if self._record_end_metrics:
             self._record_end_metrics()
-        # pylint: disable=protected-access
-        self._span_processor._on_ending(self)
+
+        try:
+            # pylint: disable=protected-access
+            self._span_processor._on_ending(self)
+        finally:
+            # Finalize (freeze) the span. After this point mutations are
+            # rejected even from the ending thread.
+            with self._lock:
+                self._ending = False
+                self._ending_thread_id = None
+                self._attributes._immutable = True  # pylint: disable=protected-access
+
         self._span_processor.on_end(self._readable_span())
 
     @_check_span_ended
