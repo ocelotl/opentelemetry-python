@@ -8,7 +8,11 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 from urllib.parse import quote_plus
 
-from opentelemetry.baggage import get_all, set_baggage
+from opentelemetry.baggage import (
+    get_all,
+    get_baggage_metadata,
+    set_baggage,
+)
 from opentelemetry.baggage.propagation import W3CBaggagePropagator
 from opentelemetry.context import get_current
 
@@ -52,8 +56,32 @@ class TestW3CBaggagePropagator(TestCase):
 
     def test_valid_header_with_properties(self):
         header = "key1=val1,key2=val2;prop=1;prop2;prop3=2"
-        expected = {"key1": "val1", "key2": "val2;prop=1;prop2;prop3=2"}
-        self.assertEqual(self._extract(header), expected)
+        # The ;-delimited metadata is stored separately from the value so the
+        # value stays clean and the metadata can be re-appended on inject.
+        expected = {"key1": "val1", "key2": "val2"}
+        context = self.propagator.extract({"baggage": [header]})
+        self.assertEqual(get_all(context), expected)
+        self.assertEqual(
+            get_baggage_metadata("key2", context), "prop=1;prop2;prop3=2"
+        )
+        self.assertIsNone(get_baggage_metadata("key1", context))
+
+    def test_metadata_round_trip(self):
+        """Entry metadata survives a full extract -> inject round trip."""
+        header = "key1=val1;prop=1;prop2;prop3=2"
+        context = self.propagator.extract({"baggage": [header]})
+        carrier = {}
+        self.propagator.inject(carrier, context=context)
+        self.assertEqual(carrier["baggage"], "key1=val1;prop=1;prop2;prop3=2")
+
+    def test_inject_metadata_from_set_baggage(self):
+        """Metadata passed to set_baggage is re-appended on inject."""
+        context = set_baggage(
+            "key1", "val1", context=get_current(), metadata="prop=1;prop2"
+        )
+        carrier = {}
+        self.propagator.inject(carrier, context=context)
+        self.assertEqual(carrier["baggage"], "key1=val1;prop=1;prop2")
 
     def test_valid_header_with_url_escaped_values(self):
         header = "key1=val1,key2=val2%3Aval3,key3=val4%40%23%24val5"
@@ -224,7 +252,20 @@ class TestW3CBaggagePropagator(TestCase):
         self.assertEqual(None, output)
 
     def test_inject_space_entries(self):
-        self.assertEqual("key=val+ue", self._inject({"key": "val ue"}))
+        # A space must be percent-encoded as %20 (not "+") to be read
+        # correctly by spec-compliant W3C Baggage receivers.
+        self.assertEqual("key=val%20ue", self._inject({"key": "val ue"}))
+
+    def test_extract_percent_encoded_space(self):
+        # A %20 in the header decodes back to a space.
+        self.assertEqual(self._extract("key=val%20ue"), {"key": "val ue"})
+
+    def test_space_round_trip(self):
+        # A value containing a space round-trips as %20 on the wire and back
+        # to a space after extraction.
+        header = self._inject({"key": "val ue"})
+        self.assertEqual(header, "key=val%20ue")
+        self.assertEqual(self._extract(header), {"key": "val ue"})
 
     def test_inject(self):
         values = {
@@ -371,7 +412,7 @@ class TestW3CBaggagePropagator(TestCase):
         context = self.propagator.extract(carrier)
 
         self.assertEqual(
-            carrier, {"baggage": "transaction=string+with+spaces"}
+            carrier, {"baggage": "transaction=string%20with%20spaces"}
         )
 
         self.assertEqual(
