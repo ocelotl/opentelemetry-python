@@ -29,14 +29,26 @@ This package is **experimental**. The API surface, type names, and
 behaviour may change between minor versions.
 """
 
+from opentelemetry.configuration._config_provider import (
+    ConfigProperties,
+    ConfigProvider,
+    get_config_provider,
+    set_config_provider,
+)
 from opentelemetry.configuration._exceptions import ConfigurationError
-from opentelemetry.configuration._sdk import configure_sdk
+from opentelemetry.configuration._sdk import Providers, configure_sdk, create
 from opentelemetry.configuration.file._loader import load_config_file
 from opentelemetry.configuration.models import OpenTelemetryConfiguration
 
 __all__ = [
+    "ConfigProperties",
+    "ConfigProvider",
     "ConfigurationError",
     "OpenTelemetryConfiguration",
+    "Providers",
     "configure_sdk",
+    "create",
+    "get_config_provider",
     "load_config_file",
+    "set_config_provider",
 ]
