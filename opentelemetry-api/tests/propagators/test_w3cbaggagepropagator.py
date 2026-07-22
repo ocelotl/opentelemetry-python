@@ -61,9 +61,7 @@ class TestW3CBaggagePropagator(TestCase):
         expected = {"key1": "val1", "key2": "val2"}
         context = self.propagator.extract({"baggage": [header]})
         self.assertEqual(get_all(context), expected)
-        self.assertEqual(
-            get_baggage_metadata("key2", context), "prop=1;prop2;prop3=2"
-        )
+        self.assertEqual(get_baggage_metadata("key2", context), "prop=1;prop2;prop3=2")
         self.assertIsNone(get_baggage_metadata("key1", context))
 
     def test_metadata_round_trip(self):
@@ -76,9 +74,7 @@ class TestW3CBaggagePropagator(TestCase):
 
     def test_inject_metadata_from_set_baggage(self):
         """Metadata passed to set_baggage is re-appended on inject."""
-        context = set_baggage(
-            "key1", "val1", context=get_current(), metadata="prop=1;prop2"
-        )
+        context = set_baggage("key1", "val1", context=get_current(), metadata="prop=1;prop2")
         carrier = {}
         self.propagator.inject(carrier, context=context)
         self.assertEqual(carrier["baggage"], "key1=val1;prop=1;prop2")

@@ -105,9 +105,7 @@ def set_baggage(
             baggage_metadata.pop(name, None)
         else:
             baggage_metadata[name] = metadata
-        context = set_value(
-            _BAGGAGE_METADATA_KEY, baggage_metadata, context=context
-        )
+        context = set_value(_BAGGAGE_METADATA_KEY, baggage_metadata, context=context)
     return context
 
 
@@ -129,9 +127,7 @@ def remove_baggage(name: str, context: Context | None = None) -> Context:
     if name in existing_metadata:
         baggage_metadata = existing_metadata.copy()
         baggage_metadata.pop(name, None)
-        context = set_value(
-            _BAGGAGE_METADATA_KEY, baggage_metadata, context=context
-        )
+        context = set_value(_BAGGAGE_METADATA_KEY, baggage_metadata, context=context)
     return context
 
 

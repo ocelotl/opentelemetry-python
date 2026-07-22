@@ -76,9 +76,7 @@ class TestBaggageManager(TestCase):
     def test_set_baggage_with_metadata(self):
         ctx = set_baggage("test", "value", metadata="prop1;prop2=x")
         self.assertEqual(get_baggage("test", context=ctx), "value")
-        self.assertEqual(
-            get_baggage_metadata("test", context=ctx), "prop1;prop2=x"
-        )
+        self.assertEqual(get_baggage_metadata("test", context=ctx), "prop1;prop2=x")
         # The value stays clean; metadata does not leak into get_all.
         self.assertEqual(get_all(context=ctx), {"test": "value"})
 
