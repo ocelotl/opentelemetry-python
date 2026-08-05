@@ -34,15 +34,13 @@ after:
 
 from argparse import ArgumentParser
 from logging import INFO, basicConfig, getLogger
-from os.path import basename
 from pathlib import Path
 from sys import path
 
 path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from edit import (
-    OPERATORS_PATTERN,
-    edit_files,
+    edit_dependency_versions,
     edit_repo_toml_version,
     edit_version_files,
 )
@@ -77,13 +75,5 @@ for group, version in (
     packages = cfg[group]["packages"]
     logger.info("update %s packages to %s", group, version)
 
-    logger.info("updating dependencies")
-    for pkg in packages:
-        edit_files(
-            package_directory_paths,
-            "pyproject.toml",
-            rf"({basename(pkg)}[^,]*)({OPERATORS_PATTERN})(.*\.dev)",
-            r"\1\2 " + version,
-        )
-
+    edit_dependency_versions(package_directory_paths, version, packages)
     edit_version_files(package_directory_paths, version, packages)

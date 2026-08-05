@@ -9,7 +9,7 @@ __version__."""
 
 from logging import getLogger
 from os import walk
-from os.path import join
+from os.path import basename, join
 from pathlib import Path
 from re import escape, sub
 
@@ -26,23 +26,27 @@ OPERATORS_PATTERN = "|".join(
 def edit_version_files(
     package_directory_paths: list[Path], version: str, packages: list[str]
 ) -> None:
-    """Rewrites __version__ to version in each package directory's version
-    file, for package directories matching one of packages."""
+    """Rewrites __version__ to version in the version file of each package
+    directory whose pyproject.toml [project].name is one of packages."""
     logger.info("updating version/__init__.py files")
 
+    package_names = set(packages)
     replace = f'__version__ = "{version}"'
 
     for package_directory_path in package_directory_paths:
-        if not any(pkg in str(package_directory_path) for pkg in packages):
+        pyproject_path = package_directory_path.joinpath("pyproject.toml")
+        if not pyproject_path.exists():
             continue
 
-        with open(
-            package_directory_path.joinpath("pyproject.toml"),
-            encoding="utf-8",
-        ) as file:
-            version_file_path = package_directory_path.joinpath(
-                load(file)["tool"]["hatch"]["version"]["path"]
-            )
+        with open(pyproject_path, encoding="utf-8") as file:
+            pyproject = load(file)
+
+        if pyproject.get("project", {}).get("name") not in package_names:
+            continue
+
+        version_file_path = package_directory_path.joinpath(
+            pyproject["tool"]["hatch"]["version"]["path"]
+        )
 
         with open(version_file_path) as file:
             text = file.read()
@@ -53,6 +57,43 @@ def edit_version_files(
 
         with open(version_file_path, "w", encoding="utf-8") as file:
             file.write(sub("__version__ .*", replace, text))
+
+
+def edit_dependency_versions(
+    package_directory_paths: list[Path], version: str, packages: list[str]
+) -> None:
+    """Rewrites every pyproject.toml dependency pin on one of packages that
+    currently ends in ".dev" to version."""
+    logger.info("updating dependencies")
+
+    for pkg in packages:
+        edit_files(
+            package_directory_paths,
+            "pyproject.toml",
+            rf"({basename(pkg)}(?:\[[^\]]+\])?\s*)({OPERATORS_PATTERN})(.*\.dev)",
+            r"\1\2 " + version,
+        )
+
+
+def edit_patch_dependency_versions(
+    package_directory_paths: list[Path],
+    version: str,
+    prev_version: str,
+    packages: list[str],
+) -> None:
+    """Rewrites every pyproject.toml dependency pin on one of packages from
+    the exact prev_version to version (the patch-release case, which can't
+    rely on a ".dev" suffix to locate the pin)."""
+    logger.info("updating patch dependencies")
+
+    for pkg in packages:
+        search = (
+            rf"({basename(pkg)}(?:\[[^\]]+\])?\s*)"
+            rf"(\s?({OPERATORS_PATTERN})\s?)(.*{escape(prev_version)})"
+        )
+        replace = r"\g<1>\g<2>" + version
+        logger.debug("search=%r replace=%r pkg=%r", search, replace, pkg)
+        edit_files(package_directory_paths, "pyproject.toml", search, replace)
 
 
 def edit_files(

@@ -35,15 +35,13 @@ after:
 
 from argparse import ArgumentParser
 from logging import INFO, basicConfig, getLogger
-from os.path import basename
 from pathlib import Path
 from sys import path
 
 path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from edit import (
-    OPERATORS_PATTERN,
-    edit_files,
+    edit_patch_dependency_versions,
     edit_repo_toml_version,
     edit_version_files,
 )
@@ -52,23 +50,6 @@ from tomlkit import load
 
 basicConfig(level=INFO, format="%(message)s")
 logger = getLogger(__name__)
-
-
-def update_patch_dependencies(
-    package_directory_paths: list[Path],
-    version: str,
-    prev_version: str,
-    packages: list[str],
-) -> None:
-    """For each of package_directory_paths, updates its pinned dependency
-    on packages from prev_version to version."""
-    logger.info("updating patch dependencies")
-    for pkg in packages:
-        search = rf"({basename(pkg)}[^,]*?)(\s?({OPERATORS_PATTERN})\s?)(.*{prev_version})"
-        replace = r"\g<1>\g<2>" + version
-        logger.debug("search=%r replace=%r pkg=%r", search, replace, pkg)
-        edit_files(package_directory_paths, "pyproject.toml", search, replace)
-
 
 parser = ArgumentParser(
     description="Updates version numbers during patch release, used by maintainers and CI"
@@ -92,7 +73,7 @@ with open(root_path / "repo.toml", encoding="utf-8") as file:
 
 packages = cfg["stable"]["packages"]
 logger.info("update stable packages to %s", args.stable_version)
-update_patch_dependencies(
+edit_patch_dependency_versions(
     package_directory_paths,
     args.stable_version,
     args.stable_version_prev,
@@ -102,7 +83,7 @@ edit_version_files(package_directory_paths, args.stable_version, packages)
 
 packages = cfg["prerelease"]["packages"]
 logger.info("update prerelease packages to %s", args.unstable_version)
-update_patch_dependencies(
+edit_patch_dependency_versions(
     package_directory_paths,
     args.unstable_version,
     args.unstable_version_prev,
