@@ -1,0 +1,2 @@
+Logs: add public `Logger.enabled(context, severity_number, event_name)` to the
+API and SDK, delegating to processor-level `enabled` hooks
