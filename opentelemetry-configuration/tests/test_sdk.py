@@ -10,6 +10,9 @@ from unittest.mock import patch
 
 from opentelemetry.configuration._sdk import configure_sdk
 from opentelemetry.configuration.models import (
+    AttributeLimits as AttributeLimitsConfig,
+)
+from opentelemetry.configuration.models import (
     OpenTelemetryConfiguration,
     SeverityNumber,
 )
@@ -70,7 +73,7 @@ class TestConfigureSdk(unittest.TestCase):
         configure_sdk(config)
 
         mock_create_resource.assert_called_once_with(resource_cfg)
-        mock_tracer.assert_called_once_with(tracer_cfg, sentinel_resource)
+        mock_tracer.assert_called_once_with(tracer_cfg, sentinel_resource, None)
         mock_meter.assert_called_once_with(None, sentinel_resource)
         mock_logger.assert_called_once_with(None, sentinel_resource)
         mock_propagator.assert_called_once_with(propagator_cfg)
@@ -214,5 +217,43 @@ class TestConfigureSdkIntegration(unittest.TestCase):
 
         configure_sdk(config)
 
-        mock_set_tracer.assert_called_once()
         self.assertIsInstance(mock_set_tracer.call_args[0][0], SdkTracerProvider)
+
+
+class TestConfigureSdkAttributeLimits(unittest.TestCase):
+    """Top-level ``attribute_limits`` are threaded to the tracer provider."""
+
+    @patch("opentelemetry.configuration._sdk.configure_propagator")
+    @patch("opentelemetry.configuration._sdk.configure_logger_provider")
+    @patch("opentelemetry.configuration._sdk.configure_meter_provider")
+    @patch("opentelemetry.configuration._sdk.configure_tracer_provider")
+    @patch("opentelemetry.configuration._sdk.create_resource")
+    def test_attribute_limits_passed_to_tracer_provider(
+        self,
+        mock_create_resource,
+        mock_tracer,
+        _mock_meter,
+        _mock_logger,
+        _mock_propagator,
+    ):
+        sentinel_resource = object()
+        mock_create_resource.return_value = sentinel_resource
+        limits = AttributeLimitsConfig(attribute_count_limit=7, attribute_value_length_limit=42)
+
+        configure_sdk(_config(attribute_limits=limits))
+
+        mock_tracer.assert_called_once_with(None, sentinel_resource, limits)
+
+    def test_attribute_limits_applied_to_span_limits(self):
+        from opentelemetry.configuration._tracer_provider import (  # noqa: PLC0415
+            create_tracer_provider,
+        )
+
+        provider = create_tracer_provider(
+            None,
+            None,
+            AttributeLimitsConfig(attribute_count_limit=9, attribute_value_length_limit=11),
+        )
+        span_limits = provider._span_limits
+        self.assertEqual(span_limits.max_span_attributes, 9)
+        self.assertEqual(span_limits.max_attribute_length, 11)
