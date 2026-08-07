@@ -40,10 +40,12 @@ from opentelemetry.exporter.otlp.proto.http import (
 )
 from opentelemetry.exporter.otlp.proto.http._common import (
     _DEFAULT_MAX_REQUEST_SIZE,
+    _MAX_BACKOFF,
     RequestPayloadTooLargeError,
     _is_request_too_large,
     _is_retryable,
     _load_session_from_envvar,
+    _parse_retry_after_header,
 )
 from opentelemetry.metrics import MeterProvider
 from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import (  # noqa: F401
@@ -283,7 +285,8 @@ class OTLPMetricExporter(MetricExporter, OTLPMetricExporterMixin):
             deadline_sec = time() + self._timeout
             for retry_num in range(_MAX_RETRYS):
                 # multiplying by a random number between .8 and 1.2 introduces a +/20% jitter to each backoff.
-                backoff_seconds = 2**retry_num * random.uniform(0.8, 1.2)
+                # The backoff is clamped to _MAX_BACKOFF so it cannot grow without bound.
+                backoff_seconds = min(2**retry_num * random.uniform(0.8, 1.2), _MAX_BACKOFF)
                 export_error: Exception | None = None
                 try:
                     resp = self._export(serialized_data, deadline_sec - time())
@@ -298,6 +301,11 @@ class OTLPMetricExporter(MetricExporter, OTLPMetricExporterMixin):
                     reason = resp.reason
                     retryable = _is_retryable(resp)
                     status_code = resp.status_code
+                    # Honor a Retry-After header when present, overriding the
+                    # computed backoff with the server-requested delay.
+                    retry_after_seconds = _parse_retry_after_header(resp)
+                    if retry_after_seconds is not None:
+                        backoff_seconds = retry_after_seconds
 
                 if not retryable:
                     _logger.error(
