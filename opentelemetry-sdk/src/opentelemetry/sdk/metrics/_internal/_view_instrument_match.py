@@ -46,7 +46,13 @@ class _ViewInstrumentMatch:
         self._attributes_aggregation: dict[frozenset, _Aggregation] = {}
         self._lock = Lock()
         self._instrument_class_aggregation = instrument_class_aggregation
-        if cardinality_limit is None:
+        # Cardinality limit precedence (finest wins):
+        #   1. per-View override (View.aggregation_cardinality_limit)
+        #   2. per-reader default (cardinality_limit argument)
+        #   3. SDK base default (_DEFAULT_CARDINALITY_LIMIT)
+        if self._view._aggregation_cardinality_limit is not None:
+            cardinality_limit = self._view._aggregation_cardinality_limit
+        elif cardinality_limit is None:
             cardinality_limit = _DEFAULT_CARDINALITY_LIMIT
         self._cardinality_limit = cardinality_limit
         self._name = self._view._name or self._instrument.name
