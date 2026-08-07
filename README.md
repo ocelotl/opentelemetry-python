@@ -8,7 +8,7 @@
 
 ## Project Status
 
-See the [OpenTelemetry Instrumentation for Python](https://opentelemetry.io/docs/instrumentation/python/#status-and-releases).
+See the [OpenTelemetry Instrumentation for Python](https://opentelemetry.io/docs/languages/python/#status-and-releases).
 
 | Signal  | Status       | Project |
 | ------- | ------------ | ------- |

@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # metrics.py
-# This is still work in progress as the metrics SDK is being implemented
 
 from collections.abc import Iterable
 

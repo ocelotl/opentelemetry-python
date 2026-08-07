@@ -1,6 +1,18 @@
 OpenCensus Exporter
 ===================
 
+.. warning::
+
+    This example is legacy and no longer works as written. It relies on
+    OpenTelemetry Collector components that have since been removed: the
+    ``opencensus`` receiver, the ``jaeger_grpc`` exporter and the
+    ``queued_retry`` processor, as well as the unmaintained
+    ``omnition/opentelemetry-collector-contrib`` image. OpenCensus itself is
+    end-of-life. For new code, export traces directly with the
+    :doc:`OTLP exporter <../../exporter/otlp/otlp>`
+    to a Collector configured with the ``otlp`` receiver. This example is kept
+    for historical reference only.
+
 This example shows how to use the OpenCensus Exporter to export traces to the
 OpenTelemetry collector.
 

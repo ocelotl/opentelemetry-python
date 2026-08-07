@@ -9,8 +9,8 @@ to interact with libraries instrumented with
 The included ``rediscache`` library creates spans via the OpenTracing Redis
 integration,
 `redis_opentracing <https://github.com/opentracing-contrib/python-redis>`_.
-Spans are exported via the Jaeger exporter, which is attached to the
-OpenTelemetry tracer.
+Spans are exported via the OTLP exporter to a Jaeger backend, which is
+attached to the OpenTelemetry tracer.
 
 
 The source files required to run this example are available :scm_web:`here <docs/examples/opentracing/>`.
