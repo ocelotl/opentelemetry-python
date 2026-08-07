@@ -1,0 +1,4 @@
+OTLP exporters (gRPC and HTTP) now inspect the export response and log a warning
+on partial success, reporting the number of rejected spans, data points or log
+records and any error message returned by the collector. Previously
+collector-rejected telemetry was silently dropped.

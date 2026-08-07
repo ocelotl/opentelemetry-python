@@ -32,8 +32,12 @@ from opentelemetry.exporter.otlp.proto.http._common import (
     _is_request_too_large,
     _is_retryable,
     _load_session_from_envvar,
+    _log_partial_success,
 )
 from opentelemetry.metrics import MeterProvider
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+    ExportTraceServiceResponse,
+)
 from opentelemetry.sdk.environment_variables import (
     _OTEL_PYTHON_EXPORTER_OTLP_HTTP_TRACES_CREDENTIAL_PROVIDER,
     OTEL_EXPORTER_OTLP_CERTIFICATE,
@@ -227,6 +231,7 @@ class OTLPSpanExporter(SpanExporter):
                 try:
                     resp = self._export(serialized_data, deadline_sec - time())
                     if resp.ok:
+                        _log_partial_success(resp.content, ExportTraceServiceResponse)
                         return SpanExportResult.SUCCESS
                 except requests.exceptions.RequestException as error:
                     reason = error
