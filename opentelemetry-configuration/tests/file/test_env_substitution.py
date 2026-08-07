@@ -37,6 +37,43 @@ class TestEnvSubstitution(unittest.TestCase):
             result = substitute_env_vars("name: ${SERVICE_NAME:-default}")
             self.assertEqual(result, "name: actual")
 
+    def test_prefixed_reference_substitution(self):
+        """Test ${env:VAR} prefixed reference substitutes like ${VAR}."""
+        with patch.dict(os.environ, {"SERVICE_NAME": "my-service"}):
+            result = substitute_env_vars("name: ${env:SERVICE_NAME}")
+            self.assertEqual(result, "name: my-service")
+
+    def test_prefixed_reference_with_default(self):
+        """Test ${env:VAR:-default} prefixed reference honors the default."""
+        with patch.dict(os.environ, {}, clear=True):
+            result = substitute_env_vars("name: ${env:MISSING:-default}")
+            self.assertEqual(result, "name: default")
+
+    def test_prefixed_reference_missing_substitutes_empty(self):
+        """An unset ${env:VAR} without a default is replaced with an empty value."""
+        with patch.dict(os.environ, {}, clear=True):
+            result = substitute_env_vars("name: ${env:MISSING_VAR}")
+            self.assertEqual(result, "name: ")
+            self.assertIsNone(yaml.safe_load(result)["name"])
+
+    def test_default_applied_when_variable_empty(self):
+        """Test ${VAR:-default} uses the default when VAR is set but empty."""
+        with patch.dict(os.environ, {"SERVICE_NAME": ""}):
+            result = substitute_env_vars("name: ${SERVICE_NAME:-default}")
+            self.assertEqual(result, "name: default")
+
+    def test_empty_variable_without_default_substitutes_empty(self):
+        """Test ${VAR} with VAR set-but-empty substitutes to empty, no error."""
+        with patch.dict(os.environ, {"EMPTY_VAR": ""}):
+            result = substitute_env_vars("name: ${EMPTY_VAR}")
+            self.assertEqual(result, "name: ")
+
+    def test_prefixed_default_applied_when_variable_empty(self):
+        """Test ${env:VAR:-default} uses the default when VAR is set but empty."""
+        with patch.dict(os.environ, {"SERVICE_NAME": ""}):
+            result = substitute_env_vars("name: ${env:SERVICE_NAME:-default}")
+            self.assertEqual(result, "name: default")
+
     def test_missing_variable_without_default_substitutes_empty(self):
         """An unset ${VAR} without a default is replaced with an empty value.
 
