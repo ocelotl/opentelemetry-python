@@ -1,0 +1,1 @@
+Jaeger propagator no longer forces the DEBUG flag on inject; a normally-sampled span now propagates only the SAMPLED flag
