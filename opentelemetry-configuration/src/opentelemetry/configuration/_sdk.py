@@ -99,8 +99,16 @@ def configure_sdk(config: OpenTelemetryConfiguration) -> None:
         level = _SEVERITY_TO_LOGGING_LEVEL.get(config.log_level, INFO)
         getLogger("opentelemetry").setLevel(level)
 
+    if config.attribute_limits is not None:
+        _logger.warning(
+            "Top-level attribute_limits are only applied to spans (via "
+            "SpanLimits); the Python SDK LoggerProvider and MeterProvider "
+            "constructors do not accept attribute limits, so they are ignored "
+            "for logs and metrics."
+        )
+
     resource = create_resource(config.resource)
-    configure_tracer_provider(config.tracer_provider, resource)
+    configure_tracer_provider(config.tracer_provider, resource, config.attribute_limits)
     configure_meter_provider(config.meter_provider, resource)
     configure_logger_provider(config.logger_provider, resource)
     configure_propagator(config.propagator)
