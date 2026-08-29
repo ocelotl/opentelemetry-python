@@ -175,6 +175,32 @@ class Logger(ABC):
     ) -> None:
         """Emits a :class:`LogRecord` representing a log to the processing pipeline."""
 
+    def enabled(
+        self,
+        context: Context | None = None,
+        severity_number: SeverityNumber | None = None,
+        event_name: str | None = None,
+    ) -> bool:
+        """Returns whether this `Logger` is enabled for the given arguments.
+
+        This is an optional performance optimization that lets callers avoid
+        the cost of constructing a :class:`LogRecord` when it would not be
+        processed. A returned value of ``True`` means the `Logger` is enabled
+        for the provided arguments; a returned value of ``False`` means the
+        `Logger` is disabled for them.
+
+        The parameters mirror the spec's ``EnabledParameters``:
+
+        Args:
+            context: The context associated with the log record.
+            severity_number: The severity number of the log record.
+            event_name: The event name of the log record.
+
+        The default implementation returns ``False``, matching the behavior of
+        the no-op API where no log records are ever emitted.
+        """
+        return False
+
 
 class NoOpLogger(Logger):
     """The default Logger used when no Logger implementation is available.
@@ -299,6 +325,18 @@ class ProxyLogger(Logger):
                 event_name=event_name,
                 exception=exception,
             )
+
+    def enabled(
+        self,
+        context: Context | None = None,
+        severity_number: SeverityNumber | None = None,
+        event_name: str | None = None,
+    ) -> bool:
+        return self._logger.enabled(
+            context=context,
+            severity_number=severity_number,
+            event_name=event_name,
+        )
 
 
 class LoggerProvider(ABC):
