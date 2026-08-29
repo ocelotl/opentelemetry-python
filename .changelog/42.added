@@ -1,0 +1,2 @@
+`LoggerProvider` now accepts a `limits` argument (a `LogRecordLimits`) that bounds the
+number and value length of log-record attributes, mirroring `SpanLimits` on `TracerProvider`
