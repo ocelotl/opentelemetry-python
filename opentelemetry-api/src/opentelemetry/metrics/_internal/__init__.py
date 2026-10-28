@@ -55,6 +55,7 @@ from opentelemetry.metrics._internal.instrument import (
     ObservableGauge,
     ObservableUpDownCounter,
     UpDownCounter,
+    _attributes_advisory_kwargs,
     _MetricsAdvisory,
     _ProxyCounter,
     _ProxyGauge,
@@ -63,7 +64,6 @@ from opentelemetry.metrics._internal.instrument import (
     _ProxyObservableGauge,
     _ProxyObservableUpDownCounter,
     _ProxyUpDownCounter,
-    _attributes_advisory_kwargs,
     _validate_attributes_advisory,
     _validate_explicit_bucket_boundaries_advisory,
 )

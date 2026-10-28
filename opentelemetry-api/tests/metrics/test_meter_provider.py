@@ -4,6 +4,7 @@
 
 # pylint: disable=protected-access
 
+from collections.abc import Sequence
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
@@ -13,8 +14,24 @@ import opentelemetry.metrics._internal as metrics_internal
 from opentelemetry import metrics
 from opentelemetry.environment_variables import OTEL_PYTHON_METER_PROVIDER
 from opentelemetry.metrics import (
+    CallbackT,
+    Counter,
+    Histogram,
+    Meter,
+    NoOpCounter,
+    NoOpHistogram,
     NoOpMeter,
     NoOpMeterProvider,
+    NoOpObservableCounter,
+    NoOpObservableGauge,
+    NoOpObservableUpDownCounter,
+    NoOpUpDownCounter,
+    ObservableCounter,
+    ObservableGauge,
+    ObservableUpDownCounter,
+    UpDownCounter,
+    _Gauge,
+    _NoOpGauge,
     get_meter_provider,
     set_meter_provider,
 )
@@ -36,6 +53,7 @@ from opentelemetry.test.globals_test import (
     MetricsGlobalsTest,
     reset_metrics_globals,
 )
+from opentelemetry.util.types import Attributes
 
 # FIXME Test that the instrument methods can be called concurrently safely.
 
@@ -146,6 +164,78 @@ class TestGetMeter(TestCase):
         self.assertEqual(meter.name, "name")
         self.assertEqual(meter.version, "version")
         self.assertEqual(meter.schema_url, "schema_url")
+
+
+class _MeterPredatingAttributesAdvisory(NoOpMeter):
+    """A `Meter` whose creation methods carry the signatures they had before
+    `_attributes_advisory` was introduced. Differing from the current
+    signatures is the whole point of this class, so `arguments-differ` is
+    disabled for it.
+    """
+
+    # pylint: disable=arguments-differ
+
+    def create_counter(self, name: str, unit: str = "", description: str = "") -> Counter:
+        return super().create_counter(name, unit=unit, description=description)
+
+    def create_up_down_counter(self, name: str, unit: str = "", description: str = "") -> UpDownCounter:
+        return super().create_up_down_counter(name, unit=unit, description=description)
+
+    def create_histogram(
+        self,
+        name: str,
+        unit: str = "",
+        description: str = "",
+        *,
+        explicit_bucket_boundaries_advisory: Sequence[float] | None = None,
+    ) -> Histogram:
+        return super().create_histogram(
+            name,
+            unit=unit,
+            description=description,
+            explicit_bucket_boundaries_advisory=explicit_bucket_boundaries_advisory,
+        )
+
+    def create_gauge(self, name: str, unit: str = "", description: str = "") -> _Gauge:
+        return super().create_gauge(name, unit=unit, description=description)
+
+    def create_observable_counter(
+        self,
+        name: str,
+        callbacks: Sequence[CallbackT] | None = None,
+        unit: str = "",
+        description: str = "",
+    ) -> ObservableCounter:
+        return super().create_observable_counter(name, callbacks, unit=unit, description=description)
+
+    def create_observable_up_down_counter(
+        self,
+        name: str,
+        callbacks: Sequence[CallbackT] | None = None,
+        unit: str = "",
+        description: str = "",
+    ) -> ObservableUpDownCounter:
+        return super().create_observable_up_down_counter(name, callbacks, unit=unit, description=description)
+
+    def create_observable_gauge(
+        self,
+        name: str,
+        callbacks: Sequence[CallbackT] | None = None,
+        unit: str = "",
+        description: str = "",
+    ) -> ObservableGauge:
+        return super().create_observable_gauge(name, callbacks, unit=unit, description=description)
+
+
+class _MeterProviderPredatingAttributesAdvisory(NoOpMeterProvider):
+    def get_meter(
+        self,
+        name: str,
+        version: str | None = None,
+        schema_url: str | None = None,
+        attributes: Attributes = None,
+    ) -> Meter:
+        return _MeterPredatingAttributesAdvisory(name, version=version, schema_url=schema_url)
 
 
 class TestProxy(MetricsGlobalsTest, TestCase):
@@ -299,3 +389,60 @@ class TestProxy(MetricsGlobalsTest, TestCase):
             real_meter.create_observable_up_down_counter(),
         )
         self.assertIs(observable_gauge, real_meter.create_observable_gauge())
+
+    def test_proxy_meter_with_meter_predating_attributes_advisory(self) -> None:
+        """A `Meter` implemented outside this repository is not required to
+        accept the private `_attributes_advisory` parameter, so the proxy must
+        not pass it when the caller asked for no advisory. Both the instruments
+        backed by the real meter once it is set and the instruments created
+        afterwards go through the real meter, by different code paths.
+        """
+        proxy_meter_provider = _ProxyMeterProvider()
+        proxy_meter: _ProxyMeter = proxy_meter_provider.get_meter("foo")
+
+        callback = Mock()
+        proxy_meter.create_counter("counter")
+        proxy_meter.create_up_down_counter("updowncounter")
+        proxy_meter.create_histogram("histogram")
+        proxy_meter.create_gauge("gauge")
+        proxy_meter.create_observable_counter("observablecounter", callbacks=[callback])
+        proxy_meter.create_observable_up_down_counter("observableupdowncounter", callbacks=[callback])
+        proxy_meter.create_observable_gauge("observablegauge", callbacks=[callback])
+
+        proxy_meter_provider.on_set_meter_provider(_MeterProviderPredatingAttributesAdvisory())
+
+        self.assertIsInstance(proxy_meter.create_counter("counter2"), NoOpCounter)
+        self.assertIsInstance(proxy_meter.create_up_down_counter("updowncounter2"), NoOpUpDownCounter)
+        self.assertIsInstance(proxy_meter.create_histogram("histogram2"), NoOpHistogram)
+        self.assertIsInstance(proxy_meter.create_gauge("gauge2"), _NoOpGauge)
+        self.assertIsInstance(
+            proxy_meter.create_observable_counter("observablecounter2", callbacks=[callback]),
+            NoOpObservableCounter,
+        )
+        self.assertIsInstance(
+            proxy_meter.create_observable_up_down_counter("observableupdowncounter2", callbacks=[callback]),
+            NoOpObservableUpDownCounter,
+        )
+        self.assertIsInstance(
+            proxy_meter.create_observable_gauge("observablegauge2", callbacks=[callback]),
+            NoOpObservableGauge,
+        )
+
+    def test_proxy_meter_forwards_attributes_advisory_when_set(self) -> None:
+        """The parameter reaches the real meter whenever the caller provides
+        one, both for an instrument backed by the real meter once it is set and
+        for an instrument created afterwards.
+        """
+        advisory = ["label"]
+        proxy_meter_provider = _ProxyMeterProvider()
+        proxy_meter: _ProxyMeter = proxy_meter_provider.get_meter("foo")
+        self.assertIsInstance(proxy_meter, _ProxyMeter)
+        proxy_meter.create_counter("counter", _attributes_advisory=advisory)
+
+        real_meter_provider = Mock()
+        proxy_meter_provider.on_set_meter_provider(real_meter_provider)
+        real_meter: Mock = real_meter_provider.get_meter()
+        real_meter.create_counter.assert_called_once_with("counter", "", "", _attributes_advisory=advisory)
+
+        proxy_meter.create_gauge("gauge", _attributes_advisory=advisory)
+        real_meter.create_gauge.assert_called_once_with("gauge", "", "", _attributes_advisory=advisory)
