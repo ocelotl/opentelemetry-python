@@ -63,6 +63,7 @@ from opentelemetry.metrics._internal.instrument import (
     _ProxyObservableGauge,
     _ProxyObservableUpDownCounter,
     _ProxyUpDownCounter,
+    _attributes_advisory_kwargs,
     _validate_attributes_advisory,
     _validate_explicit_bucket_boundaries_advisory,
 )
@@ -586,7 +587,7 @@ class _ProxyMeter(Meter):
                     name,
                     unit,
                     description,
-                    _attributes_advisory=_attributes_advisory,
+                    **_attributes_advisory_kwargs(_attributes_advisory),
                 )
             proxy = _ProxyCounter(
                 name,
@@ -611,7 +612,7 @@ class _ProxyMeter(Meter):
                     name,
                     unit,
                     description,
-                    _attributes_advisory=_attributes_advisory,
+                    **_attributes_advisory_kwargs(_attributes_advisory),
                 )
             proxy = _ProxyUpDownCounter(
                 name,
@@ -638,7 +639,7 @@ class _ProxyMeter(Meter):
                     callbacks,
                     unit,
                     description,
-                    _attributes_advisory=_attributes_advisory,
+                    **_attributes_advisory_kwargs(_attributes_advisory),
                 )
             proxy = _ProxyObservableCounter(
                 name,
@@ -666,7 +667,7 @@ class _ProxyMeter(Meter):
                     unit,
                     description,
                     explicit_bucket_boundaries_advisory=explicit_bucket_boundaries_advisory,
-                    _attributes_advisory=_attributes_advisory,
+                    **_attributes_advisory_kwargs(_attributes_advisory),
                 )
             proxy = _ProxyHistogram(
                 name,
@@ -692,7 +693,7 @@ class _ProxyMeter(Meter):
                     name,
                     unit,
                     description,
-                    _attributes_advisory=_attributes_advisory,
+                    **_attributes_advisory_kwargs(_attributes_advisory),
                 )
             proxy = _ProxyGauge(
                 name,
@@ -719,7 +720,7 @@ class _ProxyMeter(Meter):
                     callbacks,
                     unit,
                     description,
-                    _attributes_advisory=_attributes_advisory,
+                    **_attributes_advisory_kwargs(_attributes_advisory),
                 )
             proxy = _ProxyObservableGauge(
                 name,
@@ -747,7 +748,7 @@ class _ProxyMeter(Meter):
                     callbacks,
                     unit,
                     description,
-                    _attributes_advisory=_attributes_advisory,
+                    **_attributes_advisory_kwargs(_attributes_advisory),
                 )
             proxy = _ProxyObservableUpDownCounter(
                 name,

@@ -74,6 +74,24 @@ def _validate_explicit_bucket_boundaries_advisory(
     return None
 
 
+def _attributes_advisory_kwargs(
+    attributes_advisory: Sequence[str] | None,
+) -> dict[str, Sequence[str]]:
+    """Returns the keyword arguments that forward the attributes advisory to a
+    `Meter`, empty when there is no advisory.
+
+    `_attributes_advisory` is a private parameter that a `Meter` implementation
+    outside this repository is not required to accept, so forwarding it
+    unconditionally would raise `TypeError` for callers that never asked for an
+    advisory. Omitting the keyword keeps those callers working and limits the
+    error to callers that opted into the parameter.
+    """
+
+    if attributes_advisory is None:
+        return {}
+    return {"_attributes_advisory": attributes_advisory}
+
+
 @dataclass(frozen=True)
 class CallbackOptions:
     """Options for the callback
@@ -273,7 +291,7 @@ class _ProxyCounter(_ProxyInstrument[Counter], Counter):
             self._name,
             self._unit,
             self._description,
-            _attributes_advisory=self._attributes_advisory,
+            **_attributes_advisory_kwargs(self._attributes_advisory),
         )
 
 
@@ -343,7 +361,7 @@ class _ProxyUpDownCounter(_ProxyInstrument[UpDownCounter], UpDownCounter):
             self._name,
             self._unit,
             self._description,
-            _attributes_advisory=self._attributes_advisory,
+            **_attributes_advisory_kwargs(self._attributes_advisory),
         )
 
 
@@ -381,7 +399,7 @@ class _ProxyObservableCounter(_ProxyAsynchronousInstrument[ObservableCounter], O
             self._callbacks,
             self._unit,
             self._description,
-            _attributes_advisory=self._attributes_advisory,
+            **_attributes_advisory_kwargs(self._attributes_advisory),
         )
 
 
@@ -423,7 +441,7 @@ class _ProxyObservableUpDownCounter(
             self._callbacks,
             self._unit,
             self._description,
-            _attributes_advisory=self._attributes_advisory,
+            **_attributes_advisory_kwargs(self._attributes_advisory),
         )
 
 
@@ -530,7 +548,7 @@ class _ProxyHistogram(_ProxyInstrument[Histogram], Histogram):
             self._unit,
             self._description,
             explicit_bucket_boundaries_advisory=self._explicit_bucket_boundaries_advisory,
-            _attributes_advisory=self._attributes_advisory,
+            **_attributes_advisory_kwargs(self._attributes_advisory),
         )
 
 
@@ -572,7 +590,7 @@ class _ProxyObservableGauge(
             self._callbacks,
             self._unit,
             self._description,
-            _attributes_advisory=self._attributes_advisory,
+            **_attributes_advisory_kwargs(self._attributes_advisory),
         )
 
 
@@ -645,5 +663,5 @@ class _ProxyGauge(
             self._name,
             self._unit,
             self._description,
-            _attributes_advisory=self._attributes_advisory,
+            **_attributes_advisory_kwargs(self._attributes_advisory),
         )
