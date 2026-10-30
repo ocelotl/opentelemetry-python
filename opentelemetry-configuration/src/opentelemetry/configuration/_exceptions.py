@@ -7,10 +7,11 @@ Every error this package raises itself is a ``ConfigurationError`` or a
 subclass of it. That is not the whole set a caller sees, because an SDK
 constructor or a plugin reached through the configuration raises its own
 exceptions and nothing here translates them: a resource attribute whose
-value does not fit its declared type raises ``ValueError``, a dataclass
-handed an unknown key raises ``TypeError``, a view with an empty
-selector raises a bare ``Exception``, and a Prometheus reader on a bound
-port raises ``OSError``. A caller that wants to survive any bad
+value does not fit its declared type raises ``ValueError``, a plugin
+component handed a configuration mapping its constructor does not accept
+raises ``TypeError``, a view with an empty selector raises a bare
+``Exception``, and a Prometheus reader on a bound port raises
+``OSError``. A caller that wants to survive any bad
 configuration file has to catch more than ``ConfigurationError``.
 
 ``MissingDependencyError`` is the subclass raised when the configuration
