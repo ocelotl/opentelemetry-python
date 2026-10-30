@@ -31,11 +31,12 @@ class NodeEndpoint:
     The service name is not a parameter. It is read once, at construction
     time, from the resource of the globally registered tracer provider, or
     from a freshly created ``Resource`` when that provider carries none. The
-    exporter then overwrites it at the start of every export, with the service
-    name taken from the resource of the first span of that batch, whenever
-    that span carries one. The value sampled here is therefore used only until
-    the first batch that carries a service name, and each later batch is sent
-    under the service name of its own first span.
+    exporter then overwrites it at the start of every non-empty export, with
+    the service name taken from the resource of the first span of that batch,
+    whenever that span carries one. The value sampled here is therefore used
+    only until the first batch whose first span carries a service name, and
+    every batch after that is sent under the most recent such name, including
+    an empty batch and a batch whose first span carries none.
 
     Args:
         ipv4: Primary IPv4 address associated with this connection.
@@ -46,6 +47,9 @@ class NodeEndpoint:
     Raises:
         ValueError: If ``ipv4`` does not parse as an IPv4 address, or if
             ``ipv6`` does not parse as an IPv6 address.
+        KeyError: If the resource of the globally registered tracer provider
+            carries no ``service.name`` attribute, since the service name is
+            read from that resource with a plain subscript.
     """
 
     def __init__(

@@ -325,8 +325,10 @@ class Encoder(abc.ABC):
         The scope name and version are written under both ``otel.scope.name``
         and ``otel.scope.version`` and the older ``otel.library.name`` and
         ``otel.library.version``. These four bypass the stringification and
-        the truncation that the attribute groups go through, so a scope with
-        no version records a ``None`` value rather than a string.
+        the truncation that the attribute groups go through, so a scope name
+        or version longer than ``max_tag_value_length`` reaches the payload
+        at its full length while every attribute value was cut to that
+        limit.
 
         ``otel.status_code`` is written only when the status is not UNSET, and
         ``error`` is added alongside it when the status is ERROR, holding the

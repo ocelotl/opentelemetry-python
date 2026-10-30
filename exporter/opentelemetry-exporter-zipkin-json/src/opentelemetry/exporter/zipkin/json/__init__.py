@@ -124,6 +124,9 @@ class ZipkinExporter(SpanExporter):
     Raises:
         ValueError: If ``local_node_ipv4`` or ``local_node_ipv6`` does not
             parse as an address of the matching family.
+        KeyError: If the resource of the globally registered tracer provider
+            carries no ``service.name`` attribute, which ``NodeEndpoint``
+            reads with a plain subscript.
     """
 
     def __init__(
