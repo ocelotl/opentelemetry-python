@@ -380,7 +380,9 @@ def _extract_first_element(
     Returns:
         The first element, or ``None`` when ``items`` is ``None`` or has no
         element. The two cases are not distinguished, because both callers
-        treat an absent key and an empty value the same way.
+        treat an absent key and an empty sequence of values the same way. A
+        key present with the empty string is neither case, since the getter
+        reports it as a sequence of one element.
     """
     if items is None:
         return None
