@@ -3,13 +3,17 @@
 
 """Self-observability instruments for the OTLP exporters.
 
-An OTLP exporter wraps each export attempt in the context manager returned by
-``ExporterMetricsT.export_operation`` and records three instruments defined by
-the semantic conventions: an up-down counter of the telemetry handed to the
+An OTLP exporter wraps each export operation in the context manager returned
+by ``ExporterMetricsT.export_operation`` and records three instruments defined
+by the semantic conventions: an up-down counter of the telemetry handed to the
 exporter but not yet exported, a counter of the telemetry whose export has
 finished whether it succeeded or failed, and a histogram of how long the
-attempt took in seconds. The instrument names depend on the signal, so a span
-exporter records ``otel.sdk.exporter.span.inflight`` and
+operation took in seconds. An export operation is the delivery of one batch
+from the moment the exporter receives it to the moment it succeeds or gives up,
+so an exporter that retries holds the ``with`` body open across every retry and
+every backoff wait between them, and each instrument is recorded once for the
+batch rather than once per request. The instrument names depend on the
+signal, so a span exporter records ``otel.sdk.exporter.span.inflight`` and
 ``otel.sdk.exporter.span.exported`` while a metric exporter records
 ``otel.sdk.exporter.metric_data_point.inflight`` and
 ``otel.sdk.exporter.metric_data_point.exported``. The duration histogram is
@@ -71,16 +75,16 @@ _GRPC_COMPONENT_TYPES = frozenset(
 
 @dataclass
 class ExportResult:
-    """How an export attempt ended, as reported back by the exporter.
+    """How an export operation ended, as reported back by the exporter.
 
     ``export_operation`` yields a fresh instance with both fields left at their
-    defaults, which means the attempt succeeded. An exporter that fails sets
-    one or both fields before the ``with`` block ends, and the values are read
-    once the block exits.
+    defaults, which means the export operation succeeded. An exporter that
+    fails sets one or both fields before the ``with`` block ends, and the
+    values are read once the block exits.
 
     Attributes:
-        error: The exception that ended the attempt, or ``None`` when it
-            succeeded. When it is set, the qualified name of its type is
+        error: The exception that ended the export operation, or ``None`` when
+            it succeeded. When it is set, the qualified name of its type is
             recorded as the ``error.type`` attribute on the exported counter
             and on the duration histogram.
         error_attrs: Extra attributes recorded on the duration histogram only,
@@ -104,16 +108,16 @@ class ExporterMetricsT(Protocol):
     """
 
     def export_operation(self, num_items: int) -> AbstractContextManager[ExportResult]:
-        """Return a context manager that covers one export attempt.
+        """Return a context manager that covers one export operation.
 
-        The exporter runs the attempt inside the ``with`` body and reports the
-        outcome by assigning to the fields of the ``ExportResult`` the context
-        manager yields. The implementation reads those fields once the body has
-        ended.
+        The exporter runs the whole export operation inside the ``with`` body,
+        every retry and every backoff wait included, and reports the outcome by
+        assigning to the fields of the ``ExportResult`` the context manager
+        yields. The implementation reads those fields once the body has ended.
 
         Args:
             num_items: How many spans, log records or metric data points the
-                attempt covers.
+                export operation covers.
 
         Returns:
             A context manager yielding the ``ExportResult`` the exporter fills
@@ -134,12 +138,13 @@ class NoOpExporterMetrics:
     @contextmanager
     # pylint: disable-next=no-self-use
     def export_operation(self, num_items: int) -> Iterator[ExportResult]:
-        """Yield a discarded ``ExportResult`` around an export attempt.
+        """Yield a discarded ``ExportResult`` around an export operation.
 
         Args:
             num_items: How many spans, log records or metric data points the
-                attempt covers. It is accepted so that the signature matches
-                ``ExporterMetricsT.export_operation`` and is otherwise unused.
+                export operation covers. It is accepted so that the signature
+                matches ``ExporterMetricsT.export_operation`` and is otherwise
+                unused.
 
         Yields:
             A fresh ``ExportResult``. Whatever the caller assigns to its fields
@@ -152,7 +157,7 @@ class ExporterMetrics:
     """Records the self-observability instruments of one OTLP exporter.
 
     The instruments are created once, when the instance is, and every export
-    attempt reuses them. Each recording carries ``otel.component.type`` and
+    operation reuses them. Each recording carries ``otel.component.type`` and
     ``otel.component.name``, plus ``server.address`` and ``server.port`` when
     the endpoint supplied enough information to determine them.
 
@@ -242,7 +247,7 @@ class ExporterMetrics:
 
     @contextmanager
     def export_operation(self, num_items: int) -> Iterator[ExportResult]:
-        """Record one export attempt across the three instruments.
+        """Record one export operation across the three instruments.
 
         Entering the context manager adds ``num_items`` to the inflight
         up-down counter. Leaving it subtracts the same amount, adds
@@ -251,18 +256,23 @@ class ExporterMetrics:
         happens in a ``finally`` block, so an exception that propagates out of
         the ``with`` body still leaves the inflight counter balanced.
 
+        The exporter holds the ``with`` body open for the whole export
+        operation, so a retried export stays in the inflight counter across
+        every retry and every backoff wait, and reaches the exported counter
+        only after the last retry has ended.
+
         An exception that propagates out of the ``with`` body is not inspected.
-        The attempt counts as a failure only when the caller assigns to the
-        ``error`` field of the yielded ``ExportResult``, so an exporter that
-        lets an exception escape without assigning to that field records the
-        attempt as a success.
+        The export operation counts as a failure only when the caller assigns
+        to the ``error`` field of the yielded ``ExportResult``, so an exporter
+        that lets an exception escape without assigning to that field records
+        the export operation as a success.
 
         Args:
             num_items: How many spans, log records or metric data points the
-                attempt covers. It is added to the inflight counter on entry,
-                subtracted on exit and added to the exported counter, so the
-                same number is counted as exported whether the attempt
-                succeeded or failed.
+                export operation covers. It is added to the inflight counter on
+                entry, subtracted on exit and added to the exported counter, so
+                the same number is counted as exported whether the export
+                operation succeeded or failed.
 
         Yields:
             An ``ExportResult`` whose fields the caller sets to report a
