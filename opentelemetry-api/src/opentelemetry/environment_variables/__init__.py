@@ -1,12 +1,15 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Names of the environment variables the API reads.
+"""Names of the ``OTEL_*`` environment variables the API package defines.
 
-Each name in this module is the name of an ``OTEL_*`` environment variable,
-bound to a constant so that code refers to the variable by symbol rather than
-by a repeated string literal. Variables read only by the SDK live in
-:mod:`opentelemetry.sdk.environment_variables` instead.
+Each name in this module is bound to a constant so that code refers to the
+environment variable by symbol rather than by a repeated string literal.
+Defining a name here does not mean the API reads it: ``OTEL_LOGS_EXPORTER``,
+``OTEL_METRICS_EXPORTER``, ``OTEL_TRACES_EXPORTER`` and
+``OTEL_PYTHON_ID_GENERATOR`` are defined here and read only by
+``opentelemetry.sdk._configuration``. The environment variables the SDK both
+defines and reads live in :mod:`opentelemetry.sdk.environment_variables`.
 """
 
 OTEL_LOGS_EXPORTER = "OTEL_LOGS_EXPORTER"
