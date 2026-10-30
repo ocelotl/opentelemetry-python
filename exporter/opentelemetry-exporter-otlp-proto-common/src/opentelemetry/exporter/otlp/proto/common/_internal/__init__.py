@@ -196,9 +196,9 @@ def _encode_attributes(attributes: Attributes) -> list[PB2KeyValue]:
     failing the export: the exception is logged at ``ERROR`` with its traceback
     and the key that caused it, and the remaining attributes are still encoded.
     That covers both causes, a value of a type the protocol has no field for and
-    a key that is not a string. An attribute dropped here is counted nowhere. The count of
-    attributes the SDK itself dropped is a separate number, which only the span,
-    span event, span link and log record encoders copy into the
+    a key that is not a string. An attribute dropped here is counted nowhere.
+    The count of attributes the SDK itself dropped is a separate number, which
+    only the span, span event, span link and log record encoders copy into the
     ``dropped_attributes_count`` field of the message they build;
     ``_encode_instrumentation_scope`` and ``_encode_resource`` leave that field
     at 0, and no metric data point message defines it.
