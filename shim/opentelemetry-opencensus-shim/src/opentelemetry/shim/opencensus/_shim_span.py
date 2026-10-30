@@ -167,8 +167,11 @@ class ShimSpan(wrapt.ObjectProxy):
     def add_message_event(self, message_event: MessageEvent):
         """Record an OpenCensus message event as an OpenTelemetry span event.
 
-        The name of the event is the string form of ``message_event.id`` and its timestamp is the
-        one the message event carries. The type and the two sizes become the attributes
+        The name of the event is the string form of ``message_event.id``. Its timestamp comes from
+        ``message_event.timestamp`` through ``_opencensus_time_to_nanos``, so it is displaced by
+        the local UTC offset exactly as that function documents, and it matches the instant the
+        message event carries only on a process whose timezone is UTC. The type and the two sizes
+        become the attributes
         ``message.event.type``, ``message.event.size.uncompressed`` and
         ``message.event.size.compressed``, the names the OpenCensus shim of opentelemetry-java
         uses. A size that is ``None`` contributes no attribute. The type attribute is the name of
@@ -249,7 +252,9 @@ class ShimSpan(wrapt.ObjectProxy):
 
         The description is passed on, but OpenTelemetry keeps a description only on an ``ERROR``
         status, so a description accompanying an ``OK`` OpenCensus status is dropped, with a
-        warning from the OpenTelemetry API.
+        warning from the OpenTelemetry API. A non-recording span, which is what the shim holds
+        while no OpenTelemetry tracer provider has been set, drops the whole status with no
+        warning at all.
 
         Args:
             status: The OpenCensus ``Status`` to translate. Its ``is_ok`` property chooses between
