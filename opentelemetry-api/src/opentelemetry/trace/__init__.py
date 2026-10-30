@@ -818,9 +818,10 @@ def use_span(
 
     Raises:
         Exception: Re-raises whatever the block raised, after recording it on
-            the span. An exception inheriting directly from
-            :exc:`BaseException`, such as :exc:`GeneratorExit`, passes through
-            without being recorded, because it does not signal an error.
+            the span when the span is recording and ``record_exception`` is
+            true. An exception inheriting directly from :exc:`BaseException`,
+            such as :exc:`GeneratorExit`, passes through without being
+            recorded, because it does not signal an error.
     """
     try:
         token = context_api.attach(context_api.set_value(_SPAN_KEY, span))
