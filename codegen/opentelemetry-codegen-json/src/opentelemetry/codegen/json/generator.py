@@ -10,18 +10,18 @@ source destined for the ``opentelemetry-proto-json`` distribution, where it is c
 ``AUTO-GENERATED`` header and must not be edited by hand. Changing the shape of the generated code
 means changing the code here and regenerating, which ``scripts/proto_codegen_json.sh`` does.
 
-``OtlpJsonGenerator`` holds the whole translation. ``generate_code`` and
-``generate_plugin_response`` wrap it for the two callers that exist: the tests, which want the
-mapping from output path to source text, and ``opentelemetry.codegen.json.plugin``, which wants a
-``CodeGeneratorResponse`` to hand back to ``protoc``.
+``OtlpJsonGenerator`` holds the whole translation. ``generate_plugin_response`` is what
+``opentelemetry.codegen.json.plugin`` calls, and it turns the generator's output into the
+``CodeGeneratorResponse`` that ``protoc`` reads back. ``generate_code`` is the inner form it is
+built from, returning a plain mapping from output path to source text.
 
 The output layout mirrors the input layout. A ``package_transform`` callable rewrites each
-``.proto`` path, by default replacing the ``opentelemetry/proto/`` prefix with
+``.proto`` path, by default replacing the substring ``opentelemetry/proto/`` with
 ``opentelemetry/proto_json/``, and the longest directory prefix shared by every transformed path
-becomes the common root. Three things are written at that common root rather than per proto file:
+becomes the common root. Two things are written at that common root rather than per proto file:
 ``_json_codec.py``, copied verbatim from
 ``opentelemetry.codegen.json.runtime.json_codec``, and ``version/__init__.py``, holding
-``__version__``. An empty ``__init__.py`` is then added to every directory that contains a
+``__version__``. An empty ``__init__.py`` is then added to every ancestor directory of a
 generated file, apart from the ``opentelemetry`` namespace directory itself.
 """
 
@@ -62,8 +62,9 @@ class OtlpJsonGenerator:
     in a generated file may name a type defined in one of those. Generation itself happens in
     ``generate_all``.
 
-    An instance produces source text only. Writing files is left to the caller, which is
-    ``opentelemetry.codegen.json.plugin`` by way of ``generate_plugin_response``.
+    An instance produces source text only, and nothing here touches the filesystem except to read
+    the codec module. ``protoc`` is what writes the files, from the response that
+    ``opentelemetry.codegen.json.plugin`` hands back to it.
 
     Args:
         request: The ``CodeGeneratorRequest`` that ``protoc`` wrote to the plugin's standard input.
@@ -665,7 +666,8 @@ class OtlpJsonGenerator:
         Returns:
             A Python expression that evaluates to the JSON form of the value. For a type that
             needs no conversion, such as a string or a 32-bit integer, this is ``var_name``
-            unchanged, which the caller takes as a signal that it can assign the field directly.
+            unchanged. On the repeated branch the caller compares the result against ``var_name``
+            to decide whether the list needs a mapping call at all.
         """
         codec = self._get_codec_module_path()
         if field_desc.type == descriptor.FieldDescriptorProto.TYPE_MESSAGE:
@@ -962,14 +964,15 @@ def generate_code(
     """
     Main entry point for code generation.
 
-    This is the form the tests use, since a mapping from path to source is easier to assert
-    against than a protobuf response message. ``generate_plugin_response`` wraps it for ``protoc``.
+    ``generate_plugin_response`` is the only caller. This form exists because a mapping from path
+    to source is easier to read and to assert against than a protobuf response message.
 
     Args:
         request: Protobuf compiler plugin request
         package_transform: Rewrites a ``.proto`` path into the path of the Python file to generate
-            from it. The default replaces the ``opentelemetry/proto/`` prefix with
-            ``opentelemetry/proto_json/`` and leaves any other path alone.
+            from it. The default substitutes ``opentelemetry/proto_json/`` for
+            ``opentelemetry/proto/`` wherever that substring occurs, and leaves a path that does
+            not contain it alone.
 
     Returns:
         Dictionary mapping output file paths to generated code. Besides one entry per file in
@@ -995,8 +998,9 @@ def generate_plugin_response(
     Args:
         request: Protobuf compiler plugin request
         package_transform: Rewrites a ``.proto`` path into the path of the Python file to generate
-            from it. The default replaces the ``opentelemetry/proto/`` prefix with
-            ``opentelemetry/proto_json/`` and leaves any other path alone.
+            from it. The default substitutes ``opentelemetry/proto_json/`` for
+            ``opentelemetry/proto/`` wherever that substring occurs, and leaves a path that does
+            not contain it alone.
 
     Returns:
         Plugin response with generated files, ready for ``protoc`` to write to disk.
