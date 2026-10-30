@@ -353,8 +353,11 @@ def _map_compression(
 
     Returns:
         The enum member for ``value``, or ``None`` when ``value`` is ``None``
-        or ``"none"``. Both cases disable compression at the exporter, so an
-        explicit ``compression: none`` and an absent field behave alike.
+        or ``"none"``. The two cases are indistinguishable to the exporter,
+        which reads ``None`` as "consult the environment", so an explicit
+        ``compression: none`` disables compression only when
+        ``OTEL_EXPORTER_OTLP_COMPRESSION`` and its signal-specific variant
+        are both unset.
 
     Raises:
         ConfigurationError: If ``value`` is anything else, including
