@@ -220,8 +220,8 @@ def _resolve_endpoint(
     A per-signal endpoint is used exactly as given, because the OTLP
     specification requires it to already name the signal path. A
     signal-independent endpoint is a base URL instead, so ``default_path`` is
-    appended to it, after one trailing slash is removed so that the result
-    never contains a doubled separator.
+    appended to it, after exactly one trailing slash is removed. A base URL
+    ending in more than one slash therefore still produces a doubled separator.
 
     Args:
         endpoint_env_var: Name of the per-signal endpoint variable, such as
