@@ -161,10 +161,13 @@ class ZipkinExporter(SpanExporter):
         """Encode a batch of spans and POST it to the Zipkin collector.
 
         The call blocks until the collector answers or the timeout expires.
-        The service name of the local node is taken from the resource of the
-        first span of the batch, overwriting whatever the constructor read
-        from the tracer provider, on the assumption that a span processor
-        serves a single tracer provider and so a batch cannot mix resources.
+        The service name of the local node is replaced, at the start of every
+        non-empty export, with the one on the resource of the first span of
+        that batch, whenever that span carries one. Otherwise the value held
+        from before is kept, which for the first export is the one sampled
+        when the exporter was built. Reading only the first span rests on the
+        assumption that a span processor serves a single tracer provider and
+        so a batch cannot mix resources.
 
         Failures are reported through the return value and logged on the
         ``opentelemetry.exporter.zipkin.json`` logger. A transport failure is

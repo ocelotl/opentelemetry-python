@@ -184,8 +184,16 @@ class Encoder(abc.ABC):
                 ``SpanContext`` is treated as absent.
 
         Returns:
-            The parent span id, or ``None`` when the span has no parent. The
-            encoders omit the ``parentId`` field when this is ``None``.
+            The parent span id, or ``None`` when the argument is a
+            ``SpanContext`` of a root span or is neither a ``Span`` nor a
+            ``SpanContext``. The encoders omit the ``parentId`` field when
+            this is ``None``.
+
+        Raises:
+            AttributeError: If the argument is a ``Span`` whose ``parent`` is
+                ``None``, since that branch reads ``span.parent.span_id``
+                without guarding. Both encoders pass ``span.parent`` rather
+                than the span, so they never reach this.
         """
         if isinstance(span_context, Span):
             parent_id = span_context.parent.span_id
@@ -268,8 +276,8 @@ class Encoder(abc.ABC):
             The JSON array, or ``None`` when ``max_tag_value_length`` is 1,
             since one character cannot hold even an empty array. The caller
             treats ``None`` as a failure to serialize and drops the tag with a
-            warning. Note that a sequence whose elements all exceed the limit
-            still returns ``"[]"``, which the caller keeps.
+            warning. A sequence whose elements all exceed the limit still
+            returns ``"[]"``, which the caller keeps.
         """
         if self.max_tag_value_length and self.max_tag_value_length == 1:
             return None
