@@ -981,8 +981,10 @@ def generate_code(
 
     Returns:
         Dictionary mapping output file paths to generated code. Besides one entry per file in
-        ``request.file_to_generate``, it holds ``_json_codec.py``, ``version/__init__.py`` and an
-        ``__init__.py`` for each directory involved. It is empty when ``file_to_generate`` is.
+        ``request.file_to_generate``, it holds ``_json_codec.py`` and ``version/__init__.py`` at
+        the common root, and an ``__init__.py`` for every ancestor directory of a generated file
+        apart from the ``opentelemetry`` namespace directory. It is empty when
+        ``file_to_generate`` is.
     """
     generator = OtlpJsonGenerator(request, package_transform, version="0.0.0")
     return generator.generate_all()
