@@ -192,6 +192,10 @@ nitpick_ignore = [
         "py:class",
         "opentelemetry.exporter.http.transport._base.BaseHTTPTransport",
     ),
+    (
+        "py:class",
+        "prometheus_client.registry.CollectorRegistry",
+    ),
 ]
 
 # Add any paths that contain templates here, relative to this directory.
