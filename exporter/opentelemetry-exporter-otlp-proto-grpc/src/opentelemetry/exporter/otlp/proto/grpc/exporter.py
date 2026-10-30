@@ -233,9 +233,15 @@ def _read_file(file_path: str) -> bytes | None:
 
     Returns:
         The bytes of the file, or ``None`` when the file does not exist. A
-        missing file is logged with its name rather than raised, so a
-        misconfigured path degrades to the default TLS credentials instead of
-        stopping the process.
+        path that does not exist is logged with its name rather than raised,
+        so it degrades to the default TLS credentials instead of stopping the
+        process.
+
+    Raises:
+        OSError: When the path exists and still cannot be read. Only
+            ``FileNotFoundError`` is caught, so ``PermissionError`` for a file
+            the process may not open and ``IsADirectoryError`` for a path that
+            names a directory both reach the caller.
     """
     try:
         with open(file_path, "rb") as file:
@@ -269,6 +275,10 @@ def _load_credentials(
         Channel credentials built from whichever of the three files was read.
         A path that does not exist is logged and treated as if it had not been
         given, so the result can be weaker than the caller asked for.
+
+    Raises:
+        OSError: When one of the paths exists and still cannot be read,
+            propagated from ``_read_file``.
     """
     root_certificates = _read_file(certificate_file) if certificate_file else None
     private_key = _read_file(client_key_file) if client_key_file else None
@@ -316,6 +326,8 @@ def _get_credentials(
         RuntimeError: When the credential provider environment variable names
             an entry point that is not installed, or names one whose return
             value is not a ``grpc.ChannelCredentials``.
+        OSError: When one of the certificate file paths exists and still
+            cannot be read, propagated from ``_load_credentials``.
     """
     if creds is not None:
         return creds
