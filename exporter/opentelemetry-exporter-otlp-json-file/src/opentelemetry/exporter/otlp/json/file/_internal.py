@@ -29,16 +29,20 @@ class _FileExporter(Generic[T]):
     shutdown. Giving ``stream`` hands over a stream that the caller keeps responsible for. Giving
     neither writes to ``sys.stdout``.
 
-    Writes are serialised with a lock, so two exporting threads sharing one destination cannot
-    interleave halves of their lines.
+    Concurrent calls to ``export`` on one instance are serialised with a lock, so two exporting
+    threads cannot interleave halves of their lines. The lock belongs to the instance, so two
+    instances pointed at the same file, or both left on ``sys.stdout``, do not coordinate with
+    each other.
 
     Args:
         encode: Turns one batch of telemetry into a JSON serialisable dictionary. Returning
             ``None`` means the batch held nothing worth writing, and the export then flushes
             without appending a line.
-        kind: Names the telemetry this exporter carries. It appears in the warnings and the export
-            failures, so that a reader of the logs can tell which of the three exporters emitted
-            them.
+        kind: Names the telemetry this exporter carries. It is interpolated into the warning
+            logged when the stream turns out to be closed and into the message logged when an
+            export fails, so that a reader of the logs can tell which of the three exporters
+            emitted them. The two warnings about an exporter that is already shut down do not
+            carry it.
         logger: Receives the warnings and the export failures. ``None`` selects the logger of this
             module, which is what a caller with no logger of its own wants.
         path: File to append to, opened with UTF-8 encoding. The file is created when it does not
