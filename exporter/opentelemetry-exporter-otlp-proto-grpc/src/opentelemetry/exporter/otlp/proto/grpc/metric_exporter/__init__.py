@@ -346,6 +346,10 @@ class OTLPMetricExporter(
     ) -> Iterable[MetricsData]:
         """Split a collection into chunks of at most ``max_export_batch_size`` data points.
 
+        The count is checked after each data point has been added, so a
+        ``max_export_batch_size`` below 1 yields one data point per chunk
+        rather than none.
+
         The resource and scope grouping is rebuilt in every chunk, so a metric
         whose data points fall on both sides of a chunk boundary appears in
         both chunks, each time carrying only the data points of that chunk. A
