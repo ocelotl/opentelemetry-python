@@ -183,6 +183,9 @@ class Span(abc.ABC):
         this method later since samplers can only consider information already
         present during span creation.
 
+        This method is not abstract and its own body only emits a warning, so
+        a span that inherits it records no link at all.
+
         Args:
             context: The span context to link to.
             attributes: Name/value pairs describing the link.
