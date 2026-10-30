@@ -107,8 +107,13 @@ def _resolve_headers(
     ``user-agent`` naming the exporter and its version), then the headers
     parsed from the per-signal environment variable or, when that is unset or
     empty, from ``OTEL_EXPORTER_OTLP_HEADERS``, then ``headers``. The
-    environment is parsed liberally, so a header value that is not URL encoded
-    is accepted rather than dropped with a warning.
+    environment is parsed liberally, which widens the accepted value syntax by
+    the space character alone, so ``authorization=Bearer tok en`` is kept
+    rather than dropped with a warning. A value holding any other character the
+    specification requires to be percent encoded, ``;`` and ``"`` among them,
+    is still dropped with a warning. A value is percent decoded only when it
+    matches the strict syntax, so ``x-a=a%20b`` arrives as ``a b`` while
+    ``x-a=a%20b c`` arrives as ``a%20b c``.
 
     Args:
         headers: Headers passed to the exporter constructor, or ``None`` to
