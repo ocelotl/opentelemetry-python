@@ -421,6 +421,9 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
             :envvar:`OTEL_EXPORTER_OTLP_HEADERS`. ``None`` means that
             environment variable is read, and no headers are sent when it is
             unset too.
+            An empty mapping, sequence or string is treated the same way
+            as ``None``, so this argument cannot suppress the headers the
+            environment configures.
         timeout: Backend request timeout in seconds. This is the deadline for
             the whole export including retries, not for one attempt. ``None``
             means the value is taken from

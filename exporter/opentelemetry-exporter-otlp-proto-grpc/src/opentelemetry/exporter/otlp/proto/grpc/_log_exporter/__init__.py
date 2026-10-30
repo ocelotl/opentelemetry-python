@@ -108,6 +108,9 @@ class OTLPLogExporter(
             of pairs, or as the comma-separated string form used by
             :envvar:`OTEL_EXPORTER_OTLP_LOGS_HEADERS`. ``None`` means that
             variable is read, then :envvar:`OTEL_EXPORTER_OTLP_HEADERS`.
+            An empty mapping, sequence or string is treated the same way
+            as ``None``, so this argument cannot suppress the headers the
+            environment configures.
         timeout: Backend request timeout in seconds, covering the whole export
             including retries. ``None`` means the value is taken from
             :envvar:`OTEL_EXPORTER_OTLP_LOGS_TIMEOUT`, then from
