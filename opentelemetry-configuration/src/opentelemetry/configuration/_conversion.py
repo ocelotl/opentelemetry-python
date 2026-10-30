@@ -100,9 +100,10 @@ def _convert_value(value: Any, type_hint: Any) -> Any:
         ValueError: If ``value`` is not a member value of the enum the
             annotation names. The enum constructor raises it.
         TypeError: If ``value`` is a mapping for a nested dataclass field
-            and carries a key that dataclass neither declares nor captures.
+            and carries a key that dataclass neither declares nor captures,
+            or omits one of its fields that has no default.
             ``_dict_to_dataclass`` splats the mapping into the constructor,
-            which rejects the key.
+            which rejects either one.
     """
     unwrapped = _unwrap_optional(type_hint)
     origin = get_origin(unwrapped)
@@ -171,10 +172,11 @@ def _dict_to_dataclass(data: Mapping[str, Any], cls: type[_T]) -> _T:
         original name.
 
     Raises:
-        TypeError: If ``cls`` is not a dataclass type, or if ``cls`` is not
+        TypeError: If ``cls`` is not a dataclass type, if ``cls`` is not
             decorated with ``@_additional_properties`` and ``data`` holds a
-            key that is not one of its fields. The dataclass constructor
-            raises the second one.
+            key that is not one of its fields, or if ``data`` omits a field
+            of ``cls`` that has neither a default nor a default factory.
+            The dataclass constructor raises the last two.
     """
     if not is_dataclass(cls):
         raise TypeError(f"{cls.__name__} is not a dataclass")
