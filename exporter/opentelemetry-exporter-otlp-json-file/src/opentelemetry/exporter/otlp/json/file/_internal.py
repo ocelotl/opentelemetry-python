@@ -134,10 +134,12 @@ class _FileExporter(Generic[T]):
         second time logs a warning and does nothing else.
 
         Raises:
-            OSError: Closing the file this exporter opened failed, which is where the buffered
-                bytes of the last write are reported when the write itself was buffered and
-                the flush succeeded. A caller-supplied stream and ``sys.stdout`` are never
-                closed, so neither of those destinations can raise here.
+            OSError: Closing the file this exporter opened failed. Closing flushes once more
+                before it releases the file, so a write whose flush already raised, and which
+                :meth:`export` reported as ``False`` rather than propagating, raises again
+                here. Closing can also fail on its own, with the bytes of every write already
+                out. A caller-supplied stream and ``sys.stdout`` are never closed, so neither
+                of those destinations can raise here.
         """
         if self._shutdown:
             self._logger.warning("Exporter already shutdown, ignoring call")
