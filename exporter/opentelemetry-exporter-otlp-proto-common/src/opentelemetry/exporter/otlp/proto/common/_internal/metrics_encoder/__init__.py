@@ -139,8 +139,10 @@ class OTLPMetricExporterMixin:
                 environment's choice untouched. The mapping is not mutated.
 
         Returns:
-            One entry per instrument class the exporter supports, suitable for
-            the ``preferred_temporality`` argument of ``MetricExporter``.
+            One entry per instrument class the exporter supports, plus every
+            entry of ``preferred_temporality`` keyed by a class outside those,
+            suitable for the ``preferred_temporality`` argument of
+            ``MetricExporter``.
         """
         otel_exporter_otlp_metrics_temporality_preference = (
             environ.get(
