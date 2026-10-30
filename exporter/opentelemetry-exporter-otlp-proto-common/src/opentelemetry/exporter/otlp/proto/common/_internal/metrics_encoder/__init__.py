@@ -79,9 +79,12 @@ class OTLPMetricExporterMixin:
     ``opentelemetry.exporter.otlp.common._aggregation`` module instead. The two
     do not agree in every case: that module upper-cases and strips
     ``OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION`` before comparing
-    it, while this mixin compares it exactly, so a value spelled in anything but
-    lower case selects an exponential histogram under the HTTP exporter and falls
-    back to explicit buckets under the gRPC one.
+    it, while this mixin compares it exactly. So
+    ``base2_exponential_bucket_histogram`` spelled in anything but lower case, or
+    written with surrounding whitespace, selects an exponential histogram under
+    the HTTP exporter and falls back to explicit buckets under the gRPC one.
+    Every other value lands on explicit buckets either way, and only the gRPC
+    exporter logs a warning for it.
 
     The mixin defines no state of its own and takes no constructor arguments.
     """
