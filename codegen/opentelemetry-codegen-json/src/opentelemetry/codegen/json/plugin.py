@@ -5,11 +5,16 @@
 
 """The ``protoc`` plugin entry point for the OTLP/JSON generator.
 
-``protoc`` invokes a plugin as a separate process. It writes a serialized
-``CodeGeneratorRequest`` to the standard input of that process and reads a serialized
+``protoc`` invokes a plugin as a separate process, with an empty argument vector. It writes a
+serialized ``CodeGeneratorRequest`` to the standard input of that process and reads a serialized
 ``CodeGeneratorResponse`` back from its standard output, so a plugin must keep both streams free
-of anything else. Diagnostics therefore go to standard error, which is what the logging setup
-under ``if __name__ == "__main__"`` configures.
+of anything else. Diagnostics therefore go to standard error.
+
+Nothing configures logging on the path ``protoc`` takes. The ``logging.basicConfig`` call below
+runs only when this module is executed as ``__main__``, and ``protoc`` reaches ``main`` through
+the console script instead, which imports the module under its own name. A record of ``WARNING``
+or above therefore arrives at standard error through ``logging.lastResort``, carrying its message
+alone and none of the formatting set up below, and a record under ``WARNING`` is dropped.
 
 ``protoc`` finds this module through the ``protoc-gen-otlp_json`` console script, which the
 ``opentelemetry-codegen-json`` distribution declares. The name after ``protoc-gen-`` is the plugin
@@ -42,7 +47,9 @@ def code_generation() -> Iterator[tuple[plugin.CodeGeneratorRequest, plugin.Code
     output.
 
     Two cases never reach the body. A first command line argument of ``-V`` or ``--version``
-    prints the version and calls ``sys.exit``, which is how ``protoc`` probes a plugin. An
+    prints the version and calls ``sys.exit``. That branch answers a version query typed directly
+    at the console script; ``protoc`` never reaches it, because ``protoc`` runs a plugin with an
+    empty argument vector. An
     exception raised inside the body propagates, and because the serialization is placed after the
     ``yield`` rather than in a ``finally`` block, no response is written at all, so ``protoc``
     reports the failure instead of accepting a partial result.
