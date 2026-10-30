@@ -9,7 +9,45 @@ from opentelemetry.trace import Span
 
 # pylint: disable=W0223
 class V1Encoder(Encoder):
+    """The part of the v1 encoding that does not depend on the wire format.
+
+    The v1 Zipkin API has no ``tags`` field. Span attributes are carried as
+    binary annotations instead, and this supplies the conversion. Everything
+    else is left to the concrete encoder, which is why this class is still
+    abstract.
+
+    Args:
+        max_tag_value_length: maximum length of an exported tag value. Values
+          will be truncated to conform. Since values are serialized to a JSON
+          list string, max_tag_value_length is honored at the element boundary.
+    """
+
     def _extract_binary_annotations(self, span: Span, encoded_local_endpoint: dict) -> list[dict]:
+        """Convert the tags of a span into v1 binary annotations.
+
+        Each tag becomes one annotation carrying the key, the value and a copy
+        of the local endpoint, since v1 attaches the endpoint per annotation
+        rather than once per span.
+
+        String values are truncated to ``max_tag_value_length``. The tags have
+        already been truncated once when they were extracted, so this second
+        truncation changes nothing in practice.
+
+        Args:
+            span: The span whose tags to convert.
+            encoded_local_endpoint: The already encoded local endpoint, placed
+                in every annotation produced.
+
+        Returns:
+            One binary annotation per tag. Empty when the span contributes no
+            tags.
+
+        Raises:
+            TypeError: If ``max_tag_value_length`` is ``None``, which is what
+                ``ZipkinExporter`` passes when its own
+                ``max_tag_value_length`` argument is left unset, because the
+                comparison against zero has no meaning for ``None``.
+        """
         binary_annotations = []
         for tag_key, tag_value in self._extract_tags_from_span(span).items():
             if isinstance(tag_value, str) and self.max_tag_value_length > 0:
@@ -31,6 +69,28 @@ class JsonV1Encoder(JsonEncoder, V1Encoder):
     """
 
     def _encode_span(self, span: Span, encoded_local_endpoint: dict) -> dict:
+        """Encode one span in the v1 JSON format.
+
+        ``traceId``, ``id``, ``name``, ``timestamp`` and ``duration`` are
+        always written. ``annotations``, ``binaryAnnotations``, ``debug`` and
+        ``parentId`` are written only when the span has something to put in
+        them, which is what the specification asks for.
+
+        The local endpoint is repeated inside every annotation and every
+        binary annotation, because v1 has no per-span endpoint field.
+
+        Args:
+            span: The ended span to encode.
+            encoded_local_endpoint: The already encoded local endpoint.
+
+        Returns:
+            The encoded span.
+
+        Raises:
+            TypeError: If ``max_tag_value_length`` is ``None`` and the span
+                contributes at least one tag. See
+                ``_extract_binary_annotations``.
+        """
         context = span.get_span_context()
 
         encoded_span = {
