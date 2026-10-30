@@ -1,6 +1,18 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+"""Trace context propagation in the Jaeger format.
+
+The Jaeger format carries trace identity in one header, ``uber-trace-id``,
+whose value is four colon-separated hexadecimal fields, and carries each
+baggage entry in a header of its own, named with the ``uberctx-`` prefix.
+``JaegerPropagator`` reads that representation in ``extract`` and writes it in
+``inject``.
+
+The format is specified at
+https://www.jaegertracing.io/docs/1.19/client-libraries/#propagation-format
+"""
+
 import collections.abc
 import itertools
 import urllib.parse
@@ -21,6 +33,25 @@ from opentelemetry.trace import SpanContext, format_span_id, format_trace_id
 class JaegerPropagator(TextMapPropagator):
     """Propagator for the Jaeger format.
 
+    ``TRACE_ID_KEY`` names the header holding trace identity, and
+    ``BAGGAGE_PREFIX`` is prepended to a baggage key to name the header holding
+    that entry. Both are read through ``self``, so a subclass can rename them.
+
+    ``DEBUG_FLAG`` is bit 1 of the flags field of the trace identity header.
+    ``inject`` sets it on every sampled span, and ``extract`` discards it,
+    keeping only bit 0, the sampled bit.
+
+    The Jaeger format bounds neither the number of baggage entries nor their
+    size, so the three ``MAX_BAGGAGE_`` attributes bound the work an untrusted
+    carrier can cause. ``MAX_BAGGAGE_ENTRIES`` caps how many entries are
+    considered, ``MAX_BAGGAGE_ENTRY_BYTES`` caps the UTF-8 size of a single
+    ``key=value`` entry, and ``MAX_BAGGAGE_TOTAL_BYTES`` caps the size of all
+    accepted entries joined by commas. An entry over a limit is dropped with no
+    error reported, on extract and on inject alike.
+
+    An instance holds no state, so one instance can serve any number of
+    concurrent calls.
+
     See: https://www.jaegertracing.io/docs/1.19/client-libraries/#propagation-format
     """
 
@@ -39,6 +70,37 @@ class JaegerPropagator(TextMapPropagator):
         context: Context | None = None,
         getter: Getter[CarrierT] = default_getter,
     ) -> Context:
+        """Read a Jaeger trace context out of a carrier.
+
+        When the carrier holds no ``TRACE_ID_KEY`` header, the context is
+        returned unchanged and no baggage is read. Otherwise baggage is read
+        first, so a carrier whose trace identity header is malformed still
+        contributes its baggage entries.
+
+        A malformed trace identity header is reported by returning a context
+        without a span in it, never by raising. The header is malformed when it
+        does not split into exactly four colon-separated fields, when its flags
+        field is not hexadecimal, or when its trace id or span id field is not
+        hexadecimal or is zero.
+
+        Of the flags field only the sampled bit is kept, so the debug bit that
+        ``inject`` writes does not survive a round trip. The parent span id
+        field is parsed and then discarded, because ``SpanContext`` has nowhere
+        to hold it.
+
+        Args:
+            carrier: the object holding the Jaeger headers, read through
+                ``getter``.
+            context: the context the extracted values are added to. An empty
+                ``Context`` is used when this is ``None``.
+            getter: reads the values of a key out of ``carrier``. Defaults to
+                ``opentelemetry.propagators.textmap.default_getter``, which
+                treats the carrier as a mapping.
+
+        Returns:
+            A ``Context`` holding the accepted baggage entries, and a
+            non-recording remote span when the trace identity header was valid.
+        """
         if context is None:
             context = Context()
         header = getter.get(carrier, self.TRACE_ID_KEY)
@@ -67,6 +129,34 @@ class JaegerPropagator(TextMapPropagator):
         context: Context | None = None,
         setter: Setter[CarrierT] = default_setter,
     ) -> None:
+        """Write a trace context into a carrier in the Jaeger format.
+
+        Nothing at all is written when the span taken from the context has an
+        invalid span context, so a carrier handed over in that state is left
+        exactly as it was.
+
+        The parent span id field is taken from the parent of the span when the
+        span is recording and exposes one, and is sixteen zeros otherwise. A
+        non-recording span, which is what ``extract`` produces, therefore
+        always writes sixteen zeros there.
+
+        ``DEBUG_FLAG`` is set in the flags field whenever the span is sampled,
+        whether or not the debug bit was set on the header this context came
+        from.
+
+        Each baggage entry of the context becomes its own header. The value is
+        converted with ``str`` and then percent-encoded, so a baggage value
+        that is not a string is written as its ``str`` form.
+
+        Args:
+            carrier: the object the headers are written into, through
+                ``setter``.
+            context: the context holding the span and the baggage to write. The
+                current context is used when this is ``None``.
+            setter: writes the value of a key into ``carrier``. Defaults to
+                ``opentelemetry.propagators.textmap.default_setter``, which
+                treats the carrier as a mutable mapping.
+        """
         span = trace.get_current_span(context=context)
         span_context = span.get_span_context()
         if not span_context.is_valid:
@@ -100,6 +190,16 @@ class JaegerPropagator(TextMapPropagator):
 
     @property
     def fields(self) -> set[str]:
+        """The carrier keys ``inject`` sets, which a reused carrier should be cleared of first.
+
+        Only ``TRACE_ID_KEY`` is reported. The baggage headers that ``inject``
+        writes are named after the baggage keys of the context it is given, and
+        those are not known until ``inject`` runs, so a caller reusing a
+        carrier has to clear the ``BAGGAGE_PREFIX`` keys itself.
+
+        Returns:
+            A set whose one member is ``TRACE_ID_KEY``.
+        """
         return {self.TRACE_ID_KEY}
 
     def _extract_baggage(
@@ -108,6 +208,30 @@ class JaegerPropagator(TextMapPropagator):
         carrier: CarrierT,
         context: Context,
     ) -> Context:
+        """Read the ``BAGGAGE_PREFIX`` headers of a carrier into a context.
+
+        At most ``MAX_BAGGAGE_ENTRIES`` prefixed keys are looked at, in the
+        order ``getter.keys`` reports them, and the keys past that point are
+        never read at all. A key whose value is absent or an empty sequence is
+        skipped.
+
+        The byte limits are then measured on the value as it appears in the
+        carrier, before any decoding. An accepted value is percent-decoded and
+        stripped of surrounding whitespace before it is stored, so the stored
+        value can be shorter than the one that was measured.
+
+        Only the leading ``BAGGAGE_PREFIX`` is removed from a key, so the key
+        ``uberctx-a-uberctx-b`` yields the baggage key ``a-uberctx-b``.
+
+        Args:
+            getter: reads the values of a key out of ``carrier``.
+            carrier: the object holding the Jaeger headers.
+            context: the context the baggage entries are added to.
+
+        Returns:
+            A new ``Context`` holding the accepted baggage entries, or
+            ``context`` itself when no entry was accepted.
+        """
         # The limit bounds the candidates inspected, not the entries kept, so a
         # carrier full of oversized ones cannot force unbounded work.
         candidates = itertools.islice(
@@ -136,6 +260,25 @@ class JaegerPropagator(TextMapPropagator):
         carrier: CarrierT,
         baggage_entries: collections.abc.Mapping[str, object],
     ) -> None:
+        """Write baggage entries into a carrier as ``BAGGAGE_PREFIX`` headers.
+
+        At most ``MAX_BAGGAGE_ENTRIES`` entries are considered, in the
+        iteration order of ``baggage_entries``, and the entries past that point
+        are dropped. Each value is converted with ``str`` and percent-encoded,
+        and the byte limits are measured on that encoded form, so a value with
+        many characters needing encoding can exceed a limit that its plain form
+        would meet.
+
+        An entry over a limit is dropped with no error reported, and a later
+        entry small enough to still fit is written even after a larger one has
+        been dropped.
+
+        Args:
+            setter: writes the value of a key into ``carrier``.
+            carrier: the object the headers are written into.
+            baggage_entries: the baggage of the context, keyed by baggage key,
+                with the ``BAGGAGE_PREFIX`` not yet applied.
+        """
         candidates = itertools.islice(baggage_entries.items(), self.MAX_BAGGAGE_ENTRIES)
         pairs = [(key, urllib.parse.quote(str(value))) for key, value in candidates]
 
