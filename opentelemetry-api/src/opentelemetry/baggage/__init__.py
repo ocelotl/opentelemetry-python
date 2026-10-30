@@ -9,8 +9,10 @@ boundaries by :class:`~opentelemetry.baggage.propagation.W3CBaggagePropagator`.
 It lets a value set early in a request, such as an account identifier, be read
 much later without threading it through every call.
 
-Every function here returns a new :class:`~opentelemetry.context.Context`
-rather than modifying one, matching the immutability of the context API.
+Every function here that changes the baggage returns a new
+:class:`~opentelemetry.context.Context` rather than modifying one, matching the
+immutability of the context API. The reading functions, :func:`get_all` and
+:func:`get_baggage`, return the pairs themselves.
 
 Baggage is not added to spans automatically, and it is sent to every service
 downstream, so a value that is sensitive or large does not belong in it.
