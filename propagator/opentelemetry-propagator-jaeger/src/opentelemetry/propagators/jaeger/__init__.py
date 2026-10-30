@@ -72,10 +72,12 @@ class JaegerPropagator(TextMapPropagator):
     ) -> Context:
         """Read a Jaeger trace context out of a carrier.
 
-        When the carrier has no ``TRACE_ID_KEY`` header, or has one with no
-        value, the context is returned unchanged and no baggage is read at
-        all. Otherwise baggage is read before the trace identity header is
-        parsed, so a carrier whose trace identity header is malformed still
+        When ``getter`` reports no values at all for ``TRACE_ID_KEY``, the
+        context is returned unchanged and no baggage is read. A header whose
+        value is the empty string is not that case, because a getter reports
+        it as one empty value: baggage is read, and the header is then found
+        malformed. Otherwise baggage is read before the trace identity header
+        is parsed, so a carrier whose trace identity header is malformed still
         contributes its baggage entries.
 
         A malformed trace identity header is reported by returning without
@@ -145,7 +147,9 @@ class JaegerPropagator(TextMapPropagator):
         whether or not the debug bit was set on the header this context came
         from.
 
-        Each baggage entry of the context becomes its own header. The value is
+        Each baggage entry of the context that fits the ``MAX_BAGGAGE_`` limits
+        becomes its own header, and an entry past ``MAX_BAGGAGE_ENTRIES`` or
+        over a byte limit is dropped with no error reported. The value is
         converted with ``str`` and then percent-encoded, so a baggage value
         that is not a string is written as its ``str`` form.
 
@@ -297,18 +301,23 @@ def _limit_baggage_bytes(
 ) -> collections.abc.Iterator[tuple[str, str]]:
     """Yield the pairs of an iterable that fit a per-entry and a total byte budget.
 
-    A pair is charged the UTF-8 length of its key, plus the UTF-8 length of its
-    value, plus one byte for the ``=`` that joins them in a W3C Baggage header,
-    plus one further byte for the ``,`` that would separate it from an
-    already accepted pair. Charging bytes rather than characters is what makes
+    A pair costs the UTF-8 length of its key, plus the UTF-8 length of its
+    value, plus one byte for the ``=`` that joins them in a W3C Baggage header.
+    That cost on its own is what ``max_entry_bytes`` is compared against, and a
+    pair over it is skipped. Charging bytes rather than characters is what makes
     the budget match what a receiver has to parse, since one character can
     occupy several bytes.
 
-    A pair whose own cost exceeds ``max_entry_bytes``, or that would take the
-    running total past ``max_total_bytes``, is skipped. Skipping continues
-    rather than stopping, so a pair small enough to still fit is yielded even
-    after a larger one has been skipped, and the yielded pairs are therefore
-    not always a prefix of ``pairs``.
+    The running total compared against ``max_total_bytes`` charges one further
+    byte per pair, for the ``,`` that separates it from an already accepted
+    pair. The first pair accepted is charged no such byte, so the separator
+    never affects the per-entry limit and affects the total only from the
+    second accepted pair onwards.
+
+    A pair that would take the running total past ``max_total_bytes`` is
+    skipped. Skipping continues rather than stopping, so a pair small enough to
+    still fit is yielded even after a larger one has been skipped, and the
+    yielded pairs are therefore not always a prefix of ``pairs``.
 
     Args:
         pairs: the candidate key and value pairs, in the order they are to be
