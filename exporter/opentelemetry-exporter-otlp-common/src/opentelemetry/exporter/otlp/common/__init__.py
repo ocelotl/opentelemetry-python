@@ -14,8 +14,11 @@ long each attempt took.
 Every name in this package is internal to the OTLP exporters and is not covered
 by the backward compatibility policy of the project, so an application that
 imports one may break on any release. ``Compression`` is the one name an
-application meets anyway: the OTLP HTTP exporters give it as the type of their
-``compression`` constructor parameter and accept no string in its place, so
-selecting a compression scheme in code means importing it from
-``opentelemetry.exporter.otlp.common.http``.
+application meets anyway. The OTLP JSON over HTTP exporters give it as the only
+type of their ``compression`` constructor parameter, so selecting a compression
+scheme for one of those in code means importing it from
+``opentelemetry.exporter.otlp.common.http``. The OTLP protobuf over HTTP
+exporters accept it alongside their own
+``opentelemetry.exporter.otlp.proto.http.Compression``, which is the one to
+prefer there.
 """

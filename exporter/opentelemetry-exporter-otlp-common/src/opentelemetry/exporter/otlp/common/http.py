@@ -179,9 +179,12 @@ class _ExportResult:
             ``status_code``, or ``None`` on the same conditions.
         error: The exception that ended the attempt, either the one raised
             while submitting the request or the one the transport attached to
-            the last response, and ``None`` when there was neither. An OTLP
-            exporter copies it onto the ``ExportResult`` of its
-            self-observability metrics.
+            the last response, and ``None`` when there was neither. It is
+            ``None`` as well when shutdown interrupted a wait between attempts,
+            even though the attempt before the wait may have produced one. An
+            OTLP exporter copies it onto the ``ExportResult`` of its
+            self-observability metrics, so an export abandoned that way is
+            counted with no ``error.type`` attribute.
     """
 
     success: bool
@@ -217,9 +220,9 @@ class _OTLPHTTPClient:
             mapping is copied, so later changes to it are not picked up.
         jitter: How far the backoff may stray from its nominal value, as a
             fraction. A value of 0.2 multiplies each backoff by a random number
-            drawn from 0.8 up to but not including 1.2. The value is clamped to
-            the range 0 to 1, so the factor never exceeds 2, and at the clamp
-            of 1 it can be as low as 0.
+            between 0.8 and 1.2. The value is clamped to the range 0 to 1, so
+            the factor never exceeds 2, and at the clamp of 1 it can be as low
+            as 0.
         logger: Where to send the warning and error messages, or ``None`` to
             use the logger of this module. An exporter passes its own logger so
             that the messages are attributed to the exporter rather than to
@@ -270,9 +273,11 @@ class _OTLPHTTPClient:
                 before the attempt the index names.
 
         Returns:
-            The wait in seconds, to be spent after that attempt fails. The
-            ``Retry-After`` header of a response overrides it when the response
-            carried one.
+            The wait in seconds, to be spent after that attempt fails. A
+            ``Retry-After`` header overrides it only when the response carried
+            a status code and ``_extract_retry_after`` could parse the header,
+            so a header this module does not understand leaves this value in
+            place.
         """
         return 2**retry * random.uniform(1 - self._jitter, 1 + self._jitter)
 
