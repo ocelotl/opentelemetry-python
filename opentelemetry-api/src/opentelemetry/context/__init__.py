@@ -14,7 +14,7 @@ restores what was current before. The pair is normally used through a context
 manager rather than called directly.
 
 The implementation backing :func:`get_current` is chosen once at import time.
-It is :class:`~opentelemetry.context.contextvars_context.ContextVarsRuntimeContext`
+It is ``ContextVarsRuntimeContext``
 unless the ``OTEL_PYTHON_CONTEXT`` environment variable names a different
 ``opentelemetry_context`` entry point.
 """

@@ -10,7 +10,7 @@ created in another process joins the same trace. :class:`TraceFlags` and
 :class:`TraceState` are the two further fields the W3C trace context format
 carries alongside those identifiers.
 
-:class:`NonRecordingSpan` is the span implementation the API uses on its own.
+:class:`~opentelemetry.trace.NonRecordingSpan` is the span implementation the API uses on its own.
 It holds a :class:`SpanContext` so propagation keeps working, and discards
 everything else, so instrumentation runs unchanged when no SDK is installed.
 """
@@ -214,7 +214,7 @@ class Span(abc.ABC):
         Returns:
             ``True`` when the span records what is set on it. ``False`` for a
             span that has ended, for one that was not sampled, and for a
-            :class:`NonRecordingSpan`. Instrumentation should check this
+            :class:`~opentelemetry.trace.NonRecordingSpan`. Instrumentation should check this
             before doing expensive work to build an attribute value.
         """
 
@@ -634,7 +634,7 @@ class SpanContext(tuple[int, int, bool, "TraceFlags", "TraceState", bool]):
     A span context is a :class:`tuple` subclass and is immutable: assigning to
     an attribute is ignored and logged at debug level rather than raising. A
     context whose trace id or span id is zero, or out of range, is marked
-    invalid, which is how :data:`INVALID_SPAN_CONTEXT` is built.
+    invalid, which is how ``INVALID_SPAN_CONTEXT`` is built.
     """
 
     def __new__(

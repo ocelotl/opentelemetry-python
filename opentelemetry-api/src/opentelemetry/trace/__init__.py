@@ -488,7 +488,7 @@ class Tracer(ABC):
 class ProxyTracer(Tracer):
     """A tracer that stands in until a real provider is set globally.
 
-    Every span it creates is a :class:`NonRecordingSpan` while no
+    Every span it creates is a :class:`~opentelemetry.trace.NonRecordingSpan` while no
     :class:`TracerProvider` has been installed. Once one is, the proxy
     resolves a real tracer for its instrumentation scope, caches it, and
     forwards everything from then on.
@@ -553,7 +553,7 @@ class ProxyTracer(Tracer):
 
         Returns:
             The span the delegate created, which is a
-            :class:`NonRecordingSpan` while no provider has been set.
+            :class:`~opentelemetry.trace.NonRecordingSpan` while no provider has been set.
         """
         return self._tracer.start_span(*args, **kwargs)  # type: ignore
 
@@ -569,7 +569,7 @@ class ProxyTracer(Tracer):
 
         Yields:
             The span the delegate created, which is a
-            :class:`NonRecordingSpan` while no provider has been set.
+            :class:`~opentelemetry.trace.NonRecordingSpan` while no provider has been set.
         """
         with self._tracer.start_as_current_span(*args, **kwargs) as span:  # type: ignore
             yield span
@@ -610,8 +610,8 @@ class NoOpTracer(Tracer):
 
         Returns:
             The current span when it is already a
-            :class:`NonRecordingSpan`, so the trace context is preserved.
-            Otherwise a new :class:`NonRecordingSpan` carrying the current
+            :class:`~opentelemetry.trace.NonRecordingSpan`, so the trace context is preserved.
+            Otherwise a new :class:`~opentelemetry.trace.NonRecordingSpan` carrying the current
             span context, or :data:`INVALID_SPAN` when that context is not
             usable.
         """
@@ -660,7 +660,7 @@ class NoOpTracer(Tracer):
             end_on_exit: Whether to end the span when leaving the block.
 
         Yields:
-            A :class:`NonRecordingSpan`, which records nothing set on it but
+            A :class:`~opentelemetry.trace.NonRecordingSpan`, which records nothing set on it but
             keeps the trace context current so propagation still works.
         """
         span = self.start_span(
@@ -772,7 +772,7 @@ def get_tracer_provider() -> TracerProvider:
     Returns:
         The provider set by :func:`set_tracer_provider`, or the one named by
         the ``OTEL_PYTHON_TRACER_PROVIDER`` environment variable. When neither
-        is present, a :class:`ProxyTracerProvider` is returned, which starts
+        is present, a ``ProxyTracerProvider`` is returned, which starts
         delegating as soon as a provider is set.
     """
     if _TRACER_PROVIDER is None:

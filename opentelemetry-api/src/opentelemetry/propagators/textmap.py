@@ -11,7 +11,7 @@ of HTTP headers.
 A propagator never touches the carrier directly. It reads through a
 :class:`Getter` and writes through a :class:`Setter`, so one propagator works
 with any carrier shape as long as a getter and a setter exist for it.
-:data:`default_getter` and :data:`default_setter` cover a plain mapping.
+``default_getter`` and ``default_setter`` cover a plain mapping.
 """
 
 import abc
@@ -80,7 +80,7 @@ class DefaultGetter(Getter[Mapping[str, CarrierValT]]):
     """A :class:`Getter` for a carrier that is a plain mapping.
 
     This is the getter used when a caller passes HTTP headers as a dict and
-    supplies no getter of their own. :data:`default_getter` is a ready-made
+    supplies no getter of their own. ``default_getter`` is a ready-made
     instance.
     """
 
@@ -121,7 +121,7 @@ default_getter: Getter[CarrierT] = DefaultGetter()  # type: ignore
 class DefaultSetter(Setter[MutableMapping[str, CarrierValT]]):
     """A :class:`Setter` for a carrier that is a plain mutable mapping.
 
-    Setting a key that is already present replaces it. :data:`default_setter`
+    Setting a key that is already present replaces it. ``default_setter``
     is a ready-made instance.
     """
 

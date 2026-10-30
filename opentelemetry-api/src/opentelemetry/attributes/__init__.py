@@ -8,7 +8,7 @@
 The OpenTelemetry specification restricts which Python values may be used as
 an attribute value, and lets an SDK cap both the number of attributes and the
 length of each string. This module holds the two pieces that enforce those
-rules: :func:`_clean_attribute_value`, which coerces or drops an invalid
+rules: ``_clean_attribute_value``, which coerces or drops an invalid
 value, and :class:`BoundedAttributes`, the mapping that spans, log records and
 metric measurements store their attributes in.
 
@@ -82,7 +82,7 @@ def _clean_attribute_value(
 
     Args:
         value: The attribute value to clean. Any Python object is accepted;
-            one that is not a :data:`~opentelemetry.util.types.AnyValue` is
+            one that is not a ``AnyValue`` is
             coerced or replaced rather than rejected.
         max_string_value_length: Maximum length of a string value, in
             characters. A longer string is truncated to this length and a
@@ -251,7 +251,7 @@ class BoundedAttributes(MutableMapping[str, types.AnyValue]):
         Args:
             key: The attribute name. It must be a non-empty :class:`str`.
             value: The attribute value, cleaned by
-                :func:`_clean_attribute_value` before being stored.
+                ``_clean_attribute_value`` before being stored.
 
         Raises:
             TypeError: If this instance is immutable.
@@ -278,7 +278,7 @@ class BoundedAttributes(MutableMapping[str, types.AnyValue]):
 
         Args:
             attributes: The attributes to store. Each pair is cleaned by
-                :func:`_clean_attribute_value`, and any pair dropped during
+                ``_clean_attribute_value``, and any pair dropped during
                 cleaning is counted in ``dropped``.
 
         Raises:

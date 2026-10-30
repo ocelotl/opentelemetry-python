@@ -260,7 +260,7 @@ class Logger(ABC):
             severity_text: The severity of the event as the originating system
                 spelled it, for example ``"WARN"``.
             body: The payload of the event. A string for an ordinary log line,
-                or any other :data:`~opentelemetry.util.types.AnyValue` for
+                or any other ``AnyValue`` for
                 structured content.
             attributes: Further name/value pairs describing the event.
             event_name: The name identifying the class of event, for a
@@ -356,7 +356,7 @@ class NoOpLogger(Logger):
             severity_text: The severity of the event as the originating system
                 spelled it, for example ``"WARN"``.
             body: The payload of the event. A string for an ordinary log line,
-                or any other :data:`~opentelemetry.util.types.AnyValue` for
+                or any other ``AnyValue`` for
                 structured content.
             attributes: Further name/value pairs describing the event.
             event_name: The name identifying the class of event, for a
@@ -497,7 +497,7 @@ class ProxyLogger(Logger):
             severity_text: The severity of the event as the originating system
                 spelled it, for example ``"WARN"``.
             body: The payload of the event. A string for an ordinary log line,
-                or any other :data:`~opentelemetry.util.types.AnyValue` for
+                or any other ``AnyValue`` for
                 structured content.
             attributes: Further name/value pairs describing the event.
             event_name: The name identifying the class of event, for a
@@ -675,7 +675,7 @@ def get_logger_provider() -> LoggerProvider:
     Returns:
         The provider set by :func:`set_logger_provider`, or the one named by
         the ``OTEL_PYTHON_LOGGER_PROVIDER`` environment variable. When neither
-        is present, a :class:`ProxyLoggerProvider` is returned, which starts
+        is present, a ``ProxyLoggerProvider`` is returned, which starts
         delegating as soon as a provider is set.
     """
     global _LOGGER_PROVIDER  # pylint: disable=global-variable-not-assigned
