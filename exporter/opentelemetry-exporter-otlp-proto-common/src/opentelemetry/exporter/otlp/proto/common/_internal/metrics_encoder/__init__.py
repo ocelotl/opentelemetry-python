@@ -110,8 +110,11 @@ class OTLPMetricExporterMixin:
                 in charge. An instrument class absent from the mapping keeps the
                 environment's choice.
             preferred_aggregation: Per instrument class, the aggregation the
-                caller wants. Same ``None`` and absence handling as
-                ``preferred_temporality``.
+                caller wants. ``None`` and an empty mapping both leave the
+                environment in charge, as above. Absence works differently: the
+                environment decides an aggregation for ``Histogram`` only, so an
+                instrument class absent from this mapping and not ``Histogram``
+                gets no entry at all and keeps the SDK's own default.
         """
         MetricExporter.__init__(
             self,
