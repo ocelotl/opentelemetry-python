@@ -75,9 +75,12 @@ class Compression(enum.Enum):
     The value of each member is the name the OTLP specification gives that
     encoding, which is also what the ``OTEL_EXPORTER_OTLP_COMPRESSION``
     environment variable and its per-signal variants accept. An exporter
-    constructed with ``Gzip`` or ``Deflate`` compresses every request body and
-    sends the matching ``Content-Encoding`` header; one constructed with
-    ``NoCompression`` sends the body uncompressed and sets no such header.
+    constructed with ``Gzip`` or ``Deflate`` compresses every request body. It
+    also sends the matching ``Content-Encoding`` header, unless the resolved
+    headers already carry a ``Content-Encoding`` key, in which case the body is
+    still compressed and the value found there is sent as it stands. An
+    exporter constructed with ``NoCompression`` sends the body uncompressed and
+    sets no such header.
 
     Passing a member of this enum to an exporter constructor overrides the
     environment variables. Passing ``None`` instead, which is the default,
