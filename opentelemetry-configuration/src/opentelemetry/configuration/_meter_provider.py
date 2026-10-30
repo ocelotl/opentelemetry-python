@@ -1,5 +1,6 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
+# pylint: disable=too-many-lines
 
 """MeterProvider construction from declarative configuration.
 
@@ -22,11 +23,14 @@ object: the thing the schema calls its exporter, Prometheus being the
 only built-in one, is itself the reader, and constructing it starts an
 HTTP listener.
 
-Five fields the schema accepts are not supported by the Python SDK, and
-each is ignored with a warning naming it: the excluded half of a view's
-attribute keys, a pull reader's metric producers, the Prometheus scope
-info and resource constant labels, and cardinality limits on a plugin
-pull exporter.
+Several fields the schema accepts are not supported by the Python SDK.
+Five are ignored with a warning naming them: the excluded half of a
+view's attribute keys, a pull reader's metric producers, the Prometheus
+scope info and resource constant labels, and cardinality limits on a
+plugin pull exporter. Three more are ignored with no warning at all, so
+a configuration file that sets one looks as though it took effect:
+``periodic.producers``, ``periodic.max_export_batch_size/development``
+and ``prometheus/development.translation_strategy``.
 """
 
 from __future__ import annotations
@@ -663,7 +667,10 @@ def _create_periodic_metric_reader(
     Args:
         config: One ``periodic`` block from the ``readers`` list. Its
             ``interval`` and ``timeout`` are in milliseconds; an absent one
-            becomes the specification default, 60000 and 30000.
+            becomes the specification default, 60000 and 30000. Its
+            ``producers`` and ``max_export_batch_size/development`` fields
+            are read by nothing and no warning names them, so setting
+            either has no effect and leaves no trace in the log.
 
     Returns:
         A ``PeriodicExportingMetricReader`` owning the configured exporter.
@@ -699,7 +706,8 @@ def _create_prometheus_metric_reader(
     that is then discarded leaves the port bound for the life of the
     process, and a second reader on the same port fails to bind.
     ``scope_info_enabled`` and ``resource_constant_labels`` are ignored
-    with a warning naming each.
+    with a warning naming each; ``translation_strategy`` is ignored with
+    no warning.
 
     Args:
         config: The ``prometheus/development`` block of a pull metric
@@ -811,8 +819,9 @@ def _create_pull_metric_reader(
             Python SDK has no metric producer plugin point.
 
     Returns:
-        The reader its exporter block names, already carrying the reader's
-        cardinality limits.
+        The reader its exporter block names. A Prometheus reader carries
+        the reader's cardinality limits; a plugin reader does not, because
+        ``_create_pull_metric_exporter`` drops them.
 
     Raises:
         ConfigurationError: If the exporter block selects nothing or cannot
