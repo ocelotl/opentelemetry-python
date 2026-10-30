@@ -201,8 +201,9 @@ class CodeWriter:
 
         Args:
             name: The name of the class
-            bases: Optional iterable of base class names. ``None`` and an empty iterable both
-                produce a class statement with no parenthesized base list at all.
+            bases: Optional iterable of base class names. ``None`` and an empty list or tuple
+                both produce a class statement with no parenthesized base list at all, since the
+                test is on the truthiness of ``bases`` rather than on what it yields.
             decorators: Optional iterable of decorator names, written in the order given, each
                 already without its leading ``@``
 
@@ -284,9 +285,10 @@ class CodeWriter:
         """
         Generate an enum definition with optional base classes and decorators.
 
-        ``enum_type`` is written as the first base and anything in ``bases`` follows it, which is
-        the opposite of the order Python's own enum documentation uses for mixins. The generated
-        OTLP enums pass ``enum.IntEnum`` and nothing else, so the ordering does not arise there.
+        ``enum_type`` is written as the first base and anything in ``bases`` follows it. Python
+        requires the enum class to come last, so a non-empty ``bases`` produces a class statement
+        that raises ``TypeError`` when the generated module is imported. The generated OTLP enums
+        pass ``enum.IntEnum`` and nothing else, so the case does not arise there.
 
         Args:
             name: The name of the enum
@@ -580,8 +582,11 @@ class CodeWriter:
         Get the generated code as a single string with newline characters separating lines.
 
         The lines are joined rather than terminated, so the result has no trailing newline unless
-        the last line written was blank. The generator relies on that: it ends each file with
-        ``blank_line``.
+        the last line written was blank. ``_generate_file`` in
+        ``opentelemetry.codegen.json.generator`` relies on that for the per-proto message modules,
+        ending each one with ``blank_line``. The other files that generator produces end another
+        way: ``version/__init__.py`` through ``writemany``, and ``_json_codec.py`` and the empty
+        ``__init__.py`` files without a ``CodeWriter`` at all.
 
         Returns:
             A string containing the entire generated code.
