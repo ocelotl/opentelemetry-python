@@ -454,9 +454,10 @@ class _OTLPHTTPClient:
         way through a request, so a request already in flight runs to its own
         timeout.
 
-        The transport is closed, which releases its connection pool. Calling
-        this a second time logs a warning and does nothing else, so the
-        transport is never closed twice.
+        The transport is closed, which releases its connection pool. A second
+        call logs a warning and does nothing else. The flag it reads is set
+        without a lock, so two threads calling this at the same time can both
+        pass the check and close the transport twice.
         """
         if self._shutdown:
             self._logger.warning("OTLP client already shutdown, ignoring call")
