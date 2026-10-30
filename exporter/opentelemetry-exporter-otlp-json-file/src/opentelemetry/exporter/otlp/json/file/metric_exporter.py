@@ -56,16 +56,23 @@ class FileMetricExporter(MetricExporter):
         stream: Open text stream to write the metrics to. The caller keeps responsibility for
             closing it. Mutually exclusive with ``path``.
         preferred_temporality: Temporality this exporter asks the metric reader for, per
-            instrument class. Instrument classes left out of the mapping, and the whole mapping
-            when it is ``None``, take the temporality chosen by
-            :envvar:`OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE`, which is cumulative for
-            every instrument unless that variable is set to ``DELTA`` or to ``LOWMEMORY``.
+            instrument class. An entry here overrides, for that one instrument class, the choice
+            that :envvar:`OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` makes. That variable
+            names one of three presets: ``CUMULATIVE``, which is the default and what an
+            unrecognised value falls back to after a warning; ``DELTA``, which makes the counter,
+            the histogram and the observable counter delta; and ``LOWMEMORY``, which makes the
+            counter and the histogram delta. Every preset leaves the up-down counters and the
+            gauges cumulative. ``None`` overrides nothing.
         preferred_aggregation: Aggregation this exporter asks the metric reader for, per
-            instrument class. Instrument classes left out of the mapping, and the whole mapping
-            when it is ``None``, take the aggregation chosen by
-            :envvar:`OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION`, which is the
-            explicit bucket histogram unless that variable is set to
-            ``BASE2_EXPONENTIAL_BUCKET_HISTOGRAM``.
+            instrument class. The only entry this exporter contributes on its own is the one for
+            ``Histogram``, chosen by
+            :envvar:`OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION`: the explicit
+            bucket histogram by default, and also after a warning for an unrecognised value, or
+            the base-2 exponential bucket histogram when that variable is set to
+            ``BASE2_EXPONENTIAL_BUCKET_HISTOGRAM``. An entry here for ``Histogram`` overrides
+            that choice. Every other instrument class is left on the default aggregation the
+            metric reader picks, since neither this exporter nor that variable names one.
+            ``None`` overrides nothing.
 
     Raises:
         ValueError: Both ``path`` and ``stream`` were given. Leaving both out selects
