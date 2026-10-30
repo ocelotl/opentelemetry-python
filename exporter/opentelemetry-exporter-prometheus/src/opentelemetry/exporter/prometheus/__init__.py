@@ -242,8 +242,10 @@ def _get_or_create_family(
         labels: The label names the family declares. Every sample added to the
             family has to supply a value for each of them, in this order.
         unit: The Prometheus spelling of the unit, which
-            ``prometheus_client`` appends to the metric name. An empty string
-            adds no suffix.
+            ``prometheus_client`` appends to the metric name unless the name
+            already ends with an underscore and the unit, so an instrument
+            named ``latency_seconds`` with unit ``s`` stays
+            ``latency_seconds``. An empty string adds no suffix.
 
     Returns:
         The family held under ``family_id``, whether this call created it or
@@ -270,6 +272,9 @@ def _populate_counter_family(
     values: Sequence[float],
 ) -> None:
     """Add one sample per data point to the Prometheus counter family of a metric.
+
+    ``prometheus_client`` names each of those samples with ``_total`` after
+    the family name, so a family named ``requests`` exports ``requests_total``.
 
     Args:
         registry: The mapping from family identifier to family being assembled
