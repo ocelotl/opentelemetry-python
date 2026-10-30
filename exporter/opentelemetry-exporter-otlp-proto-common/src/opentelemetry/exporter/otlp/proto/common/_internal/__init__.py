@@ -6,8 +6,9 @@
 The functions here convert the pieces of SDK telemetry that all three signals
 have in common: a resource, an instrumentation scope, an attribute mapping, an
 arbitrary attribute or log body value, and the integer trace and span
-identifiers. Each one returns a message from ``opentelemetry-proto`` and never
-sends anything.
+identifiers. Each one builds the value the protocol expects, a message from
+``opentelemetry-proto`` for most of them and raw bytes for the two identifier
+encoders, and none of them performs any input or output.
 
 Everything in this subpackage is private to
 ``opentelemetry-exporter-otlp-proto-common`` and may change in any release.
@@ -58,9 +59,10 @@ def _encode_instrumentation_scope(
             left at their protobuf defaults.
 
     Returns:
-        The protobuf ``InstrumentationScope``. Its ``schema_url`` field is left
-        unset: the callers put the schema URL on the enclosing ``ScopeSpans``,
-        ``ScopeMetrics`` or ``ScopeLogs`` message instead.
+        The protobuf ``InstrumentationScope``, which carries a name, a version,
+        attributes and a dropped attribute count. It has no field for a schema
+        URL, so the callers put the schema URL of the scope on the enclosing
+        ``ScopeSpans``, ``ScopeMetrics`` or ``ScopeLogs`` message instead.
     """
     if instrumentation_scope is None:
         return PB2InstrumentationScope()
@@ -78,11 +80,11 @@ def _encode_resource(resource: Resource) -> PB2Resource:
         resource: The resource the SDK attached to the telemetry being exported.
 
     Returns:
-        The protobuf ``Resource``, carrying the encoded attributes. Its
-        ``schema_url`` field is left unset, because the schema URL belongs to the
-        enclosing ``ResourceSpans``, ``ResourceMetrics`` or ``ResourceLogs``
-        message. Attributes that cannot be encoded are dropped, as described on
-        ``_encode_attributes``.
+        The protobuf ``Resource``, carrying the encoded attributes. It has no
+        field for a schema URL, so the callers put the schema URL of the resource
+        on the enclosing ``ResourceSpans``, ``ResourceMetrics`` or
+        ``ResourceLogs`` message instead. Attributes that cannot be encoded are
+        dropped, as described on ``_encode_attributes``.
     """
     return PB2Resource(attributes=_encode_attributes(resource.attributes))
 
