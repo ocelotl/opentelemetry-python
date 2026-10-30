@@ -1266,6 +1266,12 @@ def get_meter_provider() -> MeterProvider:
         variable is absent, a proxy meter provider is returned instead, so
         that instruments created before an SDK is installed start recording
         once one is.
+
+    Raises:
+        Exception: Whatever loading the entry point named by the environment
+            variable raised, since ``_load_provider`` logs it and re-raises. A
+            name that matches no installed entry point surfaces as
+            :exc:`StopIteration`.
     """
 
     if _METER_PROVIDER is None:

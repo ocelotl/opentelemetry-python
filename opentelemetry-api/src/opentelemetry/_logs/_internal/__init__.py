@@ -671,6 +671,12 @@ def get_logger_provider() -> LoggerProvider:
         the ``OTEL_PYTHON_LOGGER_PROVIDER`` environment variable. When neither
         is present, a ``ProxyLoggerProvider`` is returned, which starts
         delegating as soon as a provider is set.
+
+    Raises:
+        Exception: Whatever loading the entry point named by the environment
+            variable raised, since ``_load_provider`` logs it and re-raises. A
+            name that matches no installed entry point surfaces as
+            :exc:`StopIteration`.
     """
     global _LOGGER_PROVIDER  # pylint: disable=global-variable-not-assigned
     if _LOGGER_PROVIDER is None:

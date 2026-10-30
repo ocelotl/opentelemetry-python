@@ -781,6 +781,12 @@ def get_tracer_provider() -> TracerProvider:
         the ``OTEL_PYTHON_TRACER_PROVIDER`` environment variable. When neither
         is present, a ``ProxyTracerProvider`` is returned, which starts
         delegating as soon as a provider is set.
+
+    Raises:
+        Exception: Whatever loading the entry point named by the environment
+            variable raised, since ``_load_provider`` logs it and re-raises. A
+            name that matches no installed entry point surfaces as
+            :exc:`StopIteration`.
     """
     if _TRACER_PROVIDER is None:
         # if a global tracer provider has not been set either via code or env
