@@ -22,13 +22,20 @@ OPENTELEMETRY_VERSION = version("opentelemetry-api")
 
 
 def proto_timestamp_from_time_ns(time_ns):
-    """Converts datetime to protobuf timestamp.
+    """Convert an OpenTelemetry nanosecond timestamp to an OpenCensus one.
+
+    OpenTelemetry records span and event times as an integer number of
+    nanoseconds since the Unix epoch, while OpenCensus carries them in the
+    protobuf ``Timestamp`` message used by its span fields ``start_time``,
+    ``end_time`` and ``time_events``.
 
     Args:
-        time_ns: Time in nanoseconds
+        time_ns: Time in nanoseconds since the Unix epoch, or ``None``.
+            ``None`` is not reported as a missing time: it leaves the message
+            at its default value, which reads back as the epoch itself.
 
     Returns:
-        Returns protobuf timestamp.
+        A ``google.protobuf.timestamp_pb2.Timestamp``.
     """
     ts = Timestamp()
     if time_ns is not None:
