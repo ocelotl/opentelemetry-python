@@ -14,10 +14,13 @@ per protobuf message and an ``enum.IntEnum`` per protobuf enum. Every generated 
 carries ``to_dict`` and ``from_dict`` methods that implement the Proto3 JSON mapping, with the
 OTLP deviation that ``trace_id``, ``span_id`` and ``parent_span_id`` are hex encoded rather than
 base64 encoded. Alongside those modules it copies
-``opentelemetry.codegen.json.runtime.json_codec`` into the output tree as ``_json_codec``, which is
-the only part of this distribution that the generated code imports at runtime.
+``opentelemetry.codegen.json.runtime.json_codec`` into the output tree as ``_json_codec``. The
+generated code imports that copy, which belongs to the generated distribution, so no part of
+``opentelemetry-codegen-json`` is imported at runtime.
 
-The modules here are hand-written. The modules they emit, which make up the
-``opentelemetry-proto-json`` distribution, carry an ``AUTO-GENERATED`` header and must never be
-edited by hand.
+The modules here are hand-written. Everything emitted into the ``opentelemetry-proto-json``
+distribution is generated and must never be edited by hand, though only the per-message modules
+say so in an ``AUTO-GENERATED`` header. The copied ``_json_codec.py``, the generated
+``version/__init__.py`` and the empty ``__init__.py`` files carry no header and are regenerated
+just the same.
 """

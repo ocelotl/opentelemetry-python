@@ -6,9 +6,12 @@
 """Turns protobuf descriptors into OTLP/JSON dataclass modules.
 
 This module is hand-written and runs at build time. Everything it produces is a string of Python
-source destined for the ``opentelemetry-proto-json`` distribution, where it is committed with an
-``AUTO-GENERATED`` header and must not be edited by hand. Changing the shape of the generated code
-means changing the code here and regenerating, which ``scripts/proto_codegen_json.sh`` does.
+source destined for the ``opentelemetry-proto-json`` distribution, where it is committed and must
+not be edited by hand. Only the per-message modules say so in an ``AUTO-GENERATED`` header; the
+copied ``_json_codec.py``, the generated ``version/__init__.py`` and the empty ``__init__.py``
+files carry no header and are overwritten by a regeneration just the same. Changing the shape of
+the generated code means changing the code here and regenerating, which
+``scripts/proto_codegen_json.sh`` does.
 
 ``OtlpJsonGenerator`` holds the whole translation. ``generate_plugin_response`` is what
 ``opentelemetry.codegen.json.plugin`` calls, and it turns the generator's output into the
@@ -656,8 +659,10 @@ class OtlpJsonGenerator:
         variable of a lambda, and for a singular field it passes an attribute access on ``self``.
 
         A field named ``trace_id``, ``span_id`` or ``parent_span_id`` is hex encoded in preference
-        to the base64 encoding that Proto3 JSON gives bytes, which is the OTLP deviation. The name
-        decides this, so any field with one of those names in any message is treated that way.
+        to the base64 encoding that Proto3 JSON gives bytes, which is the OTLP deviation. The type
+        is consulted first: a message-typed or enum-typed field is handled by its type whatever it
+        is called. Among the remaining types the name alone decides, so a field with one of those
+        three names is hex encoded even when it is declared as something other than ``bytes``.
 
         Args:
             field_desc: Field descriptor for the value being serialized
