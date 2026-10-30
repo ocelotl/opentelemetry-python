@@ -84,9 +84,11 @@ class ExportResult:
             recorded as the ``error.type`` attribute on the exported counter
             and on the duration histogram.
         error_attrs: Extra attributes recorded on the duration histogram only,
-            or ``None`` to add none. An HTTP exporter uses it to report
-            ``http.response.status_code``. The attributes are dropped unless
-            ``error`` is also set.
+            or ``None`` to add none. They are recorded whether or not ``error``
+            is set: an HTTP exporter uses this field to report
+            ``http.response.status_code``, and a response carrying a failing
+            status code but no exception leaves ``error`` at ``None`` while
+            this field is populated.
     """
 
     error: Exception | None = None
@@ -156,7 +158,8 @@ class ExporterMetrics:
     ``otel.component.name`` has to be unique among the exporters of a process,
     so instances of this class share a module-level counter per component type
     and the name is the component type followed by ``/`` and the number of
-    instances created before this one. The counter is never reset, so an
+    instances with that same component type created before this one. The
+    counter is never reset, so an
     exporter created after another one is shut down still gets a name of its
     own.
 
@@ -170,13 +173,17 @@ class ExporterMetrics:
             other value selects the metric data point instruments.
         endpoint: Where the exporter sends telemetry, parsed for the host and
             the port recorded as ``server.address`` and ``server.port``. A
-            value with no scheme and no leading ``//`` is prefixed with ``//``
-            first so that ``urlparse`` reads its leading component as the host
-            rather than as a scheme. A host with no port gets 443 when
-            ``component_type`` is one of the gRPC exporters or the scheme is
-            ``https``, and 80 when the scheme is ``http``. ``server.port`` is
-            left unrecorded in every other case, and ``server.address`` is
-            left unrecorded when no host could be parsed.
+            value that neither starts with ``//`` nor contains ``://`` is
+            prefixed with ``//`` first so that ``urlparse`` reads its leading
+            component as the host rather than as a scheme. A host with no port
+            gets 443 when ``component_type`` is one of the gRPC exporters or
+            the scheme is ``https``, and 80 when the scheme is ``http``.
+            ``server.port`` is left unrecorded in every other case, and
+            ``server.address`` is left unrecorded when no host could be parsed.
+            A port that is not an integer in range makes ``urlparse`` raise
+            ``ValueError`` out of the constructor, so enabling
+            self-observability turns a malformed endpoint into an exception the
+            exporter does not otherwise raise.
         meter_provider: Where to get the meter that creates the instruments,
             or ``None`` to use the global meter provider at the moment this
             instance is created. The meter is named ``opentelemetry-sdk``.

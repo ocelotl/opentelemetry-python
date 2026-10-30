@@ -83,10 +83,9 @@ def _extract_retry_after(result: BaseHTTPResult) -> float | None:
     rather than a negative wait.
 
     Args:
-        result: The response to read the ``Retry-After`` header from. Reading
-            its headers is allowed to raise, because a transport may defer work
-            until the headers are asked for, and any exception is treated the
-            same as a missing header.
+        result: The response to read the ``Retry-After`` header from. Any
+            exception raised while reading its headers is caught and treated
+            the same as a missing header.
 
     Returns:
         The number of seconds to wait before retrying, never negative. ``None``
@@ -125,9 +124,10 @@ class Compression(enum.Enum):
     """How an OTLP HTTP client compresses a payload before sending it.
 
     The value of each member is the token the OTLP specification uses for it in
-    ``OTEL_EXPORTER_OTLP_COMPRESSION``, and it is also the value
-    ``_OTLPHTTPClient`` writes into the ``Content-Encoding`` request header for
-    every member other than ``NONE``.
+    ``OTEL_EXPORTER_OTLP_COMPRESSION``. For every member other than ``NONE`` it
+    is also the value ``_OTLPHTTPClient`` writes into the ``Content-Encoding``
+    request header, unless the caller already supplied that header, as the
+    ``compression`` entry of ``_OTLPHTTPClient`` describes.
     """
 
     NONE = "none"
@@ -166,7 +166,7 @@ class _ExportResult:
     """Outcome of an OTLP export attempt, including retry exhaustion.
 
     Attributes:
-        success: Whether the collector answered with a status code in the range
+        success: Whether the server answered with a status code in the range
             200 to 399. Every other ending, including a run of retries that
             reached the deadline and a shutdown that interrupted the retries,
             is a failure.
@@ -215,9 +215,9 @@ class _OTLPHTTPClient:
             mapping is copied, so later changes to it are not picked up.
         jitter: How far the backoff may stray from its nominal value, as a
             fraction. A value of 0.2 multiplies each backoff by a random number
-            between 0.8 and 1.2. The value is clamped to the range 0 to 1, so a
-            backoff never reaches zero and never exceeds twice its nominal
-            value.
+            drawn from 0.8 up to but not including 1.2. The value is clamped to
+            the range 0 to 1, so the factor never exceeds 2, and at the clamp
+            of 1 it can be as low as 0.
         logger: Where to send the warning and error messages, or ``None`` to
             use the logger of this module. An exporter passes its own logger so
             that the messages are attributed to the exporter rather than to
@@ -255,19 +255,22 @@ class _OTLPHTTPClient:
         self._shutdown_event = threading.Event()
 
     def _compute_backoff(self, retry: int) -> float:
-        """Compute how long to wait before the attempt after this one.
+        """Compute the wait that follows one attempt.
 
-        The nominal wait doubles with each retry, starting at one second, and
-        is then multiplied by a random factor drawn uniformly from the jitter
-        range, so that many exporters failing at once do not retry in step.
+        The nominal wait doubles with each attempt, starting at one second for
+        ``retry`` of 0, and is then multiplied by a random factor drawn
+        uniformly from the jitter range, so that many exporters failing at once
+        do not retry in step.
 
         Args:
-            retry: How many attempts have already been made, counting from
-                zero for the first attempt.
+            retry: The zero-based index of the attempt that is about to be
+                made. ``export`` calls this at the head of each iteration,
+                before the attempt the index names.
 
         Returns:
-            The wait in seconds. The ``Retry-After`` header of a response
-            overrides it when the response carried one.
+            The wait in seconds, to be spent after that attempt fails. The
+            ``Retry-After`` header of a response overrides it when the response
+            carried one.
         """
         return 2**retry * random.uniform(1 - self._jitter, 1 + self._jitter)
 
@@ -339,27 +342,33 @@ class _OTLPHTTPClient:
     def export(self, data: bytes) -> _ExportResult:
         """Export a serialized payload, retrying on transient failures.
 
-        The payload is compressed once and a deadline of ``timeout`` seconds
-        is set, counted from this call. At most six attempts are made. A status
-        code in the range 200 to 399 ends the export as a success. A status
-        code of 429, 502, 503 or 504, or a response whose error the transport
-        recognises as a connection error, is retried. Anything else, including
-        an exception raised while submitting, ends the export as a failure
-        without another attempt.
+        The payload is compressed once and a deadline of ``timeout`` seconds is
+        set, counted from this call. At most six attempts are made, and each
+        attempt may repeat its request once after a connection error, so up to
+        twelve requests can be sent. A status code in the range 200 to 399 ends
+        the export as a success. A status code of 429, 502, 503 or 504 is
+        retried, and so is a response that carried no status code at all and
+        whose error the transport recognises as a connection error. Anything
+        else, including an exception raised while submitting, ends the export as
+        a failure without another attempt.
 
         The wait between attempts doubles each time, starting at one second and
         jittered by the fraction given to the constructor. A ``Retry-After``
-        header on a retryable response replaces that wait. The export gives up
-        when the sixth attempt has been made, when the next wait would run past
-        the deadline, or when shutdown has been requested, and it logs an error
-        in each of those cases.
+        header on a retryable response that carried a status code replaces that
+        wait. The export gives up and logs an error when the sixth attempt has
+        been made, when the next wait would run past the deadline, or when
+        shutdown was already requested before the wait began. Shutdown that
+        arrives during the wait also gives up, logging a warning rather than an
+        error.
 
         The call blocks for the wait between attempts, so an export can occupy
         the calling thread for close to ``timeout`` seconds. ``shutdown`` wakes
         it early.
 
-        This method does not raise. Every failure, including an exception
-        raised by the transport, is reported in the value returned.
+        A failure of the request, whether the transport reported it in a
+        response or raised it, is reported in the value returned rather than
+        raised. Compression runs before the first attempt and is not guarded, so
+        a payload that ``gzip`` or ``zlib`` cannot compress raises out of here.
 
         Args:
             data: The serialized payload to send, before compression.
@@ -432,9 +441,10 @@ class _OTLPHTTPClient:
         """Shutdown the client.
 
         An ``export`` already waiting between two attempts wakes up at once and
-        gives up, and an ``export`` started afterwards gives up before its
-        second attempt. Neither is cancelled part way through a request, so a
-        request already in flight runs to its own timeout.
+        gives up, and an ``export`` started afterwards makes its first attempt
+        and then gives up instead of retrying. Neither is cancelled part way
+        through a request, so a request already in flight runs to its own
+        timeout.
 
         The transport is closed, which releases its connection pool. Calling
         this a second time logs a warning and does nothing else, so the
