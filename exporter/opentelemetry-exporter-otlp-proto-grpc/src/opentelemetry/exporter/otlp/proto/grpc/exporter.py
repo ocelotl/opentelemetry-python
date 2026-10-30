@@ -374,7 +374,8 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
     """OTLP gRPC exporter mixin.
 
     This class provides the base functionality for OTLP exporters that send
-    telemetry data (spans or metrics) to an OTLP-compatible receiver via gRPC.
+    telemetry data (spans, metrics or log records) to an OTLP-compatible
+    receiver via gRPC.
     It includes a configurable reconnection mechanism to handle transient
     receiver outages.
 
