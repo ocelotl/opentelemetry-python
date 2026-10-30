@@ -153,9 +153,9 @@ def split_metrics_data(
     Yields:
         One ``ExportMetricsServiceRequest`` per batch. With
         ``max_export_batch_size`` of ``None`` that is ``metrics_data`` itself,
-        unchanged and yielded once. Otherwise every batch but the last carries
-        exactly ``max_export_batch_size`` data points, and a ``metrics_data``
-        holding no data points at all yields nothing.
+        unchanged and yielded once. For a ``max_export_batch_size`` above zero,
+        every batch but the last carries exactly that many data points. A
+        ``metrics_data`` holding no data points at all yields nothing.
     """
     if max_export_batch_size is None:
         yield metrics_data
@@ -300,11 +300,13 @@ def _build_empty_metric_batches(
 ) -> tuple[list[JSONResourceMetrics], list[JSONScopeMetrics], list[JSONMetric], list]:
     """Start the next batch, repeating the hierarchy the current metric sits in.
 
-    ``split_metrics_data`` calls this straight after yielding a full batch,
-    while it is still part way through the data points of one metric. The
-    remaining data points need somewhere to go, and OTLP requires them to be
-    reachable through a resource and a scope, so the enclosing messages are
-    repeated in the new batch.
+    ``split_metrics_data`` calls this straight after yielding a full batch.
+    When the batch boundary falls part way through the data points of a metric,
+    the data points that are left need somewhere to go, and OTLP requires them
+    to be reachable through a resource and a scope, so the enclosing messages
+    are repeated in the new batch. When the boundary instead falls on the last
+    data point of a metric, ``split_metrics_data`` discards what this returns
+    and starts the next batch from the next metric.
 
     Args:
         resource_metrics: the ``ResourceMetrics`` the current metric sits
@@ -463,7 +465,10 @@ def _encode_sum_data_point(
     """Encode one data point of a sum.
 
     The start time of the data point is carried across, which is what lets a
-    receiver tell a cumulative sum apart from a delta one and detect a reset.
+    receiver detect a reset in a cumulative series and bound the interval a
+    delta value covers. Whether the sum is cumulative or delta is carried by
+    ``aggregation_temporality`` on the enclosing ``Sum``, not by the start
+    time, which both kinds have.
 
     Args:
         data_point: the data point to encode.
