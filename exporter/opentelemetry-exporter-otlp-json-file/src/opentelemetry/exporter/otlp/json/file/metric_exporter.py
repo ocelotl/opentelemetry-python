@@ -173,6 +173,12 @@ class FileMetricExporter(MetricExporter):
             timeout_millis: Accepted for compatibility with the exporter interface and ignored,
                 because closing a local file does not block.
             kwargs: Accepted for compatibility with the exporter interface and ignored.
+
+        Raises:
+            OSError: Closing the file this exporter opened failed, which is where the buffered
+                bytes of the last write are reported when the write itself was buffered and
+                the flush succeeded. A caller-supplied stream and ``sys.stdout`` are never
+                closed, so neither of those destinations can raise here.
         """
         self._exporter.shutdown()
 

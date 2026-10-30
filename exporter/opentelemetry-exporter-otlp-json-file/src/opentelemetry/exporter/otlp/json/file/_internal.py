@@ -132,6 +132,12 @@ class _FileExporter(Generic[T]):
 
         A stream supplied by the caller is left open, and so is ``sys.stdout``. Calling this a
         second time logs a warning and does nothing else.
+
+        Raises:
+            OSError: Closing the file this exporter opened failed, which is where the buffered
+                bytes of the last write are reported when the write itself was buffered and
+                the flush succeeded. A caller-supplied stream and ``sys.stdout`` are never
+                closed, so neither of those destinations can raise here.
         """
         if self._shutdown:
             self._logger.warning("Exporter already shutdown, ignoring call")

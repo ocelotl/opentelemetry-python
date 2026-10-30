@@ -122,6 +122,12 @@ class FileSpanExporter(SpanExporter):
                 with no parameters at all, so a caller holding the base type must not rely on
                 this one.
             kwargs: Absorbs any further keyword a span processor passes, and is ignored.
+
+        Raises:
+            OSError: Closing the file this exporter opened failed, which is where the buffered
+                bytes of the last write are reported when the write itself was buffered and
+                the flush succeeded. A caller-supplied stream and ``sys.stdout`` are never
+                closed, so neither of those destinations can raise here.
         """
         self._exporter.shutdown()
 

@@ -129,6 +129,12 @@ class FileLogExporter(LogRecordExporter):
 
         A stream supplied by the caller is left open, and so is ``sys.stdout``. A later call to
         :meth:`export` logs a warning and returns ``LogRecordExportResult.FAILURE``.
+
+        Raises:
+            OSError: Closing the file this exporter opened failed, which is where the buffered
+                bytes of the last write are reported when the write itself was buffered and
+                the flush succeeded. A caller-supplied stream and ``sys.stdout`` are never
+                closed, so neither of those destinations can raise here.
         """
         self._exporter.shutdown()
 
