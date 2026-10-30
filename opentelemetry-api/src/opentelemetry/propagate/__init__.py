@@ -114,8 +114,9 @@ def _load_propagators() -> textmap.TextMapPropagator:
 
     Each comma-separated name is loaded as an ``opentelemetry_propagator``
     entry point. When the variable is unset, W3C trace context and W3C baggage
-    are used. When any name is ``none``, propagation is disabled entirely and
-    the remaining names are ignored.
+    are used. When a name is ``none``, propagation is disabled entirely and
+    every name after it is ignored. Every name before it is resolved first, so
+    a misspelled name ahead of ``none`` still raises :exc:`ValueError`.
 
     Returns:
         A :class:`~opentelemetry.propagators.composite.CompositePropagator`
