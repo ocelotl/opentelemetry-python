@@ -124,6 +124,13 @@ def _port_from_env() -> int:
     An invalid value is logged and ignored instead of raising, mirroring the
     OTLP/Zipkin exporters so a malformed environment variable cannot take
     auto-instrumentation startup down.
+
+    Returns:
+        The port the Prometheus HTTP server binds to. That is the integer
+        parsed from the environment variable, or ``9464`` when the variable is
+        unset, holds only whitespace, or does not parse as an integer. A value
+        that parses but is outside the range of a TCP port is returned as it
+        stands, and the failure surfaces later when the server binds.
     """
     raw = environ.get(OTEL_EXPORTER_PROMETHEUS_PORT)
     if raw is None or not raw.strip():
@@ -147,6 +154,27 @@ _OTEL_SCOPE_ATTR_PREFIX = "otel_scope_"
 
 
 def _convert_buckets(bucket_counts: Sequence[int], explicit_bounds: Sequence[float]) -> Sequence[tuple[str, int]]:
+    """Turn the per-bucket counts of an OpenTelemetry histogram into cumulative Prometheus buckets.
+
+    A Prometheus bucket reports how many observations fall at or below its
+    upper bound, so each count returned here is the running total of every
+    bucket up to and including the current one. The open-ended bucket above the
+    last explicit bound is labelled ``+Inf``.
+
+    Args:
+        bucket_counts: The number of observations recorded in each bucket, in
+            the order ``HistogramDataPoint`` holds them. It has one entry more
+            than ``explicit_bounds``, the extra one being the open-ended bucket.
+        explicit_bounds: The inclusive upper bound of every bucket except the
+            open-ended one, in ascending order.
+
+    Returns:
+        One pair per bucket, holding the upper bound rendered as a string and
+        the cumulative count of observations at or below it. The two arguments
+        are paired positionally and pairing stops at the shorter of them, so a
+        ``bucket_counts`` with fewer entries than expected drops the trailing
+        buckets without an error.
+    """
     buckets = []
     total_count = 0
     for upper_bound, count in zip(
@@ -160,6 +188,19 @@ def _convert_buckets(bucket_counts: Sequence[int], explicit_bounds: Sequence[flo
 
 
 def _should_convert_sum_to_gauge(metric: Metric) -> bool:
+    """Report whether a metric carrying a Sum has to be exported as a Prometheus gauge.
+
+    Args:
+        metric: The metric about to be translated. Its ``data`` decides the
+            answer and metrics carrying anything other than a ``Sum`` are
+            rejected outright.
+
+    Returns:
+        ``True`` when the metric carries a ``Sum`` that is non-monotonic and
+        cumulative, which a Prometheus counter cannot represent because a
+        counter only increases. ``False`` otherwise, including for a
+        non-monotonic ``Sum`` with delta temporality.
+    """
     # The Prometheus compatibility spec requires cumulative non-monotonic Sums
     # to be exported as Gauges.
     if not isinstance(metric.data, Sum):
@@ -180,6 +221,34 @@ def _get_or_create_family(
     labels: Sequence[str],
     unit: str,
 ) -> _FamilyT:
+    """Return the Prometheus metric family stored under ``family_id``, creating it when absent.
+
+    A single scrape can contribute many data points to one family, and
+    ``prometheus_client`` expects the family to be built once and then fed
+    sample by sample. The first call for a given ``family_id`` constructs the
+    family and stores it. Every later call ignores the construction arguments
+    it was passed and hands back the stored family, so a second call that
+    disagrees about the labels or the unit is silently ignored.
+
+    Args:
+        registry: The mapping from family identifier to family being assembled
+            for the scrape in progress. It is modified in place.
+        family_id: The key the family is stored under.
+        factory: The ``prometheus_client`` family class to construct when the
+            key is absent, such as ``CounterMetricFamily``.
+        name: The sanitized Prometheus metric name.
+        documentation: The description of the metric, empty when the instrument
+            carries none.
+        labels: The label names the family declares. Every sample added to the
+            family has to supply a value for each of them, in this order.
+        unit: The Prometheus spelling of the unit, which
+            ``prometheus_client`` appends to the metric name. An empty string
+            adds no suffix.
+
+    Returns:
+        The family held under ``family_id``, whether this call created it or
+        found it already there.
+    """
     if family_id not in registry:
         registry[family_id] = factory(
             name=name,
@@ -200,6 +269,25 @@ def _populate_counter_family(
     label_rows: Sequence[Sequence[str]],
     values: Sequence[float],
 ) -> None:
+    """Add one sample per data point to the Prometheus counter family of a metric.
+
+    Args:
+        registry: The mapping from family identifier to family being assembled
+            for the scrape in progress. It is modified in place.
+        per_metric_family_id: The identifier shared by every family of this
+            metric, built from its name, description and unit. The name of the
+            family class is appended to it here, which keeps a metric that
+            yields a counter apart from one that yields a gauge or a histogram.
+        metric_name: The sanitized Prometheus metric name.
+        description: The description of the metric, empty when the instrument
+            carries none.
+        unit: The Prometheus spelling of the unit.
+        label_keys: The label names the family declares.
+        label_rows: One row of label values per data point, each row ordered to
+            match ``label_keys``.
+        values: The value of each data point, paired positionally with
+            ``label_rows``.
+    """
     family_id = "|".join([per_metric_family_id, CounterMetricFamily.__name__])
     family = _get_or_create_family(
         registry,
@@ -224,6 +312,28 @@ def _populate_gauge_family(
     label_rows: Sequence[Sequence[str]],
     values: Sequence[float],
 ) -> None:
+    """Add one sample per data point to the Prometheus gauge family of a metric.
+
+    Both a ``Gauge`` and a cumulative non-monotonic ``Sum`` are exported this
+    way, the latter because a Prometheus counter cannot decrease.
+
+    Args:
+        registry: The mapping from family identifier to family being assembled
+            for the scrape in progress. It is modified in place.
+        per_metric_family_id: The identifier shared by every family of this
+            metric, built from its name, description and unit. The name of the
+            family class is appended to it here, which keeps a metric that
+            yields a gauge apart from one that yields a counter or a histogram.
+        metric_name: The sanitized Prometheus metric name.
+        description: The description of the metric, empty when the instrument
+            carries none.
+        unit: The Prometheus spelling of the unit.
+        label_keys: The label names the family declares.
+        label_rows: One row of label values per data point, each row ordered to
+            match ``label_keys``.
+        values: The value of each data point, paired positionally with
+            ``label_rows``.
+    """
     family_id = "|".join([per_metric_family_id, GaugeMetricFamily.__name__])
     family = _get_or_create_family(
         registry,
@@ -248,6 +358,32 @@ def _populate_histogram_family(
     label_rows: Sequence[Sequence[str]],
     values: Sequence[dict[str, Any]],
 ) -> None:
+    """Add one sample per data point to the Prometheus histogram family of a metric.
+
+    Args:
+        registry: The mapping from family identifier to family being assembled
+            for the scrape in progress. It is modified in place.
+        per_metric_family_id: The identifier shared by every family of this
+            metric, built from its name, description and unit. The name of the
+            family class is appended to it here, which keeps a metric that
+            yields a histogram apart from one that yields a counter or a gauge.
+        metric_name: The sanitized Prometheus metric name.
+        description: The description of the metric, empty when the instrument
+            carries none.
+        unit: The Prometheus spelling of the unit.
+        label_keys: The label names the family declares.
+        label_rows: One row of label values per data point, each row ordered to
+            match ``label_keys``.
+        values: One mapping per data point, paired positionally with
+            ``label_rows``. Each holds the keys ``bucket_counts``,
+            ``explicit_bounds`` and ``sum``, taken from the
+            ``HistogramDataPoint`` the mapping was built from. The bucket
+            counts are made cumulative before the sample is added, and the
+            ``_count`` series is left for ``prometheus_client`` to derive from
+            the ``+Inf`` bucket. ``prometheus_client`` drops both ``_count``
+            and ``_sum`` when ``sum`` is ``None`` or when the lowest explicit
+            bound is negative, so such a histogram exports its buckets alone.
+    """
     family_id = "|".join([per_metric_family_id, HistogramMetricFamily.__name__])
     family = _get_or_create_family(
         registry,
