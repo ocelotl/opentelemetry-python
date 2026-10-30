@@ -108,9 +108,13 @@ class FileSpanExporter(SpanExporter):
         :meth:`export` logs a warning and returns ``SpanExportResult.FAILURE``.
 
         Args:
-            timeout_millis: Accepted for compatibility with the exporter interface and ignored,
-                because closing a local file does not block.
-            kwargs: Accepted for compatibility with the exporter interface and ignored.
+            timeout_millis: What is left of the shutdown budget.
+                ``opentelemetry.sdk.trace.export.BatchSpanProcessor`` passes it because this
+                signature accepts it, and it is ignored here because closing a local file does
+                not block. ``opentelemetry.sdk.trace.export.SpanExporter`` declares this method
+                with no parameters at all, so a caller holding the base type must not rely on
+                this one.
+            kwargs: Absorbs any further keyword a span processor passes, and is ignored.
         """
         self._exporter.shutdown()
 
