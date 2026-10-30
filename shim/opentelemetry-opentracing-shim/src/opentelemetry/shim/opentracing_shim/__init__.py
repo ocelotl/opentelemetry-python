@@ -276,7 +276,7 @@ class SpanShim(Span):
             The OpenTracing API defines the values of *key_values* to be of any
             type. However, the OpenTelemetry API requires that the values be
             any one of the types defined in
-            ``opentelemetry.util.types.Attributes`` therefore, only these types
+            ``opentelemetry.util.types.AnyValue`` therefore, only these types
             are supported as values.
 
         Args:
@@ -430,15 +430,15 @@ class ScopeShim(Scope):
         :meth:`close` or by leaving the ``with`` block that produced it, for
         the previously recorded :class:`ScopeShim` to be the active one again.
 
-        This does not make the OpenTelemetry span current. Starting the span
-        and making it current is done by
+        This does not make the OpenTelemetry span current, and does not
+        change what :func:`opentelemetry.trace.get_current_span` returns.
+        Starting the span and making it current is done by
         :meth:`opentelemetry.trace.use_span` on the
-        :meth:`from_context_manager` path, before this method runs. A
-        :class:`ScopeShim` built directly from a :class:`SpanShim` whose
-        OpenTelemetry span was never made current leaves
-        :func:`opentelemetry.trace.get_current_span` returning the invalid
-        span, and :attr:`ScopeManagerShim.active` then returns `None` rather
-        than this object.
+        :meth:`from_context_manager` path, before this method runs. So for a
+        :class:`ScopeShim` built directly from a :class:`SpanShim`,
+        :attr:`ScopeManagerShim.active` hands back this object while some
+        OpenTelemetry span is current, whichever span that is, and returns
+        `None` while none is.
         """
         super().__init__(manager, span)
         self._span_cm = span_cm
@@ -541,12 +541,18 @@ class ScopeShim(Scope):
         was built. One built by :meth:`from_context_manager` holds the context
         manager returned by :meth:`opentelemetry.trace.use_span`, and the
         three arguments are passed to that context manager's ``__exit__()``
-        method, so an exception is recorded on the OpenTelemetry span and the
-        span is ended only if *finish_on_close* was `True` when
-        :meth:`ScopeManagerShim.activate` created it. One built directly from
-        a :class:`SpanShim` has no context manager, so the OpenTelemetry span
-        is ended unconditionally and the three arguments are ignored, which
-        means an exception leaving such a scope is not recorded.
+        method. An exception is then recorded on the OpenTelemetry span, as an
+        exception event and a span status of ``ERROR``, with no condition
+        attached. The ending of the span is the conditional part: it happens
+        only if *finish_on_close* was `True` when
+        :meth:`ScopeManagerShim.activate` created this :class:`ScopeShim`,
+        because that is the value handed to the ``end_on_exit`` parameter of
+        :meth:`opentelemetry.trace.use_span`.
+
+        One built directly from a :class:`SpanShim` has no context manager, so
+        the OpenTelemetry span is ended unconditionally and the three
+        arguments are ignored, which means an exception leaving such a scope
+        is not recorded.
 
         Args:
             exc_type: The class of the exception that ended the scope, or
