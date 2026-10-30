@@ -172,8 +172,11 @@ def load_entry_point(group: str, name: str) -> type:
 
     Raises:
         ConfigurationError: If no entry point in ``group`` is named ``name``,
-            or if loading it raises. The message names the missing plugin and
-            tells the user to install the package that provides it.
+            in which case the message names the plugin and tells the user to
+            install the package that provides it. Also if loading a
+            registered entry point raises, for instance when its module
+            fails to import, in which case the message names the plugin and
+            quotes the underlying exception instead, with no install hint.
     """
     try:
         ep = next(iter(entry_points(group=group, name=name)), None)
@@ -274,10 +277,14 @@ def _parse_headers(
     Returns:
         The merged headers, with an entry from ``headers`` overwriting one of
         the same name from ``headers_list``. ``None`` when both arguments are
-        ``None``, which leaves the exporter free to read
-        ``OTEL_EXPORTER_OTLP_HEADERS`` instead. An empty dict is returned,
-        and suppresses that environment variable, when a field was present
-        but contributed no usable pair.
+        ``None``, and an empty dict when a field was present but contributed
+        no usable pair.
+
+        Neither result suppresses ``OTEL_EXPORTER_OTLP_HEADERS``. The gRPC
+        exporter falls back to the variable whenever what it is given is
+        falsy, which an empty dict is, and the HTTP exporters always read
+        the variable first and then overlay what they are given, so a
+        header set only in the environment is sent either way.
     """
     if headers is None and headers_list is None:
         return None

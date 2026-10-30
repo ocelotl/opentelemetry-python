@@ -54,9 +54,11 @@ def configure_instrumentation(
 
     When the instrumentor declares a ``configuration`` dataclass, only the
     fields of that dataclass whose resolved value is not ``None`` are
-    forwarded. An option the instrumentor's dataclass does not declare is
-    therefore dropped, and an option set explicitly to null is dropped too,
-    so the instrumentor applies its own default instead.
+    forwarded, so an option set explicitly to null is dropped and the
+    instrumentor applies its own default. An option the dataclass does not
+    declare is not dropped: building the dataclass raises ``TypeError``,
+    which is logged as an error, and that instrumentor is skipped entirely
+    rather than instrumented with its remaining options.
 
     Args:
         configuration: The ``instrumentation/development`` section of the

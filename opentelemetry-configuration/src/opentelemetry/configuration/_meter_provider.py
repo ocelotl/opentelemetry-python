@@ -172,10 +172,10 @@ def _map_temporality(
             read as cumulative.
 
     Returns:
-        One entry per synchronous and asynchronous instrument class. Delta
-        and low_memory differ only for the observable counter, which
-        low_memory keeps cumulative. The gauge instrument has no entry,
-        because its temporality is fixed.
+        Six entries, one per instrument class except the synchronous gauge,
+        which is left out. Delta and low_memory differ only for the
+        observable counter, which low_memory keeps cumulative; the
+        observable gauge is pinned to cumulative in all three mappings.
 
     Raises:
         ConfigurationError: If ``pref`` is some other enum member.
