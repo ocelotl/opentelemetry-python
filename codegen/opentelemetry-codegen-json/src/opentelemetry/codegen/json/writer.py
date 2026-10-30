@@ -7,10 +7,10 @@
 ``opentelemetry.codegen.json.generator`` uses it to assemble every file it emits.
 
 The writer has no model of the code it is building. It appends strings to a list and prefixes each
-one with the current indentation, and the methods named after Python constructs only save the
-caller from writing the keyword, the punctuation and the indentation bookkeeping by hand. Nothing
-here parses or validates what it is given, so a syntactically invalid fragment passed in comes out
-unchanged.
+non-empty one with the current indentation, and the methods named after Python constructs only
+save the caller from writing the keyword, the punctuation and the indentation bookkeeping by hand.
+Nothing here parses or validates what it is given, so a syntactically invalid fragment passed in
+comes out unchanged.
 
 A method named after a block construct, such as ``if_`` or ``class_``, is a context manager that
 writes the header line and indents the body for the duration of the ``with`` statement. A method
