@@ -311,15 +311,15 @@ class Urllib3HTTPTransport(BaseHTTPTransport):
         the request into a bodiless ``GET``, so a ``303`` from a misconfigured
         endpoint gives the caller a ``200`` for an export whose payload was
         never delivered. A redirect to a different host drops the
-        ``Authorization`` header. ``Cookie`` is dropped from ``urllib3``
-        1.26.17 onwards and from 2.0.6 onwards, and ``Proxy-Authorization``
-        from 1.26.19 onwards and from 2.2.2 onwards, so an earlier ``urllib3``
-        re-sends those two headers to the redirect target. A chain longer than
-        three redirects comes back as a result whose ``error`` is a
-        ``MaxRetryError``, which :meth:`is_connection_error` reports as
-        retryable, so the exporter sends the batch again. The redirect target
-        also gets a retry budget of its own, drawn from what is left of the
-        ``urllib3`` default, in place of the zero this transport asked for.
+        ``Authorization`` header. ``Cookie`` is re-sent to the redirect target
+        by an ``urllib3`` below 1.26.17 and by 2.0.0 through 2.0.5, and
+        ``Proxy-Authorization`` by an ``urllib3`` below 1.26.19 and by 2.0.0
+        through 2.2.1. A chain longer than three redirects comes back as a
+        result whose ``error`` is a ``MaxRetryError``, which
+        :meth:`is_connection_error` reports as retryable, so the exporter sends
+        the batch again. The redirect target also gets a retry budget of its
+        own, drawn from what is left of the ``urllib3`` default, in place of
+        the zero this transport asked for.
 
         Every exception raised by ``urllib3`` is caught and placed in the
         result, including ones that are not connection errors, so this method
