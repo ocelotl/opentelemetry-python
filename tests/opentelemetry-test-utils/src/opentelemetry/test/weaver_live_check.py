@@ -734,8 +734,10 @@ class WeaverLiveCheck:
         Raises :exc:`RuntimeError` if closed without requesting a report or if
         an earlier report request or shutdown failed.
 
-        Raises :exc:`RuntimeError` for infrastructure problems (weaver failed
-        to start, HTTP communication error, etc.).
+        Raises :exc:`RuntimeError` when weaver never became ready, so there is
+        nothing to stop. An admin request that fails or answers with an error
+        status is not turned into a :exc:`RuntimeError`: the
+        ``requests.RequestException`` raised by ``_do_stop`` propagates.
 
         See https://github.com/open-telemetry/weaver/tree/main/crates/weaver_live_check#output
         for the report structure.
@@ -767,8 +769,10 @@ class WeaverLiveCheck:
         Raises :exc:`RuntimeError` if closed without requesting a report or if
         an earlier report request or shutdown failed.
 
-        Raises :exc:`RuntimeError` for infrastructure problems (weaver failed
-        to start, HTTP communication error, etc.).
+        Raises :exc:`RuntimeError` when weaver never became ready, so there is
+        nothing to stop. An admin request that fails or answers with an error
+        status is not turned into a :exc:`RuntimeError`: the
+        ``requests.RequestException`` raised by ``_do_stop`` propagates.
 
         Args:
             timeout: Seconds allowed for each step of stopping weaver.

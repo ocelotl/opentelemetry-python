@@ -304,9 +304,11 @@ class OtlpProtoTestServer:
             exporter.export([span])
             recorded = server.wait_for_span(name="my-span")
 
-    The three endpoint properties give the URLs to configure an exporter with,
-    and are only meaningful after ``start``, because the port is assigned on
-    bind. Received telemetry is read either by waiting for a specific item, with
+    The three endpoint properties give the URLs to configure an exporter with.
+    Under the default ``port`` of ``0`` they are meaningful only after
+    ``start``, because the port is assigned on bind; when an explicit port was
+    requested they already hold it before ``start``.
+    Received telemetry is read either by waiting for a specific item, with
     ``get_span``, ``wait_for_span`` and their metric and log counterparts, or by
     taking whatever has arrived, with ``drain_spans``, ``drain_metrics`` and
     ``drain_log_records``. Every read removes what it returns, so an item is

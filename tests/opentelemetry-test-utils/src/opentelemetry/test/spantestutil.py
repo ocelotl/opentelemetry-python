@@ -49,8 +49,10 @@ def get_span_with_dropped_attributes_events_links():
     non-zero once a limit is exceeded, so this builds a span that exceeds every
     one of them. The default ``SpanLimits`` cap attributes, events and links at
     128 each; this span is given 130 attributes, 131 events and 129 links, and
-    its resource and every one of its events and links carry the same 130
-    attributes. The span name is ``"span"``.
+    its resource and every one of its events and links are given the same 130
+    attributes. Only the resource keeps all 130, because no limit applies to it;
+    the span, each event and each link keep the 128 the limits allow. The span
+    name is ``"span"``.
 
     Returns:
         The span, already ended, because it is returned from inside the

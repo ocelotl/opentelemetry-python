@@ -18,8 +18,12 @@ ASGI and HTTP server fixtures (``opentelemetry.test.wsgitestutil``,
 ``opentelemetry.test.asgitestutil``, ``opentelemetry.test.httptest``), builders
 for spans, metrics and samplers (``opentelemetry.test.spantestutil``,
 ``opentelemetry.test.metrictestutil``, ``opentelemetry.test.samplertestutil``),
-propagator doubles (``opentelemetry.test.mock_textmap``), and an in-process
-OTLP/HTTP receiver (``opentelemetry.test._otlp_test_server``).
+propagator doubles (``opentelemetry.test.mock_textmap``), an entry point double
+(``opentelemetry.test.mock_test_classes``), helpers for provoking a thread race
+(``opentelemetry.test.concurrency_test``), an in-process OTLP/HTTP receiver
+(``opentelemetry.test._otlp_test_server``), a semantic convention check against
+weaver (``opentelemetry.test.weaver_live_check``), and the version of the
+distribution (``opentelemetry.test.version``).
 """
 
 from traceback import format_tb
