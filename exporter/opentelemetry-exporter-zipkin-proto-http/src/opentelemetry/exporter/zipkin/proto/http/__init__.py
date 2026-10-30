@@ -124,8 +124,11 @@ class ZipkinExporter(SpanExporter):
             and when that is unset the timeout is 10 seconds.
         session: Connection session used to reach the Zipkin collector endpoint.
             Pass one to control connection pooling, retries or authentication.
-            When ``None``, this exporter creates its own session and closes it
-            on shutdown.
+            When ``None``, this exporter creates one. Either way the exporter
+            takes the session over: it sets ``Content-Type`` on the session
+            headers, and :meth:`shutdown` closes the session even when the
+            caller supplied it. Do not pass a session the application also uses
+            for its own requests.
     """
 
     def __init__(
@@ -228,8 +231,10 @@ class ZipkinExporter(SpanExporter):
         This exporter holds no queue of its own: :meth:`export` posts each batch
         before it returns, so by the time this method runs every batch handed to
         the exporter has already been sent. Buffering belongs to the span
-        processor in front of the exporter, which flushes itself before calling
-        this method.
+        processor in front of the exporter, and the span processors of the SDK
+        drain their own queue through :meth:`export` rather than through this
+        method, which none of them calls. It exists to satisfy the
+        :class:`~opentelemetry.sdk.trace.export.SpanExporter` interface.
 
         Args:
             timeout_millis: Budget in milliseconds for the flush. Ignored,
