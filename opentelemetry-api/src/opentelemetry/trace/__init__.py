@@ -601,19 +601,21 @@ class NoOpTracer(Tracer):
     ) -> "Span":
         """Return a non-recording span, creating no telemetry.
 
+        ``context`` is the only argument that has an effect. Every other one
+        is accepted so that the signature matches :meth:`Tracer.start_span`,
+        and discarded, because a non-recording span holds nothing but a span
+        context.
+
         Args:
-            name: The name of the span to be created.
-            context: An optional Context containing the span's parent.
-                Defaults to the current context.
-            kind: The span's kind, meaning its relationship to its parent.
-            attributes: The span's attributes.
-            links: Other spans this one is causally related to.
-            start_time: When the operation started, as nanoseconds since the
-                Unix epoch. Defaults to the time of the call.
-            record_exception: Whether to record an exception raised in the
-                span as an event on it.
-            set_status_on_exception: Whether to set the span status to ERROR
-                when an exception leaves the span.
+            name: Ignored.
+            context: The Context to read the current span from. Defaults to
+                the current context.
+            kind: Ignored.
+            attributes: Ignored.
+            links: Ignored.
+            start_time: Ignored.
+            record_exception: Ignored.
+            set_status_on_exception: Ignored.
 
         Returns:
             The current span when it is already a
@@ -651,20 +653,26 @@ class NoOpTracer(Tracer):
     ) -> Iterator["Span"]:
         """Make a non-recording span current for the duration of the block.
 
+        ``context`` is the only argument that changes what happens. The rest
+        are accepted so that the signature matches
+        :meth:`Tracer.start_as_current_span`, and the three passed on to
+        :func:`use_span` change nothing there, because a non-recording span is
+        never recording and discards the call to :meth:`Span.end`.
+
         Args:
-            name: The name of the span to be created.
-            context: An optional Context containing the span's parent.
-                Defaults to the current context.
-            kind: The span's kind, meaning its relationship to its parent.
-            attributes: The span's attributes.
-            links: Other spans this one is causally related to.
-            start_time: When the operation started, as nanoseconds since the
-                Unix epoch.
-            record_exception: Whether to record an exception raised in the
-                span as an event on it.
-            set_status_on_exception: Whether to set the span status to ERROR
-                when an exception leaves the span.
-            end_on_exit: Whether to end the span when leaving the block.
+            name: Ignored.
+            context: The Context to read the current span from. Defaults to
+                the current context.
+            kind: Ignored.
+            attributes: Ignored.
+            links: Ignored.
+            start_time: Ignored.
+            record_exception: Passed on to :func:`use_span`, which records
+                nothing on a non-recording span.
+            set_status_on_exception: Passed on to :func:`use_span`, which sets
+                no status on a non-recording span.
+            end_on_exit: Passed on to :func:`use_span`, whose call to
+                :meth:`Span.end` a non-recording span discards.
 
         Yields:
             A :class:`~opentelemetry.trace.NonRecordingSpan`, which records nothing set on it but
