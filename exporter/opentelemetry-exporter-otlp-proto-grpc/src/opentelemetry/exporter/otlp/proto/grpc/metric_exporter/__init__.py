@@ -454,7 +454,9 @@ class OTLPMetricExporter(
         Call this when the meter provider to record those metrics with was not
         known at the time the exporter was constructed. This does not change
         where the exported metrics go, only where the exporter's own metrics
-        are recorded.
+        are recorded. It does nothing at all unless
+        :envvar:`OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED` is set to ``true``,
+        because the exporter records no self-observability metrics otherwise.
 
         Args:
             meter_provider: Meter provider to record the exporter's own

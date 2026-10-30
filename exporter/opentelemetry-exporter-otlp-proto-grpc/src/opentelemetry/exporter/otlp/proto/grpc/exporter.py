@@ -180,7 +180,11 @@ def environ_to_compression(environ_key: str) -> Compression | None:
     Returns:
         ``grpc.Compression.Gzip`` when the variable holds ``gzip``, and
         ``None`` when the variable is unset. ``None`` leaves the choice to the
-        caller, which falls back to ``grpc.Compression.NoCompression``.
+        caller, and the callers in this package do two different things with
+        it: ``OTLPExporterMixin`` falls back to
+        ``grpc.Compression.NoCompression``, while the three exporter
+        constructors pass the ``None`` on so that the generic compression
+        variable is read next.
 
     Raises:
         InvalidCompressionValueException: When the variable is set to anything
@@ -780,9 +784,12 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
 
         Call this when the meter provider to record those metrics with was not
         known at the time the exporter was constructed. The instruments
-        created earlier are discarded and new ones are created from
-        ``meter_provider``, and whether anything is recorded still depends on
-        :envvar:`OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED`.
+        created earlier are discarded, and new ones are created from
+        ``meter_provider`` only when
+        :envvar:`OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED` is set to ``true``.
+        When it is not, no instrument is created, ``meter_provider`` is never
+        asked for a meter, and the call leaves the exporter recording
+        nothing.
 
         Args:
             meter_provider: Meter provider to record the exporter's own
