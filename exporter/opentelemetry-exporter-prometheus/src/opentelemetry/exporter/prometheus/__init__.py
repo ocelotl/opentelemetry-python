@@ -839,10 +839,11 @@ class _CustomCollector:
             name.
 
         Raises:
-            AttributeError: If a data point is of neither of those two kinds,
-                since the value is then read from a field the point does not
-                have. An ``ExponentialHistogramDataPoint`` is the case that
-                reaches this.
+            AttributeError: If a data point is neither a ``NumberDataPoint``
+                nor a ``HistogramDataPoint``, since the value is then read
+                from a field the data point does not have. An
+                ``ExponentialHistogramDataPoint`` is the case that reaches
+                this.
         """
         keys: set[str] = set()
         rows: list[dict[str, str]] = []
