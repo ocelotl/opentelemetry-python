@@ -293,6 +293,32 @@ def _limit_baggage_bytes(
     max_entry_bytes: int,
     max_total_bytes: int,
 ) -> collections.abc.Iterator[tuple[str, str]]:
+    """Yield the pairs of an iterable that fit a per-entry and a total byte budget.
+
+    A pair is charged the UTF-8 length of its key, plus the UTF-8 length of its
+    value, plus one byte for the ``=`` that joins them in a W3C Baggage header,
+    plus one further byte for the ``,`` that would separate it from an
+    already accepted pair. Charging bytes rather than characters is what makes
+    the budget match what a receiver has to parse, since one character can
+    occupy several bytes.
+
+    A pair whose own cost exceeds ``max_entry_bytes``, or that would take the
+    running total past ``max_total_bytes``, is skipped. Skipping continues
+    rather than stopping, so a pair small enough to still fit is yielded even
+    after a larger one has been skipped, and the yielded pairs are therefore
+    not always a prefix of ``pairs``.
+
+    Args:
+        pairs: the candidate key and value pairs, in the order they are to be
+            considered. Both halves are counted as they are given, so a caller
+            that encodes its values has to encode them first.
+        max_entry_bytes: the largest a single pair is allowed to be.
+        max_total_bytes: the largest all yielded pairs together are allowed to
+            be.
+
+    Yields:
+        Each pair that fits, in the order it was given.
+    """
     total_bytes = 0
     accepted = 0
     for key, value in pairs:
@@ -308,12 +334,43 @@ def _limit_baggage_bytes(
 
 
 def _format_uber_trace_id(trace_id, span_id, parent_span_id, flags):
+    """Render the four fields of a ``uber-trace-id`` header value.
+
+    Args:
+        trace_id: the trace id, rendered zero-padded to 32 hexadecimal
+            characters.
+        span_id: the span id, rendered zero-padded to 16 hexadecimal
+            characters.
+        parent_span_id: the span id of the parent, rendered zero-padded to 16
+            hexadecimal characters. ``inject`` passes 0 when it finds no
+            parent, which renders as 16 zeros.
+        flags: the flags field, rendered zero-padded to 2 hexadecimal
+            characters. Bit 0 is the sampled bit and bit 1 is the debug bit.
+
+    Returns:
+        The four fields joined by colons.
+    """
     return f"{format_trace_id(trace_id)}:{format_span_id(span_id)}:{format_span_id(parent_span_id)}:{flags:02x}"
 
 
 def _extract_first_element(
     items: collections.abc.Iterable[str] | None,
 ) -> str | None:
+    """Take the first element of an iterable, treating no element as ``None``.
+
+    A getter reports the values of a carrier key as a sequence, because one
+    header name can appear several times, and the Jaeger format reads only the
+    first occurrence.
+
+    Args:
+        items: the values a getter reported, or ``None`` when the key was
+            absent from the carrier.
+
+    Returns:
+        The first element, or ``None`` when ``items`` is ``None`` or has no
+        element. The two cases are not distinguished, because both callers
+        treat an absent key and an empty value the same way.
+    """
     if items is None:
         return None
     return next(iter(items), None)
@@ -322,6 +379,32 @@ def _extract_first_element(
 def _parse_trace_id_header(
     items: collections.abc.Iterable[str],
 ) -> tuple[int, int, int]:
+    """Split a ``uber-trace-id`` header value into a trace id, a span id and flags.
+
+    Only the first value is read. A value with no ``:`` in it is
+    percent-decoded first, because some Jaeger clients encode the delimiter
+    along with everything else.
+
+    The value has to split into exactly four colon-separated fields and its
+    flags field has to be hexadecimal. Failing either of those discards the
+    whole value and gives the invalid result. The third field, the parent span
+    id, has to be present but its content is discarded, because
+    ``SpanContext`` has nowhere to hold it.
+
+    A trace id or span id field that is not hexadecimal becomes the invalid id
+    on its own, leaving the other two values as they were parsed. No width is
+    checked, so a field with more hexadecimal digits than the format allows is
+    still parsed into an integer.
+
+    Args:
+        items: the values a getter reported for the ``TRACE_ID_KEY`` header.
+
+    Returns:
+        The trace id, the span id and the flags, as integers. The invalid
+        result is ``(INVALID_TRACE_ID, INVALID_SPAN_ID, 0)`` from
+        ``opentelemetry.trace``, and the caller detects it by checking each id
+        against those two values rather than the tuple as a whole.
+    """
     invalid_header_result = (trace.INVALID_TRACE_ID, trace.INVALID_SPAN_ID, 0)
 
     header = _extract_first_element(items)
@@ -352,6 +435,22 @@ def _parse_trace_id_header(
 
 
 def _int_from_hex_str(identifier: str) -> int | None:
+    """Parse hexadecimal text into an integer, reporting a failure as ``None``.
+
+    This is ``int(identifier, 16)`` with its ``ValueError`` turned into a
+    return value, so that ``_parse_trace_id_header`` can check three fields in
+    a row without a ``try`` block around each one.
+
+    The parse is as permissive as ``int`` itself: surrounding whitespace, a
+    leading sign, a leading ``0x`` and underscores between digits are all
+    accepted, and no width is enforced.
+
+    Args:
+        identifier: the text of one field of the trace identity header.
+
+    Returns:
+        The integer value, or ``None`` when ``identifier`` is not hexadecimal.
+    """
     try:
         return int(identifier, 16)
     except ValueError:
