@@ -11,7 +11,11 @@ temporality and aggregation preferences an exporter passes to the SDK, and
 ``_exporter_metrics`` records how much telemetry an exporter submitted and how
 long each attempt took.
 
-Every name in this package is internal to the OTLP exporters. Nothing here is
-covered by the backward compatibility policy of the project, so an application
-that imports it may break on any release.
+Every name in this package is internal to the OTLP exporters and is not covered
+by the backward compatibility policy of the project, so an application that
+imports one may break on any release. ``Compression`` is the one name an
+application meets anyway: the OTLP HTTP exporters give it as the type of their
+``compression`` constructor parameter and accept no string in its place, so
+selecting a compression scheme in code means importing it from
+``opentelemetry.exporter.otlp.common.http``.
 """

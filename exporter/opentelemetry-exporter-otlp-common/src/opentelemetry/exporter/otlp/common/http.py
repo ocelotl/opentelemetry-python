@@ -171,8 +171,10 @@ class _ExportResult:
             reached the deadline and a shutdown that interrupted the retries,
             is a failure.
         status_code: The status code of the last response received, or ``None``
-            when no response was received at all or when retries were
-            abandoned because shutdown was requested.
+            when no response was received at all or when shutdown interrupted a
+            wait between attempts. Shutdown noticed before a wait begins is the
+            other case, and that one does carry the status code of the attempt
+            that had just failed.
         reason: The reason phrase the transport reported alongside
             ``status_code``, or ``None`` on the same conditions.
         error: The exception that ended the attempt, either the one raised
@@ -441,9 +443,10 @@ class _OTLPHTTPClient:
         """Shutdown the client.
 
         An ``export`` already waiting between two attempts wakes up at once and
-        gives up, and an ``export`` started afterwards makes its first attempt
-        and then gives up instead of retrying. Neither is cancelled part way
-        through a request, so a request already in flight runs to its own
+        gives up. An ``export`` started afterwards still makes its first
+        attempt, and gives up rather than retrying if that attempt fails, so it
+        succeeds whenever the first attempt succeeds. Neither is cancelled part
+        way through a request, so a request already in flight runs to its own
         timeout.
 
         The transport is closed, which releases its connection pool. Calling

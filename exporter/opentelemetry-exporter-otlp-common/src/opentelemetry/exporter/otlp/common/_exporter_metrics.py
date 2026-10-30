@@ -160,9 +160,8 @@ class ExporterMetrics:
     so instances of this class share a module-level counter per component type
     and the name is the component type followed by ``/`` and the number of
     instances with that same component type created before this one. The
-    counter is never reset, so an
-    exporter created after another one is shut down still gets a name of its
-    own.
+    counter is never reset, so an exporter created after another one is shut
+    down still gets a name of its own.
 
     Args:
         component_type: The kind of exporter being observed, recorded as the
@@ -181,10 +180,10 @@ class ExporterMetrics:
             the scheme is ``https``, and 80 when the scheme is ``http``.
             ``server.port`` is left unrecorded in every other case, and
             ``server.address`` is left unrecorded when no host could be parsed.
-            A port that is not an integer in range makes ``urlparse`` raise
-            ``ValueError`` out of the constructor, so enabling
-            self-observability turns a malformed endpoint into an exception the
-            exporter does not otherwise raise.
+            ``urlparse`` itself accepts a port that is not an integer in range,
+            and reading the parsed port then raises ``ValueError`` out of the
+            constructor, so enabling self-observability turns a malformed
+            endpoint into an exception the exporter does not otherwise raise.
         meter_provider: Where to get the meter that creates the instruments,
             or ``None`` to use the global meter provider at the moment this
             instance is created. The meter is named ``opentelemetry-sdk``.
@@ -302,6 +301,13 @@ def create_exporter_metrics(
     provider is replaced, so that the instruments come from the new provider.
     The call creates no instruments and touches no meter provider while
     ``enabled`` is false.
+
+    Every call with ``enabled`` true builds a new ``ExporterMetrics`` and so
+    takes the next ``otel.component.name`` for its component type. One exporter
+    that replaces its meter provider therefore reports one name before the
+    replacement and the next name after it, and a backend grouping the
+    ``otel.sdk.exporter.*`` series by that attribute sees two series rather
+    than one.
 
     Args:
         component_type: The kind of exporter being observed. See
