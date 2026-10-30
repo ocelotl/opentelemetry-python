@@ -80,6 +80,11 @@ def extract(
             which understands how to extract a value from it.
         context: an optional Context to use. Defaults to root
             context if not set.
+
+    Returns:
+        A Context holding whatever the globally configured propagator found in
+        the carrier. When the carrier holds nothing the propagator recognises,
+        ``context`` is returned unchanged.
     """
     return get_global_textmap().extract(carrier, context, getter=getter)
 
@@ -105,6 +110,24 @@ def inject(
 
 
 def _load_propagators() -> textmap.TextMapPropagator:
+    """Build the global propagator from the ``OTEL_PROPAGATORS`` variable.
+
+    Each comma-separated name is loaded as an ``opentelemetry_propagator``
+    entry point. When the variable is unset, W3C trace context and W3C baggage
+    are used. When any name is ``none``, propagation is disabled entirely and
+    the remaining names are ignored.
+
+    Returns:
+        A :class:`~opentelemetry.propagators.composite.CompositePropagator`
+        wrapping the configured propagators, in the order they were named. It
+        wraps an empty list when propagation is disabled.
+
+    Raises:
+        ValueError: If a named propagator has no matching entry point, which
+            means it is misspelled or its package is not installed.
+        Exception: Re-raises whatever loading an entry point raised, after
+            logging it.
+    """
     configured = environ.get(OTEL_PROPAGATORS)
     if not configured:
         # pylint: disable=import-outside-toplevel,no-name-in-module
@@ -161,11 +184,27 @@ for propagator in environ_propagators.split(","):  # type: ignore[assignment]
 
 
 def get_global_textmap() -> textmap.TextMapPropagator:
+    """Return the propagator that :func:`extract` and :func:`inject` use.
+
+    Returns:
+        The globally configured propagator. Unless
+        :func:`set_global_textmap` has replaced it, this is the one built from
+        the ``OTEL_PROPAGATORS`` environment variable at import time.
+    """
     return _HTTP_TEXT_FORMAT
 
 
 def set_global_textmap(
     http_text_format: textmap.TextMapPropagator,
 ) -> None:
+    """Replace the propagator that :func:`extract` and :func:`inject` use.
+
+    This overrides whatever the ``OTEL_PROPAGATORS`` environment variable
+    selected. Call it before any instrumentation starts propagating, since a
+    propagator already captured by a caller is not replaced.
+
+    Args:
+        http_text_format: The propagator to install globally.
+    """
     global _HTTP_TEXT_FORMAT  # pylint:disable=global-statement
     _HTTP_TEXT_FORMAT = http_text_format
