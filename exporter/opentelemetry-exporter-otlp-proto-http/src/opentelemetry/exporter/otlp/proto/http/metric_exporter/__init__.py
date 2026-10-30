@@ -130,8 +130,10 @@ class OTLPMetricExporter(MetricExporter):
     each be left unset, in which case the value is resolved from the
     environment: first the per-signal ``OTEL_EXPORTER_OTLP_METRICS_*`` variable,
     then the signal-independent ``OTEL_EXPORTER_OTLP_*`` one, then a built-in
-    fallback. An argument given here overrides both variables. ``headers``
-    follows the same order key by key instead of replacing the whole mapping.
+    fallback. An argument given here overrides both variables. ``headers`` is
+    merged key by key over the headers of whichever one of the two variables is
+    used, but the two variables do not merge with each other: the per-signal one
+    replaces the signal-independent one entirely when it is set.
 
     ``max_export_batch_size``, ``max_request_size`` and ``meter_provider`` have
     no environment variable of either kind, so they can only be set here.

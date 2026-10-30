@@ -10,9 +10,11 @@ The ``_resolve_*`` functions here take that per-signal variable as an argument
 and apply one precedence rule to all three signals: a value passed to the
 constructor wins over the per-signal environment variable, which wins over the
 signal-independent ``OTEL_EXPORTER_OTLP_*`` variable, which wins over the
-default built into this module. ``_resolve_headers`` applies that order key by
-key rather than to the mapping as a whole, and ``_load_session_from_envvar``
-reads the signal-independent variable first.
+default built into this module. ``_resolve_headers`` merges the headers passed
+to the constructor key by key over the headers of whichever one of the two
+variables it used, but the two variables do not merge with each other: the
+per-signal one replaces the signal-independent one entirely when it is set.
+``_load_session_from_envvar`` reads the signal-independent variable first.
 
 The metric exporter takes ``preferred_temporality``, ``preferred_aggregation``
 and ``max_export_batch_size`` on top of that set, and none of the three is
