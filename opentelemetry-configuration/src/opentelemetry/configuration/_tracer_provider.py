@@ -16,13 +16,18 @@ configuration field, so ``OTEL_TRACES_SAMPLER`` and the
 ``OTEL_SPAN_*_LIMIT`` family have no effect once a configuration file is
 in use.
 
-Two things are left to the SDK and so still follow the environment.
+Three things are left to the SDK and so still follow the environment.
 ``_create_span_processor`` passes an absent batch field through as
 ``None``, which lets the SDK read ``OTEL_BSP_SCHEDULE_DELAY`` and its
 siblings. ``_create_span_limits`` never passes ``max_attributes``, so
-``OTEL_ATTRIBUTE_COUNT_LIMIT`` is still read for it. The logger provider
-does neither, which is why ``OTEL_BLRP_*`` is dead there and
-``OTEL_BSP_*`` is not dead here.
+``OTEL_ATTRIBUTE_COUNT_LIMIT`` is still read for it. The OTLP exporter
+factories pass an absent endpoint, header set, timeout or compression
+through as ``None``, so the exporter still reads the
+``OTEL_EXPORTER_OTLP_*`` family for whatever the configuration file
+leaves out. The logger provider passes its batch values and its
+``max_attributes`` explicitly, which is why ``OTEL_BLRP_*`` is dead
+there and ``OTEL_BSP_*`` is not dead here; its exporter fields behave
+exactly as the ones here do.
 
 The SDK's experimental composable samplers are reachable through the
 ``composite/development`` field. They are a separate sampler hierarchy

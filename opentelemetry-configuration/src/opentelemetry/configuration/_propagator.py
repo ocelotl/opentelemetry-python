@@ -11,11 +11,14 @@ nothing. That is deliberate: the SDK otherwise defaults to W3C trace
 context plus baggage, and a configuration file is meant to describe the
 whole configuration rather than add to a default.
 
-``tracecontext`` and ``baggage`` are constructed directly from the API
-package. Every other name, declared in the schema or not, is loaded from
-the ``opentelemetry_propagator`` entry point group, so a propagator the
-schema names but no installed package provides is a configuration error
-rather than a silently missing header.
+In a ``composite`` entry, ``tracecontext`` and ``baggage`` are
+constructed directly from the API package, and every other name,
+declared in the schema or not, is loaded from the
+``opentelemetry_propagator`` entry point group. In ``composite_list``
+every name goes through that entry point group, ``tracecontext`` and
+``baggage`` included. Either way, a propagator the schema names but no
+installed package provides is a configuration error rather than a
+silently missing header.
 """
 
 from __future__ import annotations

@@ -5,15 +5,16 @@
 
 Four kinds of helper live here. The glob matchers implement the
 restricted wildcard syntax the configuration schema uses, which is not
-``fnmatch`` and not a regular expression. ``load_entry_point`` and
-``_resolve_component`` turn a component name from the configuration file
-into a class, either a built-in one or a plugin registered through an
-entry point group, though only the first of those two is called from
-anywhere in the package. ``_additional_properties`` is the decorator the
-code generator puts on a model that accepts a plugin component name; it
-rewrites the generated ``__init__`` so an undeclared key is captured
-rather than rejected. The value translators turn one configuration field
-into the shape an SDK exporter constructor expects: a headers dict, a
+``fnmatch`` and not a regular expression. ``load_entry_point`` turns a
+component name from the configuration file into the class an entry
+point group registers under that name, and ``_resolve_component`` goes
+one step further and returns a constructed component, built-in or
+plugin. Only ``load_entry_point`` is called from anywhere in the
+package. ``_additional_properties`` is the decorator the code generator
+puts on a model that accepts a plugin component name; it rewrites the
+generated ``__init__`` so an undeclared key is captured rather than
+rejected. The value translators turn one configuration field into the
+shape an SDK exporter constructor expects: a headers dict, a
 ``Compression`` enum member, or a file path.
 
 The component resolvers and the value translators raise
