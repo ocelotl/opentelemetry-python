@@ -1,7 +1,18 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""OpenCensus Span Exporter."""
+"""OpenCensus Span Exporter.
+
+The exporter reads ended spans in the OpenTelemetry model, the one the
+application produced through ``opentelemetry.sdk.trace``, and sends them in
+the OpenCensus model, the one the OpenCensus Agent and the OpenTelemetry
+Collector accept on their OpenCensus receiver port. The two models are not
+the same shape, so the translation loses some information. Each place where
+it does is named in the docstring of the function responsible.
+
+The wire protocol is the OpenCensus Agent trace service, a bidirectional gRPC
+stream, and the generated stubs for it come from ``opencensus.proto``.
+"""
 
 import logging
 from collections.abc import Sequence
@@ -28,10 +39,33 @@ logger = logging.getLogger(__name__)
 class OpenCensusSpanExporter(SpanExporter):
     """OpenCensus Collector span exporter.
 
+    An instance translates each batch of ended OpenTelemetry spans into
+    OpenCensus spans and sends them over the OpenCensus Agent trace service.
+    Export is synchronous and blocks until the collector has answered, so the
+    exporter belongs behind a ``BatchSpanProcessor`` rather than behind a
+    ``SimpleSpanProcessor``.
+
+    The service name the collector is told comes from the ``service.name``
+    resource attribute. It is sampled once from the global tracer provider
+    when the exporter is constructed, and replaced on every later batch whose
+    first span carries one, which is why an exporter built before the tracer
+    provider is set still reports the right name from its first export
+    onwards.
+
     Args:
-        endpoint: OpenCensus Collector receiver endpoint.
-        host_name: Host name.
-        client: TraceService client stub.
+        endpoint: Host and port of the OpenCensus receiver of the collector,
+            written as ``host:port`` with no scheme, since gRPC takes a
+            target rather than a URL. Defaults to ``localhost:55678``. The
+            value is ignored when ``client`` is given, because no channel is
+            opened in that case.
+        host_name: Host name to report to the collector as part of the
+            process identifier. ``None`` means the host name of the machine
+            is read with ``socket.gethostname()``.
+        client: An already built ``TraceServiceStub``. ``None`` means the
+            exporter opens its own insecure gRPC channel to ``endpoint``,
+            with no TLS and no credentials. Passing a stub is how the tests
+            avoid a network connection, and it is also the way to reach a
+            collector that needs a secured channel.
     """
 
     def __init__(
@@ -40,6 +74,10 @@ class OpenCensusSpanExporter(SpanExporter):
         host_name=None,
         client=None,
     ):
+        """Initialize the exporter.
+
+        The parameters are documented on the class.
+        """
         tracer_provider = trace.get_tracer_provider()
         service_name = (
             tracer_provider.resource.attributes[SERVICE_NAME]
@@ -57,6 +95,33 @@ class OpenCensusSpanExporter(SpanExporter):
         self.node = utils.get_node(service_name, host_name)
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        """Translate a batch of ended spans and send it to the collector.
+
+        The call blocks until the collector has answered, since the whole
+        response stream is consumed before returning. An empty batch still
+        reaches the collector, as a request carrying the node and no spans.
+
+        Before sending, the node is rebuilt from the ``service.name``
+        attribute on the resource of the first span of the batch, whenever
+        that span carries one. Otherwise the node held from before is reused.
+        Reading only the first span rests on the assumption that one span
+        processor serves one tracer provider, so a batch cannot mix
+        resources.
+
+        Nothing is logged on failure, so a caller that wants to know why an
+        export failed has to inspect the collector instead.
+
+        Args:
+            spans: The ended OpenTelemetry spans to export.
+
+        Returns:
+            ``SpanExportResult.SUCCESS`` when the whole stream was sent and
+            read without a gRPC error, and ``SpanExportResult.FAILURE`` when
+            gRPC reported one, which covers a collector that is unreachable,
+            that rejected the request or that closed the stream early. An
+            exporter already shut down still exports and still reports
+            success, because ``shutdown`` sets no flag to check here.
+        """
         # Populate service_name from first span
         # We restrict any SpanProcessor to be only associated with a single
         # TracerProvider, so it is safe to assume that all Spans in a single
@@ -79,19 +144,98 @@ class OpenCensusSpanExporter(SpanExporter):
         return SpanExportResult.SUCCESS
 
     def shutdown(self) -> None:
-        pass
+        """Do nothing.
+
+        The method exists because ``SpanExporter`` requires it. It releases
+        nothing: the insecure gRPC channel opened by the constructor stays
+        open, and no flag is set, so a later call to ``export`` still sends
+        spans instead of refusing them. A process that has to free the
+        channel has to close it itself.
+        """
 
     def generate_span_requests(self, spans):
+        """Produce the request stream that the trace service is called with.
+
+        The OpenCensus Agent trace service takes a stream of requests, so the
+        batch is handed to gRPC as this generator rather than as one value.
+        The translation therefore runs while gRPC consumes the generator, not
+        before the call.
+
+        Args:
+            spans: The ended OpenTelemetry spans to translate.
+
+        Yields:
+            Exactly one OpenCensus ``ExportTraceServiceRequest``, carrying the
+            node of this exporter and every translated span of the batch. The
+            batch is never split, so a batch too large for the limit the
+            collector puts on a message is rejected whole.
+        """
         collector_spans = translate_to_collector(spans)
         service_request = trace_service_pb2.ExportTraceServiceRequest(node=self.node, spans=collector_spans)
         yield service_request
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
+        """Report that there is nothing left to send.
+
+        ``export`` sends each batch before it returns and the exporter keeps
+        no queue of its own, so there is never anything to flush and the call
+        does no work.
+
+        Args:
+            timeout_millis: Ignored. The parameter is part of the
+                ``SpanExporter`` signature and no waiting happens here.
+
+        Returns:
+            ``True``, always.
+        """
         return True
 
 
 # pylint: disable=too-many-branches
 def translate_to_collector(spans: Sequence[ReadableSpan]):
+    """Translate OpenTelemetry spans into OpenCensus spans.
+
+    One OpenCensus span is produced per OpenTelemetry span, in the order
+    given. The identifiers become fixed width big endian byte strings, 16
+    bytes for the trace id and 8 for the span id, and the times go through
+    ``opentelemetry.exporter.opencensus.util.proto_timestamp_from_time_ns``,
+    so a span that has not ended reports the Unix epoch as its end time.
+
+    What the OpenCensus model cannot hold is dropped here:
+
+    - The status code number is copied across without being mapped. An
+      OpenCensus status code is a canonical gRPC code, where 0 means OK and 1
+      means CANCELLED, while the OpenTelemetry codes are UNSET 0, OK 1 and
+      ERROR 2. An OpenTelemetry OK therefore arrives at the collector as the
+      code that means CANCELLED, and an ERROR as the one that means UNKNOWN.
+    - Three of the five span kinds have no OpenCensus counterpart. See
+      ``opentelemetry.exporter.opencensus.util.get_collector_span_kind``.
+    - A span with no parent is given a parent span id of eight zero bytes
+      rather than no parent span id at all.
+    - A link is typed ``PARENT_LINKED_SPAN`` only when it points at the
+      parent of the span that carries it, matching on both the trace id and
+      the span id. Every other link is typed ``TYPE_UNSPECIFIED``, since
+      nothing in an OpenTelemetry link says that the target is a child.
+    - Every event becomes an annotation, with the event name as the
+      annotation description. OpenCensus also has message events, and none
+      are produced.
+    - The instrumentation scope of the span, and every resource attribute
+      other than ``service.name``, which ``OpenCensusSpanExporter.export``
+      reads separately, have no field to go into and are not sent.
+    - The counts of attributes, events and links that the span limits
+      dropped are not sent either, so the collector cannot tell a truncated
+      span from a complete one.
+
+    Args:
+        spans: The ended OpenTelemetry spans to translate.
+
+    Returns:
+        A list of OpenCensus ``trace_pb2.Span`` messages.
+
+    Raises:
+        AttributeError: If a span carries no span context, which is read
+            without a check for ``None``.
+    """
     collector_spans = []
     for span in spans:
         status = None
