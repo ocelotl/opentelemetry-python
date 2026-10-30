@@ -518,6 +518,10 @@ def _encode_exemplars(sdk_exemplars: list[Exemplar]) -> list[pb2.Exemplar]:
         ValueError: If an exemplar value is neither a ``float`` nor an ``int``.
             ``_encode_resource_metrics`` turns this into an ``EncodingException``,
             which loses the whole export batch, not only the one exemplar.
+        TypeError: If an exemplar value is a ``bool``. ``bool`` is a subclass of
+            ``int``, so it passes the check above and is assigned to ``as_int``,
+            which protobuf refuses. ``_encode_resource_metrics`` turns this into
+            an ``EncodingException`` as well, with the same loss.
     """
     pb_exemplars = []
     for sdk_exemplar in sdk_exemplars:
