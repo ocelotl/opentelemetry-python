@@ -7,9 +7,10 @@
 OpenTelemetry span. ``ShimTracer.start_span`` creates these and hands them back to OpenCensus
 callers.
 
-Two parts of the OpenCensus span interface cannot be served, because OpenCensus allows them to be
-set after a span has started and OpenTelemetry does not: links and span kind. Both are accepted
-and discarded with a warning. The incompatibility is listed in
+Two parts of the OpenCensus span interface are accepted and discarded with a warning: links and
+span kind. The OpenCensus ``Tracer`` takes neither in ``start_span``, so the shim has neither to
+hand to the OpenTelemetry tracer at the moment the OpenTelemetry span is created, and
+OpenTelemetry fixes the kind of a span at creation. The incompatibility is listed in
 https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/compatibility/opencensus.md#known-incompatibilities
 """
 
@@ -140,12 +141,14 @@ class ShimSpan(wrapt.ObjectProxy):
 
         Args:
             attribute_key: The name of the attribute.
-            attribute_value: The value of the attribute. Nothing is converted here, so the
-                OpenTelemetry API is what cleans it. A value that is not a ``bool``, ``str``,
+            attribute_value: The value of the attribute. Nothing is converted here, so an
+                OpenTelemetry SDK span is what cleans it. A value that is not a ``bool``, ``str``,
                 ``None``, ``bytes``, ``int``, ``float``, or a mapping or sequence of those, is
                 logged as a warning and then passed through ``str``, or replaced by ``None`` when
                 its type defines neither ``__str__`` nor ``__repr__``. The attribute key survives
                 either way, so a bad value shows up on the span rather than disappearing from it.
+                A non-recording span, which is what the shim holds while no OpenTelemetry tracer
+                provider has been set, drops the attribute with no warning at all.
         """
         self._self_otel_span.set_attribute(attribute_key, attribute_value)
 
@@ -258,7 +261,9 @@ class ShimSpan(wrapt.ObjectProxy):
         )
 
     def finish(self):
-        """Note this method does not pop the span from current context. Use the OpenCensus
+        """End the OpenTelemetry span, which is what hands an SDK span to its span processors.
+
+        Note this method does not pop the span from current context. Use the OpenCensus
         Tracer.end_span() or a `with span: ...` statement (contextmanager) to do that.
         """
         self._self_otel_span.end()

@@ -74,7 +74,9 @@ def install_shim(
         Args:
             span_context: The OpenCensus ``SpanContext`` the shim tracer serves. It becomes the
                 parent of any span the shim tracer starts while the OpenTelemetry context holds no
-                current span.
+                current span, provided it carries a span ID. The one an OpenCensus ``Tracer``
+                builds for itself when given none has a random trace ID and no span ID, and a span
+                started under that is a root span with a trace ID of its own.
 
         Returns:
             The shim tracer bound to ``span_context``.

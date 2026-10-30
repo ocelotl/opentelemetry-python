@@ -68,7 +68,7 @@ def get_shim_span_in_context() -> ShimSpan:
 
 
 def set_oc_span_in_context(oc_span_context: SpanContext, ctx: context.Context) -> context.Context:
-    """Returns an OTel context with oc_span_context set as the current span.
+    """Returns an OTel context with oc_span_context set as the current span, when it has a span ID.
 
     The OpenCensus identifiers are hexadecimal strings and the OpenTelemetry ones are integers, so
     both are parsed. The resulting OpenTelemetry span context is wrapped in a non-recording span,
@@ -147,7 +147,9 @@ class ShimTracer(wrapt.ObjectProxy):
             nothing.
         oc_span_context: The OpenCensus ``SpanContext`` of the OpenCensus ``Tracer`` this instance
             serves. It supplies the parent of a span started while the OpenTelemetry context holds
-            no current span.
+            no current span, provided it carries a span ID. The one an OpenCensus ``Tracer`` builds
+            for itself when given none has a random trace ID and no span ID, and a span started
+            under that is a root span with a trace ID of its own.
         otel_tracer: The OpenTelemetry tracer that creates the spans.
     """
 
@@ -187,7 +189,10 @@ class ShimTracer(wrapt.ObjectProxy):
         The parent is the span current in the OpenTelemetry context. When there is none, the
         OpenCensus ``SpanContext`` given at construction supplies the parent instead, which is how
         trace context that an OpenCensus instrumentation extracted from an incoming request is
-        honoured.
+        honoured. That only happens when the ``SpanContext`` carries a span ID. The one an
+        OpenCensus ``Tracer`` builds for itself when given none does not, so an application that
+        passes no propagated context gets a root span with a trace ID unrelated to the OpenCensus
+        one.
 
         The shim span is attached to the OpenTelemetry context and also set as the current span of
         the OpenCensus ``execution_context``, matching what
@@ -272,12 +277,14 @@ class ShimTracer(wrapt.ObjectProxy):
 
         Args:
             attribute_key: The name of the attribute.
-            attribute_value: The value of the attribute. Nothing is converted here, so the
-                OpenTelemetry API is what cleans it. A value that is not a ``bool``, ``str``,
+            attribute_value: The value of the attribute. Nothing is converted here, so an
+                OpenTelemetry SDK span is what cleans it. A value that is not a ``bool``, ``str``,
                 ``None``, ``bytes``, ``int``, ``float``, or a mapping or sequence of those, is
                 logged as a warning and then passed through ``str``, or replaced by ``None`` when
                 its type defines neither ``__str__`` nor ``__repr__``. The attribute key survives
                 either way, so a bad value shows up on the span rather than disappearing from it.
+                A non-recording span, which is what the shim holds while no OpenTelemetry tracer
+                provider has been set, drops the attribute with no warning at all.
 
         Raises:
             AttributeError: When no shim span is current in the OpenTelemetry context, since
