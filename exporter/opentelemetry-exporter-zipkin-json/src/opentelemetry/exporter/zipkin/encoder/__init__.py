@@ -201,9 +201,10 @@ class Encoder(abc.ABC):
         Zipkin tag values are strings, so every value is stringified: a bool
         becomes ``"true"`` or ``"false"``, a number becomes its ``str``, and a
         sequence becomes a compact JSON array. A value of any other type, and
-        a sequence that cannot be rendered within the tag length limit, is
-        dropped with a warning on the ``opentelemetry.exporter.zipkin.encoder``
-        logger rather than failing the export.
+        a sequence when ``max_tag_value_length`` is 1, is dropped with a
+        warning on the ``opentelemetry.exporter.zipkin.encoder`` logger rather
+        than failing the export. A sequence whose elements do not fit the
+        limit is not dropped: it is kept as the empty array ``"[]"``.
 
         Values are truncated to ``max_tag_value_length`` characters when that
         limit is set to a positive number. Truncation applies to the rendered
@@ -248,6 +249,13 @@ class Encoder(abc.ABC):
         the brackets, the quotes and the separating commas, stays within
         ``max_tag_value_length``. The first element that would exceed it ends
         the array, and the remaining elements are dropped silently.
+
+        That running length measures each element before ``json.dumps``
+        escapes it, so an element holding a non-ASCII character, a double
+        quote or a backslash renders longer than it was counted as, and the
+        array can come back longer than ``max_tag_value_length``. The caller
+        then truncates it, which is the one case in which a sequence tag ends
+        up as invalid JSON.
 
         An element that is not a bool, a number, a string or ``None`` is
         skipped without ending the array, and without counting towards the

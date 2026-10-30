@@ -31,10 +31,11 @@ class NodeEndpoint:
     The service name is not a parameter. It is read once, at construction
     time, from the resource of the globally registered tracer provider, or
     from a freshly created ``Resource`` when that provider carries none. The
-    exporter then replaces it, permanently, with the service name of the first
-    span of the first exported batch that carries one, so the value sampled
-    here is used only until that batch and the replacement is used for every
-    batch after it.
+    exporter then overwrites it at the start of every export, with the service
+    name taken from the resource of the first span of that batch, whenever
+    that span carries one. The value sampled here is therefore used only until
+    the first batch that carries a service name, and each later batch is sent
+    under the service name of its own first span.
 
     Args:
         ipv4: Primary IPv4 address associated with this connection.
