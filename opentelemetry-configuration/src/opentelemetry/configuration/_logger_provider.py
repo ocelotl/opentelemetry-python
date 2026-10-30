@@ -307,6 +307,8 @@ def _create_log_record_exporter(
             selected one cannot be built.
         MissingDependencyError: If the selected exporter's distribution is
             not installed.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
     """
     match config:
         case LogRecordExporterConfig(otlp_http=exporter_config) if exporter_config is not None:

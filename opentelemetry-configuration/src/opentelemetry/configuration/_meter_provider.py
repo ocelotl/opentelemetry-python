@@ -609,6 +609,8 @@ def _create_push_metric_exporter(
             selected one cannot be built.
         MissingDependencyError: If the selected exporter's distribution is
             not installed.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
     """
     match config:
         case PushMetricExporterConfig(otlp_http=exporter_config) if exporter_config is not None:
