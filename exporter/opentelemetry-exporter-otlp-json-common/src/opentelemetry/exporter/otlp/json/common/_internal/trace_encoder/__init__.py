@@ -73,6 +73,11 @@ def encode_spans(
         An ``ExportTraceServiceRequest`` holding every span in ``sdk_spans``,
         regrouped by resource and then by instrumentation scope. An empty
         ``sdk_spans`` gives a request with no resource spans.
+
+    Raises:
+        KeyError: if the kind of one of the spans is not one of the five
+            members of ``opentelemetry.trace.SpanKind``. One such span fails
+            the export of the whole batch.
     """
     return JSONExportTraceServiceRequest(resource_spans=_encode_resource_spans(sdk_spans))
 
@@ -96,6 +101,10 @@ def _encode_resource_spans(
         absent or falsy is grouped under a scope of ``None``, which encodes as
         an empty scope message and leaves the schema URL of the ``ScopeSpans``
         unset.
+
+    Raises:
+        KeyError: if the kind of one of the spans is not one of the five
+            members of ``opentelemetry.trace.SpanKind``.
     """
     sdk_resource_spans = defaultdict(lambda: defaultdict(list))
 
