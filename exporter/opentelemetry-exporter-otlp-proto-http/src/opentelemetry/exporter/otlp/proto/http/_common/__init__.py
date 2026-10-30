@@ -363,10 +363,11 @@ def _build_transport(
     the constructor argument, then the per-signal variable, then the
     signal-independent one.
 
-    A client certificate and a client key are only used together. When just one
-    of the two resolves to a path, mutual TLS is not configured: a certificate
-    on its own is passed to ``requests`` as a combined certificate-and-key
-    file, and a key on its own is discarded.
+    A client certificate and a client key are only passed to ``requests`` as a
+    pair when both resolve to a path. A key that resolves on its own is
+    discarded and no client credential is sent. A certificate that resolves on
+    its own is passed as a combined certificate-and-key file, so client
+    authentication still happens when that one file carries the key too.
 
     Args:
         certificate_file: Path to the CA certificate bundle used to verify the
