@@ -534,6 +534,27 @@ class _CustomCollector:
 
     See more:
     https://github.com/prometheus/client_python#custom-collectors
+
+    ``prometheus_client`` calls ``collect`` on every registered collector each
+    time the registry is scraped. This one answers by calling back into
+    :class:`PrometheusMetricReader`, which collects from the SDK and queues the
+    result here, and then translates the queue into Prometheus metric families.
+    Holding a queue rather than a single batch means a batch delivered outside
+    a scrape is kept until the next one.
+
+    Args:
+        disable_target_info: Whether to leave out the ``target_info`` metric
+            that carries the resource attributes. When it is left in, the
+            attributes are read once, from the first batch ever queued, and the
+            metric is reused for the lifetime of the collector.
+        prefix: String placed in front of every exported metric name, joined to
+            it with an underscore. An empty string adds nothing.
+        scope_info_enabled: Whether to label every exported metric with the
+            instrumentation scope it came from.
+        resource_attribute_filter: Callback deciding which resource attributes
+            are copied onto every exported metric as labels. It receives the
+            unsanitized attribute key. ``None`` copies none of them, which
+            leaves the resource visible only through ``target_info``.
     """
 
     def __init__(
@@ -543,6 +564,12 @@ class _CustomCollector:
         scope_info_enabled: bool = True,
         resource_attribute_filter: Callable[[str], bool] | None = None,
     ):
+        """Build a collector with an empty queue and no callback.
+
+        The parameters are documented on the class. The callback is supplied
+        afterwards by :class:`PrometheusMetricReader`, which cannot pass it
+        here because it needs the collector to exist first.
+        """
         self._callback = None
         self._metrics_datas: deque[MetricsData] = deque()
         self._disable_target_info = disable_target_info
@@ -552,7 +579,14 @@ class _CustomCollector:
         self._resource_attribute_filter = resource_attribute_filter
 
     def add_metrics_data(self, metrics_data: MetricsData) -> None:
-        """Add metrics to Prometheus data"""
+        """Add metrics to Prometheus data
+
+        Args:
+            metrics_data: A batch of metrics the SDK collected. It is queued as
+                it stands and translated by the next ``collect``, so nothing is
+                validated here and nothing bounds the queue if no scrape ever
+                arrives.
+        """
         self._metrics_datas.append(metrics_data)
 
     def collect(self) -> Iterable[PrometheusMetric]:
@@ -560,6 +594,19 @@ class _CustomCollector:
         and delivers them as Prometheus Metrics.
         Collect is invoked every time a ``prometheus.Gatherer`` is run
         for example when the HTTP endpoint is invoked by Prometheus.
+
+        The callback installed by :class:`PrometheusMetricReader` runs first,
+        which collects from the SDK and queues one batch, and the queue is then
+        drained batch by batch into one shared set of metric families.
+
+        Returns:
+            A generator over the Prometheus metric families built from every
+            queued batch, with ``target_info`` first when the collector was not
+            told to leave it out. Nothing is produced while the queue is empty,
+            so a scrape that arrives before the first collection reports no
+            metrics at all. The families are yielded once per queued batch
+            rather than once in total, so a queue holding more than one batch
+            repeats the families built by the earlier ones.
         """
         if self._callback is not None:
             self._callback()
@@ -589,6 +636,19 @@ class _CustomCollector:
         metrics_data: MetricsData,
         metric_family_id_metric_family: dict[str, PrometheusMetric],
     ):
+        """Translate one batch of SDK metrics into Prometheus metric families.
+
+        The resource labels and the scope labels are computed once per resource
+        and once per scope, then shared by every metric underneath, because
+        they are the same for all of them.
+
+        Args:
+            metrics_data: A batch of metrics taken off the queue.
+            metric_family_id_metric_family: The families being assembled for
+                the scrape in progress. It is modified in place, and it is
+                shared across batches so that two batches carrying the same
+                metric contribute samples to one family.
+        """
         for rm in metrics_data.resource_metrics:
             resource_attrs = self._build_resource_attrs(rm.resource)
             for sm in rm.scope_metrics:
@@ -608,6 +668,25 @@ class _CustomCollector:
         resource_attrs: dict[str, AnyValue],
         metric_family_id_metric_family: dict[str, PrometheusMetric],
     ) -> None:
+        """Add one metric to the Prometheus family that matches its data type.
+
+        A ``Sum`` becomes a Prometheus counter unless it is cumulative and
+        non-monotonic, in which case it becomes a gauge. A ``Gauge`` becomes a
+        gauge and a ``Histogram`` becomes a histogram. Any other data type,
+        ``ExponentialHistogram`` among them, is logged at warning level and
+        dropped, because Prometheus text format has nothing to map it onto.
+
+        Args:
+            metric: The metric to translate. Its name is prefixed and
+                sanitized, its description defaults to the empty string, and
+                its unit is mapped to the Prometheus spelling.
+            scope_attrs: The labels describing the instrumentation scope the
+                metric came from, empty when scope labels are switched off.
+            resource_attrs: The labels copied from the resource, empty when no
+                resource attribute filter was given.
+            metric_family_id_metric_family: The families being assembled for
+                the scrape in progress. It is modified in place.
+        """
         metric_name = self._resolve_metric_name(metric.name)
         description = metric.description or ""
         unit = map_unit(metric.unit or "")
@@ -653,6 +732,21 @@ class _CustomCollector:
             _logger.warning("Unsupported metric data. %s", type(metric.data))
 
     def _build_scope_attrs(self, scope: InstrumentationScope) -> dict[str, AnyValue]:
+        """Build the labels that identify the instrumentation scope of a metric.
+
+        Args:
+            scope: The instrumentation scope the metrics were recorded under.
+
+        Returns:
+            An empty mapping when scope labels are switched off. Otherwise a
+            mapping holding ``otel_scope_name``, ``otel_scope_version`` and
+            ``otel_scope_schema_url``, each falling back to the empty string
+            when the scope leaves it unset, plus one entry per scope attribute
+            with ``otel_scope_`` in front of its key. A scope attribute named
+            ``name``, ``version`` or ``schema_url`` collides with one of the
+            three fixed keys and loses to it. The keys are sanitized later,
+            along with the data point attributes.
+        """
         if not self._scope_info_enabled:
             return {}
         attrs: dict[str, AnyValue] = {}
@@ -665,11 +759,35 @@ class _CustomCollector:
         return attrs
 
     def _build_resource_attrs(self, resource: Resource) -> dict[str, AnyValue]:
+        """Select the resource attributes that become labels on every exported metric.
+
+        Args:
+            resource: The resource of the meter provider the metrics came from.
+
+        Returns:
+            An empty mapping when no resource attribute filter was configured,
+            which is the default and leaves the resource reported only by
+            ``target_info``. Otherwise the attributes the filter accepted, with
+            their keys still unsanitized. A scope label or a data point
+            attribute that sanitizes to the same label name takes precedence
+            over the resource attribute.
+        """
         if not self._resource_attribute_filter:
             return {}
         return {key: value for key, value in resource.attributes.items() if self._resource_attribute_filter(key)}
 
     def _resolve_metric_name(self, name: str) -> str:
+        """Apply the configured prefix to a metric name and sanitize the result.
+
+        Args:
+            name: The metric name as recorded through the OpenTelemetry API.
+
+        Returns:
+            The name with the configured prefix and an underscore in front of
+            it, sanitized into a valid Prometheus metric name. The prefix is
+            applied before sanitizing, so a prefix containing a character
+            Prometheus rejects is rewritten rather than refused.
+        """
         if self._prefix:
             name = self._prefix + "_" + name
         return sanitize_full_name(name)
@@ -680,6 +798,32 @@ class _CustomCollector:
         scope_attrs: dict[str, AnyValue],
         resource_attrs: dict[str, AnyValue],
     ) -> tuple[list[str], list[list[str]], list[float | dict[str, Any]]]:
+        """Flatten the data points of a metric into a Prometheus label set and value list.
+
+        Prometheus requires every sample of a family to carry the same label
+        names, while OpenTelemetry lets each data point carry its own
+        attributes. The union of the label names is taken here and every row is
+        filled out against it.
+
+        Args:
+            metric_data: The ``Sum``, ``Gauge`` or ``Histogram`` holding the
+                data points.
+            scope_attrs: The instrumentation scope labels to add to every data
+                point.
+            resource_attrs: The resource labels to add to every data point.
+
+        Returns:
+            Three parallel structures. The first is the sorted list of
+            sanitized label names, the union over all data points. The second
+            holds one row of label values per data point, in the order of that
+            list, with the empty string wherever a data point did not carry the
+            attribute. The third holds one value per data point: a number for a
+            ``NumberDataPoint``, and a mapping of ``bucket_counts``,
+            ``explicit_bounds`` and ``sum`` for a ``HistogramDataPoint``.
+            Resource, scope and data point attributes are merged in that order,
+            so a later one wins when two of them sanitize to the same label
+            name.
+        """
         keys: set[str] = set()
         rows: list[dict[str, str]] = []
         values: list[float | dict[str, Any]] = []
@@ -715,13 +859,41 @@ class _CustomCollector:
 
     # pylint: disable=no-self-use
     def _check_value(self, value: float | str | Sequence) -> str:
-        """Check the label value and return is appropriate representation"""
+        """Check the label value and return is appropriate representation
+
+        Args:
+            value: An attribute value taken from a data point, from an
+                instrumentation scope or from the resource.
+
+        Returns:
+            The value as a Prometheus label value, which can only be a string.
+            A string is returned unchanged. Anything else is serialized as
+            JSON, so a sequence becomes ``["a", "b"]``, a boolean becomes
+            ``true`` or ``false`` and ``None`` becomes ``null``. A value JSON
+            cannot represent falls back to its ``str``.
+        """
         if not isinstance(value, str):
             return dumps(value, default=str)
         return str(value)
 
     def _create_info_metric(self, name: str, description: str, attributes: dict[str, str]) -> InfoMetricFamily:
-        """Create an Info Metric Family with list of attributes"""
+        """Create an Info Metric Family with list of attributes
+
+        Args:
+            name: The metric name without the ``_info`` suffix that
+                ``prometheus_client`` appends. The only caller passes
+                ``target``, which produces ``target_info``.
+            description: The description of the metric.
+            attributes: The resource attributes to carry as labels. Their keys
+                are sanitized into valid Prometheus label names here, and two
+                keys that sanitize to the same name leave only the later one.
+
+        Returns:
+            An info family holding one sample, whose value is the constant 1
+            and whose labels are the sanitized attributes. The information is
+            in the labels, which is how Prometheus carries metadata that has no
+            numeric value of its own.
+        """
         # sanitize the attribute names according to Prometheus rule
         attributes = {sanitize_attribute(key): self._check_value(value) for key, value in attributes.items()}
         info = InfoMetricFamily(name, description, labels=attributes)
