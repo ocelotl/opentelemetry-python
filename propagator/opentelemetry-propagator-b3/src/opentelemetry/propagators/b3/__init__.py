@@ -81,8 +81,9 @@ class B3MultiFormat(TextMapPropagator):
         The single ``b3`` header is looked up first and takes precedence over
         the multi-header fields when a carrier carries both. Only when it is
         absent, or present with an empty value, are ``x-b3-traceid``,
-        ``x-b3-spanid``, ``x-b3-sampled`` and ``x-b3-flags`` read. ``B3SingleFormat`` inherits this method unchanged,
-        which is why both propagators accept both encodings on extraction.
+        ``x-b3-spanid``, ``x-b3-sampled`` and ``x-b3-flags`` read.
+        ``B3SingleFormat`` inherits this method unchanged, which is why both
+        propagators accept both encodings on extraction.
 
         A single ``b3`` header is read as up to four ``-`` separated fields:
         trace id, span id, sampling state and parent span id. The parent span
@@ -93,11 +94,14 @@ class B3MultiFormat(TextMapPropagator):
         "deferred" has no counterpart in a ``SpanContext``, so a ``b3`` header
         that omits the sampling state is treated as sampled.
 
-        Sampling is turned on when the sampling state is one of ``1``,
-        ``True``, ``true`` or ``d``, or when ``x-b3-flags`` is ``1``. B3
-        defines no behaviour for both being set, so either one on its own is
-        enough. The debug state ``d`` is read as plain sampling and its
-        distinction from ordinary sampling is lost.
+        Sampling is turned on, in either encoding, when the sampling state is
+        one of ``1``, ``True``, ``true`` or ``d``. The multi-header encoding
+        has a second way of turning it on, ``x-b3-flags`` set to ``1``, which
+        is enough on its own; B3 defines no behaviour for the sampling state
+        and that flag disagreeing, so either one alone is honoured. A carrier
+        read through the single ``b3`` header never consults ``x-b3-flags``,
+        even when the carrier also carries it. The debug state ``d`` is read as
+        plain sampling and its distinction from ordinary sampling is lost.
 
         A trace id of 16 hexadecimal characters is accepted as well as one of
         32, and the next injection writes it back zero padded to 32.
