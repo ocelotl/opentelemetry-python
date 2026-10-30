@@ -8,7 +8,8 @@
 What the three signals have in common is what this module covers: the resource
 and the instrumentation scope that every exported batch is grouped by, the
 attribute lists that hang off nearly every OTLP message, and the fixed-width
-byte form that trace and span identifiers take on the wire.
+byte form of trace and span identifiers that ``to_dict`` on the enclosing
+message renders as hexadecimal.
 
 Nothing here is public. The names are imported by the three sibling packages
 under ``opentelemetry.exporter.otlp.json.common._internal`` and by nothing
