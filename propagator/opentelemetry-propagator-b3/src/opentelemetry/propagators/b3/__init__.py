@@ -80,8 +80,8 @@ class B3MultiFormat(TextMapPropagator):
 
         The single ``b3`` header is looked up first and takes precedence over
         the multi-header fields when a carrier carries both. Only when it is
-        absent are ``x-b3-traceid``, ``x-b3-spanid``, ``x-b3-sampled`` and
-        ``x-b3-flags`` read. ``B3SingleFormat`` inherits this method unchanged,
+        absent, or present with an empty value, are ``x-b3-traceid``,
+        ``x-b3-spanid``, ``x-b3-sampled`` and ``x-b3-flags`` read. ``B3SingleFormat`` inherits this method unchanged,
         which is why both propagators accept both encodings on extraction.
 
         A single ``b3`` header is read as up to four ``-`` separated fields:
@@ -327,9 +327,15 @@ class B3Format(B3MultiFormat):
     keep resolving. It adds no behaviour of its own: construct it and it warns,
     then behaves exactly like ``B3MultiFormat``.
 
+    ``B3Format()`` is the only call that succeeds. The signature accepts
+    ``*args`` and ``**kwargs`` and forwards them to the base class, but neither
+    ``B3MultiFormat`` nor anything it inherits from defines a constructor, so
+    they reach ``object.__init__``, which raises ``TypeError`` on any argument
+    at all.
+
     Args:
-        *args: passed on to ``B3MultiFormat`` unchanged.
-        **kwargs: passed on to ``B3MultiFormat`` unchanged.
+        *args: forwarded to the base class, which rejects every one of them.
+        **kwargs: forwarded to the base class, which rejects every one of them.
     """
 
     @deprecated(
