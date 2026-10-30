@@ -108,17 +108,24 @@ class OpenCensusSpanExporter(SpanExporter):
         processor serves one tracer provider, so a batch cannot mix
         resources.
 
-        Nothing is logged on failure, so a caller that wants to know why an
-        export failed has to inspect the collector instead.
+        This exporter logs nothing of its own, and the ``grpc.RpcError`` it
+        catches is discarded without being read, so the status code and the
+        details that say why the call failed do not outlive the call. An
+        exception raised while a span is being translated is reported on the
+        ``grpc._channel`` logger instead, because gRPC is the code consuming
+        the request stream when the translation runs.
 
         Args:
             spans: The ended OpenTelemetry spans to export.
 
         Returns:
             ``SpanExportResult.SUCCESS`` when the whole stream was sent and
-            read without a gRPC error, and ``SpanExportResult.FAILURE`` when
-            gRPC reported one, which covers a collector that is unreachable,
-            that rejected the request or that closed the stream early. An
+            read without a gRPC error, and ``SpanExportResult.FAILURE`` in
+            every other case. A failure covers a collector that is
+            unreachable, one that rejected the request, one that closed the
+            stream early, and an exception raised while translating a span,
+            which gRPC turns into a cancelled call with status ``UNKNOWN``
+            rather than letting it reach the caller of ``export``. An
             exporter already shut down still exports and still reports
             success, because ``shutdown`` sets no flag to check here.
         """
@@ -245,7 +252,10 @@ def translate_to_collector(spans: Sequence[ReadableSpan]):
 
     Raises:
         AttributeError: If a span carries no span context, which is read
-            without a check for ``None``.
+            without a check for ``None``. Reached through
+            ``OpenCensusSpanExporter.export`` the exception does not surface
+            here, because gRPC is what consumes the generator that calls this
+            function and it turns the exception into a failed call.
     """
     collector_spans = []
     for span in spans:
