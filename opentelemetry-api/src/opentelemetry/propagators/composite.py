@@ -52,8 +52,10 @@ class CompositePropagator(textmap.TextMapPropagator):
         Args:
             carrier: The object holding the incoming values, passed unchanged
                 to every configured propagator.
-            context: The context to add the extracted values to. If ``None``,
-                each propagator falls back to the current context.
+            context: The context to add the extracted values to. ``None`` is
+                handed to the first configured propagator only, which decides
+                what to use in its place. Every later propagator receives the
+                context the previous propagator returned.
             getter: Reads values out of ``carrier``, passed unchanged to every
                 configured propagator.
 
