@@ -313,13 +313,6 @@ class Meter(ABC):
         Register an instrument with the name, type, unit and description as
         identifying keys and the advisory as value.
 
-        Returns a tuple. The first value is the instrument id.
-        The second value is an `_InstrumentRegistrationStatus` where
-        `already_registered` is `True` if the instrument has been registered
-        already.
-        If `conflict` is set to True the `current_advisory` attribute contains
-        the registered instrument advisory.
-
         Args:
             name: The name of the instrument being created.
             type_: The class of the instrument being created.
@@ -330,7 +323,12 @@ class Meter(ABC):
 
         Returns:
             An `_InstrumentRegistrationStatus` describing what the registry
-            held for this identity before the call.
+            held for this identity before the call. Its ``instrument_id``
+            attribute carries the identity the registry keyed on. Its
+            ``already_registered`` attribute is ``True`` when an instrument
+            with that identity was registered before. When its ``conflict``
+            attribute is ``True``, its ``current_advisory`` attribute carries
+            the advisory of the instrument that was already registered.
         """
 
         instrument_id = ",".join([name.strip().lower(), type_.__name__, unit, description])
