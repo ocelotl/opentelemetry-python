@@ -96,8 +96,9 @@ class ZipkinExporter(SpanExporter):
     taken from an argument: it is read from the ``service.name`` resource
     attribute of the first span of each batch, and a batch whose first span
     carries none keeps the name the exporter last resolved. That is the name
-    read from the global tracer provider when the exporter was constructed,
-    until the first batch supplies one of its own.
+    read when the exporter was constructed, from the resource of the global
+    tracer provider when that provider has one and from ``Resource.create()``
+    otherwise, until the first batch supplies one of its own.
 
     Args:
         endpoint: Full URL of the Zipkin collector endpoint that receives the
