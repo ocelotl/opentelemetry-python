@@ -81,8 +81,10 @@ def _convert_value(value: Any, type_hint: Any) -> Any:
     instead of leaving the field unset.
 
     Nothing is validated here. A value whose shape does not fit the
-    annotation is passed through, and the error surfaces later as a
-    ``TypeError`` from the dataclass constructor.
+    annotation is passed through, and the error comes from a dataclass
+    constructor instead. For a nested dataclass field that constructor runs
+    inside this function, through ``_dict_to_dataclass``; for any other
+    field it runs in the caller.
 
     Args:
         value: The parsed YAML or JSON value for one field.
@@ -97,6 +99,10 @@ def _convert_value(value: Any, type_hint: Any) -> Any:
     Raises:
         ValueError: If ``value`` is not a member value of the enum the
             annotation names. The enum constructor raises it.
+        TypeError: If ``value`` is a mapping for a nested dataclass field
+            and carries a key that dataclass neither declares nor captures.
+            ``_dict_to_dataclass`` splats the mapping into the constructor,
+            which rejects the key.
     """
     unwrapped = _unwrap_optional(type_hint)
     origin = get_origin(unwrapped)
