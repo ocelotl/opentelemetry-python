@@ -3,14 +3,20 @@
 
 """Configuration resolution shared by the three OTLP/HTTP exporters.
 
-The span, metric and log exporters accept the same constructor arguments and
-read the same environment variables, differing only in which per-signal
-variable they consult and which path they append to a base endpoint. The
-``_resolve_*`` functions here take that per-signal variable as an argument and
-apply one precedence rule to all three signals: a value passed to the
+The span, metric and log exporters resolve their endpoint, TLS file paths,
+headers, timeout and compression the same way, differing only in which
+per-signal variable they consult and which path they append to a base endpoint.
+The ``_resolve_*`` functions here take that per-signal variable as an argument
+and apply one precedence rule to all three signals: a value passed to the
 constructor wins over the per-signal environment variable, which wins over the
 signal-independent ``OTEL_EXPORTER_OTLP_*`` variable, which wins over the
-default built into this module.
+default built into this module. ``_resolve_headers`` applies that order key by
+key rather than to the mapping as a whole, and ``_load_session_from_envvar``
+reads the signal-independent variable first.
+
+The metric exporter takes ``preferred_temporality``, ``preferred_aggregation``
+and ``max_export_batch_size`` on top of that set, and none of the three is
+resolved here.
 
 Everything in this module is private. The names are imported by the exporter
 modules and are not part of the public API.
@@ -119,8 +125,9 @@ def _load_session_from_envvar(
 
     Returns:
         The session the entry point returned, or None when neither variable is
-        set to a non-empty value, in which case the caller uses the session the
-        exporter was given or lets the transport create its own.
+        set to a non-empty value, in which case the transport creates its own
+        session. Every call site reaches this function only when the exporter
+        was given no session, so a None return cannot fall back to one.
 
     Raises:
         ImportError: ``requests`` is not importable. It is imported here rather
