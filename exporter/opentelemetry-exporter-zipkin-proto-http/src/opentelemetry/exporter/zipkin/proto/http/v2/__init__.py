@@ -61,8 +61,9 @@ class ProtobufEncoder(Encoder):
                 empty ``ListOfSpans``, which is an empty byte string.
             local_endpoint: Network context of the node that produced the spans.
                 Its service name, IPv4 address, IPv6 address and port are copied
-                into the ``local_endpoint`` field of every encoded span, and the
-                three that are ``None`` are left out.
+                into the ``local_endpoint`` field of every encoded span. The
+                service name is always written; whichever of the IPv4 address,
+                the IPv6 address and the port is ``None`` is left out.
 
         Returns:
             The protobuf wire-format bytes of the ``ListOfSpans`` message, ready
@@ -83,10 +84,10 @@ class ProtobufEncoder(Encoder):
         duration is the difference between the end and start times of the span,
         which means a span that has not ended raises ``TypeError`` here.
 
-        The Zipkin specification asks that a field which can be absent be left
-        out of the payload when the OpenTelemetry span has nothing for it, so
-        the tags, annotations, debug flag and parent identifier are each set
-        only when they have a value. A span whose kind is ``SpanKind.INTERNAL``
+        The OpenTelemetry specification asks that a Zipkin field which can be
+        absent be left out of the payload when it is empty in the OpenTelemetry
+        span, so the tags, annotations, debug flag and parent identifier are
+        each set only when they have a value. A span whose kind is ``SpanKind.INTERNAL``
         is encoded with the unspecified Zipkin kind, since Zipkin has no
         equivalent of an internal span.
 
@@ -132,9 +133,10 @@ class ProtobufEncoder(Encoder):
         """Encode the events of a span as Zipkin ``Annotation`` messages.
 
         Each event becomes one annotation whose value is a JSON object mapping
-        the event name to its attributes, with string attribute values truncated
-        to ``max_tag_value_length``, and whose timestamp is the event time in
-        microseconds.
+        the event name to its attributes, and whose timestamp is the event time
+        in microseconds. String attribute values are truncated to
+        ``max_tag_value_length`` only when that limit is a positive number, and
+        ``ZipkinExporter`` leaves it unset, so by default nothing is truncated.
 
         Args:
             span_events: The events recorded on the span, in the order they were
