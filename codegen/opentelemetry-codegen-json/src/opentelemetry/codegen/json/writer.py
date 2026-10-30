@@ -30,10 +30,11 @@ class CodeWriter:
     """
     Builds a Python source file line by line, keeping track of the current indentation level.
 
-    A new instance holds no lines and sits at indentation level zero. ``writeln`` and the methods
-    built on it append one line each, prefixed with the current level's worth of spaces, and the
-    block context managers raise the level for the duration of a ``with`` statement and lower it
-    again on exit, including when the body raises. ``to_string`` and ``to_lines`` read the result
+    A new instance holds no lines and sits at indentation level zero. ``writeln`` appends one
+    line, prefixed with the current level's worth of spaces unless the line is empty, and the
+    methods built on it append one or more such lines. The block context managers raise the level
+    for the duration of a ``with`` statement and lower it again on exit, including when the body
+    raises. ``to_string`` and ``to_lines`` read the result
     out; neither clears the instance, and no method removes or rewrites a line once it has been
     appended.
 
