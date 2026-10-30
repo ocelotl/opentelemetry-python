@@ -9,12 +9,20 @@ piece of the provider: a sampler, an id generator, the span limits, a
 span processor and its exporter, or the experimental per-tracer
 configurator.
 
-No function here reads an environment variable. Where a configuration
-field is absent, the value comes from the constant the specification
-gives, which is passed to the SDK explicitly so that the SDK does not
-read the environment variable itself. ``OTEL_TRACES_SAMPLER``,
-``OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT`` and the rest therefore have no
-effect once a configuration file is in use.
+No function here reads an environment variable. The sampler, the id
+generator and most of the span limits are passed to the SDK explicitly,
+with the constant the specification gives standing in for an absent
+configuration field, so ``OTEL_TRACES_SAMPLER`` and the
+``OTEL_SPAN_*_LIMIT`` family have no effect once a configuration file is
+in use.
+
+Two things are left to the SDK and so still follow the environment.
+``_create_span_processor`` passes an absent batch field through as
+``None``, which lets the SDK read ``OTEL_BSP_SCHEDULE_DELAY`` and its
+siblings. ``_create_span_limits`` never passes ``max_attributes``, so
+``OTEL_ATTRIBUTE_COUNT_LIMIT`` is still read for it. The logger provider
+does neither, which is why ``OTEL_BLRP_*`` is dead there and
+``OTEL_BSP_*`` is not dead here.
 
 The SDK's experimental composable samplers are reachable through the
 ``composite/development`` field. They are a separate sampler hierarchy
@@ -645,10 +653,14 @@ def _create_span_limits(
             the configuration has no top-level block.
 
     Returns:
-        ``SpanLimits`` with every field set, so the SDK reads none of the
-        ``OTEL_SPAN_*`` or ``OTEL_ATTRIBUTE_*`` environment variables. The
+        ``SpanLimits`` with seven of its eight parameters set, so the SDK
+        reads none of the ``OTEL_SPAN_*`` environment variables. The
         value-length limit is applied to both the generic and the
         span-specific field, which is what makes it reach span attributes.
+        The generic ``max_attributes`` is the one parameter not passed, so
+        ``OTEL_ATTRIBUTE_COUNT_LIMIT`` is still read for it, and a value
+        that is not a non-negative integer raises ``ValueError`` from the
+        ``SpanLimits`` constructor.
     """
     attribute_count_limit = config.attribute_count_limit
     if attribute_count_limit is None and global_limits is not None:
