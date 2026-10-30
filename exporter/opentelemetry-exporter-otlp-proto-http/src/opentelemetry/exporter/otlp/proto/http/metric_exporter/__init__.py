@@ -362,8 +362,8 @@ class OTLPMetricExporter(MetricExporter):
 
         Args:
             metrics_data: The metrics a reader collected.
-            timeout_millis: Accepted so that the signature matches
-                :class:`~opentelemetry.sdk.metrics.export.MetricExporter`, and
+            timeout_millis: Accepted because
+                :class:`~opentelemetry.sdk.metrics.export.MetricExporter` declares it, and
                 ignored. The deadline that is actually applied is the
                 ``timeout`` the exporter was constructed with.
             **kwargs: Accepted for the same reason and ignored.
@@ -407,8 +407,8 @@ class OTLPMetricExporter(MetricExporter):
         nothing, so shutting down twice is harmless.
 
         Args:
-            timeout_millis: Accepted so that the signature matches
-                :class:`~opentelemetry.sdk.metrics.export.MetricExporter`, and
+            timeout_millis: Accepted because
+                :class:`~opentelemetry.sdk.metrics.export.MetricExporter` declares it, and
                 ignored, since closing the client does not wait.
             **kwargs: Accepted for the same reason and ignored.
         """
