@@ -390,9 +390,10 @@ class OTLPMetricExporter(
     def set_meter_provider(self, meter_provider: MeterProvider):
         """Rebuild the exporter's own self-observability metrics against another meter provider.
 
-        The SDK calls this when the exporter is installed under a meter
-        provider that was not known when the exporter was constructed. This
-        does not change where the exported metrics go.
+        Call this when the meter provider to record those metrics with was not
+        known at the time the exporter was constructed. This does not change
+        where the exported metrics go, only where the exporter's own metrics
+        are recorded.
 
         Args:
             meter_provider: Meter provider to record the exporter's own

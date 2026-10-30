@@ -371,9 +371,10 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
             members are what ``_export`` returns.
         endpoint: OTLP-compatible receiver endpoint. Falls back to
             :envvar:`OTEL_EXPORTER_OTLP_ENDPOINT` and then to
-            ``http://localhost:4317``. Any path in the endpoint is dropped
-            with a warning, because the gRPC exporter addresses a service
-            rather than a URL path.
+            ``http://localhost:4317``. Only the host and port are kept,
+            because the gRPC exporter addresses a service rather than a URL
+            path, and a path that holds more than slashes is dropped with a
+            warning naming the HTTP exporter instead.
         insecure: Connection type. ``True`` sends plain HTTP/2 with no TLS.
             ``None`` means the value is taken from
             :envvar:`OTEL_EXPORTER_OTLP_INSECURE`, or from the endpoint scheme
@@ -402,14 +403,17 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
             ``OTEL_PYTHON_EXPORTER_OTLP_GRPC_RETRYABLE_ERROR_CODES``, parsed as
             a comma-separated list of status code names, and otherwise falls
             back to this module's own set.
-        component_type: Semantic conventions component type recorded on the
-            exporter's own self-observability metrics. ``None`` turns those
-            metrics off.
-        signal: Signal name recorded on the exporter's own self-observability
-            metrics.
+        component_type: Semantic conventions component type recorded as an
+            attribute on the exporter's own self-observability metrics.
+            ``None`` records ``unknown_otlp_exporter`` instead, and does not
+            stop those metrics from being recorded.
+        signal: Signal name, which selects which self-observability
+            instruments the exporter creates.
         meter_provider: Meter provider used to record the exporter's own
             self-observability metrics. ``None`` means the globally configured
-            meter provider is used.
+            meter provider is used. Those metrics are recorded at all only
+            when :envvar:`OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED` is set to
+            ``true``.
     """
 
     def __init__(
@@ -694,9 +698,10 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
         """
         Shut down the exporter.
 
-        Closing the channel also releases an export that is waiting between
-        retries, which then gives up rather than making a further attempt. A
-        second call logs a warning and does nothing.
+        An export that is waiting between retries is released by the same
+        event that marks the shutdown, and then gives up rather than making a
+        further attempt. The gRPC channel is closed afterwards. A second call
+        logs a warning and does nothing.
 
         Args:
             timeout_millis: Timeout in milliseconds for shutting down the exporter.
@@ -728,9 +733,11 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
     def _set_meter_provider(self, meter_provider: MeterProvider) -> None:
         """Rebuild the exporter's own self-observability metrics against another meter provider.
 
-        The SDK calls this when the exporter is installed under a meter
-        provider that was not known when the exporter was constructed. The
-        previous instruments are discarded.
+        Call this when the meter provider to record those metrics with was not
+        known at the time the exporter was constructed. The instruments
+        created earlier are discarded and new ones are created from
+        ``meter_provider``, and whether anything is recorded still depends on
+        :envvar:`OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED`.
 
         Args:
             meter_provider: Meter provider to record the exporter's own

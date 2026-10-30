@@ -4,9 +4,9 @@
 """OTLP Log Record Exporter
 
 This module holds the log record exporter that sends log records to an
-OTLP-compatible receiver over gRPC. The module name starts with an underscore
-because the logs signal of this package is still unstable, so the import path
-can change without a major version bump.
+OTLP-compatible receiver over gRPC. It reads the records that
+``opentelemetry.sdk._logs`` produces, and it carries the same leading
+underscore that module does.
 """
 
 from collections.abc import Iterable, Sequence
