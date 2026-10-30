@@ -156,6 +156,28 @@ class ZipkinExporter(SpanExporter):
         self.timeout = timeout or int(environ.get(OTEL_EXPORTER_ZIPKIN_TIMEOUT, 10))
 
     def export(self, spans: Sequence[Span]) -> SpanExportResult:
+        """Serialize one batch of spans and POST it to the Zipkin collector.
+
+        The ``service.name`` resource attribute of the first span of the batch
+        becomes the service name of the local endpoint for every span in it. All
+        spans of a batch come from one tracer provider, so they share a resource
+        and therefore a service name. A batch whose first span carries no
+        ``service.name`` leaves the previously resolved service name in place.
+
+        A collector response whose status code is neither 200 nor 202 is logged
+        at error level together with the response body, and counts as a failed
+        export. Network and timeout failures are not caught here: they surface
+        to the caller as the exception raised by the underlying session.
+
+        Args:
+            spans: The batch of ended spans to export. An empty batch is still
+                serialized and posted.
+
+        Returns:
+            ``SpanExportResult.SUCCESS`` when the collector accepted the batch,
+            and ``SpanExportResult.FAILURE`` when it rejected it or when this
+            exporter has already been shut down.
+        """
         # After the call to Shutdown subsequent calls to Export are
         # not allowed and should return a Failure result
         if self._closed:
@@ -186,6 +208,14 @@ class ZipkinExporter(SpanExporter):
         return SpanExportResult.SUCCESS
 
     def shutdown(self) -> None:
+        """Close the session and refuse any further export.
+
+        Closing the session releases its connection pool, including a session
+        that was passed to the constructor rather than created here. Every later
+        call to :meth:`export` logs a warning and returns
+        ``SpanExportResult.FAILURE``. A second call to this method logs a
+        warning and does nothing else, so shutting down twice is safe.
+        """
         if self._closed:
             logger.warning("Exporter already shutdown, ignoring call")
             return
@@ -193,4 +223,19 @@ class ZipkinExporter(SpanExporter):
         self._closed = True
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
+        """Report that there is nothing left to flush.
+
+        This exporter holds no queue of its own: :meth:`export` posts each batch
+        before it returns, so by the time this method runs every batch handed to
+        the exporter has already been sent. Buffering belongs to the span
+        processor in front of the exporter, which flushes itself before calling
+        this method.
+
+        Args:
+            timeout_millis: Budget in milliseconds for the flush. Ignored,
+                because nothing is waited on.
+
+        Returns:
+            ``True`` always.
+        """
         return True
