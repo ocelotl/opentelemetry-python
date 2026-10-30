@@ -36,10 +36,11 @@ class Status:
             status of the operation.
         description: An optional description of the status.
 
-    A description is kept only when ``status_code`` is
+    A non-empty description is kept only when ``status_code`` is
     :attr:`StatusCode.ERROR` and the description is a :class:`str`. Otherwise
     it is discarded and a warning is logged, which is what the specification
-    requires.
+    requires. A description that is ``None`` or the empty string skips those
+    checks altogether and is stored as it was given, with no warning.
     """
 
     def __init__(
@@ -79,8 +80,10 @@ class Status:
         """Status description.
 
         Returns:
-            The description, or ``None`` when none was supplied or the one
-            supplied was discarded for accompanying a non-error status code.
+            The description as it was stored. That is ``None`` when none was
+            supplied and when the one supplied was discarded for not being a
+            :class:`str` or for accompanying a non-error status code, and the
+            empty string when the empty string was supplied.
         """
         return self._description
 
