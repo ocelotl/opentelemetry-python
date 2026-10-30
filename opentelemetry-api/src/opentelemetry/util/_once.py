@@ -30,9 +30,11 @@ class Once:
 
         Args:
             func: The callable to execute. It takes no argument and its return
-                value is discarded. It is called at most once over the lifetime
-                of this :class:`Once` instance, no matter how many threads call
-                this method.
+                value is discarded. It is called at most once per :class:`Once`
+                instance no matter how many threads call this method, counting
+                only calls that return. A call that raises leaves the instance
+                unmarked and propagates the exception, so the next call to this
+                method runs ``func`` again.
 
         Returns:
             Whether or not ``func`` was executed in this call
