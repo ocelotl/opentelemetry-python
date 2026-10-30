@@ -23,9 +23,10 @@ name ``otlp`` to either ``otlp_proto_grpc`` or ``otlp_proto_http`` and then
 loads the entry point of that rewritten name, which the gRPC and HTTP
 distributions register. The choice comes from
 ``OTEL_EXPORTER_OTLP_TRACES_PROTOCOL``, or from ``OTEL_EXPORTER_OTLP_PROTOCOL``
-when the signal-specific variable is unset or empty: ``http/protobuf`` gives
-HTTP, ``grpc`` gives gRPC, and any other non-empty value raises
-``RuntimeError``. Both variables unset or empty gives gRPC, so an unfilled
+when the signal-specific variable is unset or empty. The value is read with
+surrounding whitespace removed: ``http/protobuf`` gives HTTP, ``grpc`` gives
+gRPC, and any other non-empty value raises ``RuntimeError``. Both variables
+unset or empty gives gRPC, so an unfilled
 placeholder is read as no setting at all rather than as an error.
 ``OTEL_METRICS_EXPORTER`` and ``OTEL_LOGS_EXPORTER`` work the same way, against
 ``OTEL_EXPORTER_OTLP_METRICS_PROTOCOL`` and
