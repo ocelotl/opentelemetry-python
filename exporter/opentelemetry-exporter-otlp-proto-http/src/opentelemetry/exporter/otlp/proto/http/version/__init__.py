@@ -3,9 +3,12 @@
 
 """Version of the ``opentelemetry-exporter-otlp-proto-http`` distribution.
 
-The string is written here by hand and read by ``pyproject.toml``, so it is the
-single place the released version number is defined. The exporters also send it
-in the ``User-Agent`` header of every export request.
+``pyproject.toml`` reads ``__version__`` from this file, through the path its
+``[tool.hatch.version]`` table declares, so this is where the built
+distribution takes its version from. The string is not edited here by hand:
+``scripts/eachdist.py`` rewrites it from the version recorded for the
+``[stable]`` package set in ``eachdist.ini``. The exporters also send it in the
+``User-Agent`` header of every export request.
 """
 
 __version__ = "1.46.0.dev"
