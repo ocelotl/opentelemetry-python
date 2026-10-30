@@ -89,11 +89,12 @@ DEFAULT_TIMEOUT = 10  # in seconds
 class OTLPLogExporter(LogRecordExporter):
     """OTLP HTTP log exporter.
 
-    ``endpoint``, the three TLS file paths, ``headers``, ``timeout`` and
-    ``compression`` may each be left unset, in which case the value is resolved
-    from the environment: first the per-signal ``OTEL_EXPORTER_OTLP_LOGS_*``
-    variable, then the signal-independent ``OTEL_EXPORTER_OTLP_*`` one, then a
-    built-in fallback. An argument given here overrides both variables.
+    ``endpoint``, the three TLS file paths, ``timeout`` and ``compression`` may
+    each be left unset, in which case the value is resolved from the
+    environment: first the per-signal ``OTEL_EXPORTER_OTLP_LOGS_*`` variable,
+    then the signal-independent ``OTEL_EXPORTER_OTLP_*`` one, then a built-in
+    fallback. An argument given here overrides both variables. ``headers``
+    follows the same order key by key instead of replacing the whole mapping.
 
     ``max_request_size`` and ``meter_provider`` have no environment variable of
     either kind, so they can only be set here. ``session`` reverses the
@@ -107,9 +108,13 @@ class OTLPLogExporter(LogRecordExporter):
         client_key_file: Path to the client key file for mTLS. It is used only
             together with ``client_certificate_file``.
         client_certificate_file: Path to the client certificate file for mTLS.
-        headers: Headers to send with each export request. They override the
-            headers resolved from the environment, and the ``Content-Type`` and
-            ``User-Agent`` this exporter sets.
+        headers: Headers to send with each export request. They are merged key
+            by key over the headers parsed from the environment, which are in
+            turn merged over the ``Content-Type`` and ``User-Agent`` this
+            exporter always sets. A header the environment supplies and this
+            argument does not is therefore still sent. Keys are lowercased
+            before merging, so a key given in a different case replaces the
+            earlier value rather than adding a second header.
         timeout: Timeout in seconds for each export request. It covers the
             retries and the waits between them, not one HTTP attempt.
         compression: Compression to use; one of none, gzip, deflate.
@@ -292,9 +297,8 @@ class OTLPLogExporter(LogRecordExporter):
         """Nothing is buffered in this exporter, so this method does nothing.
 
         Args:
-            timeout_millis: Accepted so that the signature matches
-                :class:`~opentelemetry.sdk._logs.export.LogRecordExporter`, and
-                ignored, since there is nothing to wait for.
+            timeout_millis: Accepted because :class:`~opentelemetry.sdk._logs.export.LogRecordExporter`
+                declares it, and ignored, since there is nothing to wait for.
 
         Returns:
             True, always.

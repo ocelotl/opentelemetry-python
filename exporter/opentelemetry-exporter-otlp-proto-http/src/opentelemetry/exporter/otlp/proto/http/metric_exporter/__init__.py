@@ -126,11 +126,12 @@ DEFAULT_TIMEOUT = 10  # in seconds
 class OTLPMetricExporter(MetricExporter):
     """OTLP HTTP metrics exporter.
 
-    ``endpoint``, the three TLS file paths, ``headers``, ``timeout`` and
-    ``compression`` may each be left unset, in which case the value is resolved
-    from the environment: first the per-signal ``OTEL_EXPORTER_OTLP_METRICS_*``
-    variable, then the signal-independent ``OTEL_EXPORTER_OTLP_*`` one, then a
-    built-in fallback. An argument given here overrides both variables.
+    ``endpoint``, the three TLS file paths, ``timeout`` and ``compression`` may
+    each be left unset, in which case the value is resolved from the
+    environment: first the per-signal ``OTEL_EXPORTER_OTLP_METRICS_*`` variable,
+    then the signal-independent ``OTEL_EXPORTER_OTLP_*`` one, then a built-in
+    fallback. An argument given here overrides both variables. ``headers``
+    follows the same order key by key instead of replacing the whole mapping.
 
     ``max_export_batch_size``, ``max_request_size`` and ``meter_provider`` have
     no environment variable of either kind, so they can only be set here.
@@ -145,9 +146,13 @@ class OTLPMetricExporter(MetricExporter):
         client_key_file: Path to the client key file to use for any TLS. It is
             used only together with ``client_certificate_file``.
         client_certificate_file: Path to the client certificate file to use for any TLS
-        headers: Headers to be sent with HTTP requests at export. They override
-            the headers resolved from the environment, and the ``Content-Type``
-            and ``User-Agent`` this exporter sets.
+        headers: Headers to be sent with HTTP requests at export. They are
+            merged key by key over the headers parsed from the environment,
+            which are in turn merged over the ``Content-Type`` and
+            ``User-Agent`` this exporter always sets. A header the environment
+            supplies and this argument does not is therefore still sent. Keys
+            are lowercased before merging, so a key given in a different case
+            replaces the earlier value rather than adding a second header.
         timeout: Timeout in seconds for export. It covers the retries and the
             waits between them, not one HTTP attempt, and it applies to each
             request separately when a collection is split into several.
@@ -417,9 +422,8 @@ class OTLPMetricExporter(MetricExporter):
         """Nothing is buffered in this exporter, so this method does nothing.
 
         Args:
-            timeout_millis: Accepted so that the signature matches
-                :class:`~opentelemetry.sdk.metrics.export.MetricExporter`, and
-                ignored, since there is nothing to wait for.
+            timeout_millis: Accepted because :class:`~opentelemetry.sdk.metrics.export.MetricExporter`
+                declares it, and ignored, since there is nothing to wait for.
 
         Returns:
             True, always.
@@ -510,7 +514,8 @@ def _split_metrics_data(
         ``pb2.ResourceMetrics``, ``pb2.ScopeMetrics`` and ``pb2.Metric``
         objects rather than from the ones in ``metrics_data``. A metric whose
         ``data`` oneof is unset is reported with a warning and left out, so the
-        yielded requests may hold fewer data points than the original.
+        yielded requests may hold fewer metrics than the original. It carries
+        no data points, so no data point is lost with it.
     """
     if not max_export_batch_size:
         return metrics_data
