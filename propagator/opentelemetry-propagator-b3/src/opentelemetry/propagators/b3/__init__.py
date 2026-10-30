@@ -17,7 +17,8 @@ named ``b3``, holding the same fields joined by ``-``.
 What differs between the two is injection, and with it the set of header names
 each one reports through ``fields``. ``B3SingleFormat`` inherits
 ``B3MultiFormat.extract`` unchanged, so either class reads a carrier written in
-either encoding, and the single ``b3`` header wins when a carrier holds both.
+either encoding, and a ``b3`` header with a non-empty value wins when a carrier
+holds both.
 
 Both classes are registered as ``opentelemetry_propagator`` entry points, under
 the names ``b3`` for ``B3SingleFormat`` and ``b3multi`` for ``B3MultiFormat``,
@@ -52,7 +53,8 @@ class B3MultiFormat(TextMapPropagator):
     Injection writes one header per field: ``x-b3-traceid``, ``x-b3-spanid``
     and ``x-b3-sampled``. Extraction reads those headers but also reads the
     single ``b3`` header of the other B3 encoding, and prefers it when both are
-    present, so this class accepts a carrier written either way.
+    present and its value is not empty, so this class accepts a carrier written
+    either way.
     ``B3SingleFormat`` inherits that extraction and overrides injection, along
     with the ``fields`` property that reports what injection writes.
 
