@@ -150,8 +150,8 @@ class NoOpMeterProvider(MeterProvider):
                 library.
             schema_url: Optional. Specifies the Schema URL of the emitted
                 telemetry.
-            attributes: Optional. Attributes that are associated with the
-                emitted telemetry.
+            attributes: Optional. Accepted and discarded: the `NoOpMeter` is
+                built without them.
 
         Returns:
             A `NoOpMeter`, which discards every measurement made through the
@@ -192,8 +192,9 @@ class _ProxyMeterProvider(MeterProvider):
                 library.
             schema_url: Optional. Specifies the Schema URL of the emitted
                 telemetry.
-            attributes: Optional. Attributes that are associated with the
-                emitted telemetry.
+            attributes: Optional. Accepted and discarded: neither the
+                `_ProxyMeter` nor the real meter provider is given them, so a
+                scope attribute supplied here never reaches the telemetry.
 
         Returns:
             A meter from the real meter provider when one has been set, and a
