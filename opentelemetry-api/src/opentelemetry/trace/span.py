@@ -66,9 +66,10 @@ def _is_valid_pair(key: str, value: str) -> bool:
     """Report whether a pair may appear in a ``tracestate`` header.
 
     Args:
-        key: The candidate trace state key. It must start with a lowercase
-            letter or a digit, and may carry one ``@`` separating a tenant
-            from a vendor.
+        key: The candidate trace state key. A key starting with a lowercase
+            letter needs no ``@``. A key starting with a digit is valid only
+            in the tenant ``@`` vendor form, whose vendor half must itself
+            start with a lowercase letter.
         value: The candidate trace state value. It must hold only printable
             ASCII other than comma and equals sign, and must not end with a
             space.
