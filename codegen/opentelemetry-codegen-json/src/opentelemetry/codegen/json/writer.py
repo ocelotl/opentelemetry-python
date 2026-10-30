@@ -383,8 +383,8 @@ class CodeWriter:
             name: The name of the function
             params: An iterable of parameter strings or a single string for the parameter list.
                 An iterable is joined with ``", "``; a string is written as it stands, which is
-                the way to pass something a comma would split wrongly, such as a default value
-                holding a comma.
+                the way to pass a parameter list that is already assembled, with the caller
+                responsible for the separators.
             decorators: Optional iterable of decorator names
             return_type: Optional return type hint for the function. ``None`` and the empty string
                 both leave the arrow off entirely.
