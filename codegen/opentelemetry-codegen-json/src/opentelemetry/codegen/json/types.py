@@ -181,9 +181,9 @@ def to_json_field_name(snake_name: str) -> str:
     that field in, and the generator prefers it when present.
 
     The conversion uses ``str.title`` on each component after the first. ``str.title`` uppercases
-    the first letter after every character that is not a letter and lowercases every other letter,
-    so ``trace_ID`` gives ``traceId`` and a digit inside a component starts a second uppercase
-    letter: ``foo_bar1baz`` gives ``fooBar1Baz``.
+    the first letter of the string and the first letter after every character that is not a
+    letter, and lowercases every other letter, so ``trace_ID`` gives ``traceId`` and a digit
+    inside a component starts a second uppercase letter: ``foo_bar1baz`` gives ``fooBar1Baz``.
     A leading underscore produces an empty first component, so the result begins with whatever
     ``str.title`` makes of the second one: ``_foo`` gives ``Foo``, and ``_1abc`` gives ``1Abc``.
 
