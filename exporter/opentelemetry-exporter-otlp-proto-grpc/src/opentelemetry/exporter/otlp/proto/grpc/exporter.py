@@ -399,10 +399,18 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
             when that variable is unset. Only an ``http`` scheme gives
             ``True`` that way, so an endpoint written without a scheme
             resolves to ``False`` and opens a TLS channel. An ``https`` scheme
-            forces ``False`` whatever the argument says.
+            forces ``False`` whatever the argument and that variable say,
+            because the scheme is tested before either of them is.
         credentials: ChannelCredentials object for server authentication. Used
-            only when the connection is not insecure. ``None`` means the
-            credentials are resolved from the environment instead.
+            only when the connection is not insecure, and returned unchanged
+            when it is not ``None``. ``None`` on a connection that is not
+            insecure means the credentials are resolved from the environment
+            instead: first the entry point named by
+            ``OTEL_PYTHON_EXPORTER_OTLP_GRPC_CREDENTIAL_PROVIDER``, then
+            :envvar:`OTEL_EXPORTER_OTLP_CERTIFICATE` with its client key and
+            client certificate companions, then the root certificates gRPC
+            finds for itself. An insecure connection resolves nothing and
+            reads none of those variables.
         headers: Headers to send when exporting, as a mapping, as a sequence
             of pairs, or as the comma-separated string form used by
             :envvar:`OTEL_EXPORTER_OTLP_HEADERS`. ``None`` means that
