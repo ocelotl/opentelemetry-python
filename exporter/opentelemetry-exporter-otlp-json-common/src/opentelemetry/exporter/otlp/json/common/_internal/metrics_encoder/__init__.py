@@ -138,9 +138,11 @@ def split_metrics_data(
     its own. A metric whose data points span a batch boundary appears in both
     batches, each time carrying only the data points of that batch.
 
-    A metric that has none of the five data fields set, and a metric whose data
-    field holds no data points, are both logged as a warning and left out of
-    every batch.
+    When ``max_export_batch_size`` is not ``None``, a metric that has none of
+    the five data fields set, and a metric whose data field holds no data
+    points, are both logged as a warning and left out of every batch. Neither
+    check runs on the unlimited path, which hands ``metrics_data`` back
+    untouched.
 
     Args:
         metrics_data: the encoded request to split. It is read but never
@@ -153,9 +155,10 @@ def split_metrics_data(
     Yields:
         One ``ExportMetricsServiceRequest`` per batch. With
         ``max_export_batch_size`` of ``None`` that is ``metrics_data`` itself,
-        unchanged and yielded once. For a ``max_export_batch_size`` above zero,
-        every batch but the last carries exactly that many data points. A
-        ``metrics_data`` holding no data points at all yields nothing.
+        unchanged and yielded once, even when it holds no data points at all.
+        For a ``max_export_batch_size`` above zero, every batch but the last
+        carries exactly that many data points, and a ``metrics_data`` holding
+        no data points at all yields nothing.
     """
     if max_export_batch_size is None:
         yield metrics_data
