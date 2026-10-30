@@ -47,9 +47,12 @@ class FileMetricExporter(MetricExporter):
 
     A line written by this exporter always holds one whole ``ExportMetricsServiceRequest``, so the
     output can be read back a line at a time and a collection is never split across lines. A
-    collection that encodes to nothing writes no line at all.
-    Register this exporter with ``opentelemetry.sdk.metrics.export.PeriodicExportingMetricReader``
-    for the metrics to reach it.
+    collection that encodes to nothing writes no line at all. Register this exporter with
+    ``opentelemetry.sdk.metrics.export.PeriodicExportingMetricReader`` for the metrics to reach
+    it.
+
+    The destination is bound when the exporter is built, so replacing ``sys.stdout`` afterwards,
+    with ``contextlib.redirect_stdout`` or in any other way, does not redirect the output.
 
     Args:
         path: File to append the metrics to, opened with UTF-8 encoding. The exporter closes this

@@ -51,9 +51,12 @@ class FileLogExporter(LogRecordExporter):
 
     A line written by this exporter always holds one whole ``ExportLogsServiceRequest``, so the
     output can be read back a line at a time and a batch is never split across lines. A batch that
-    encodes to nothing writes no line at all. Register
-    this exporter with a log record processor, such as
-    ``opentelemetry.sdk._logs.export.BatchLogRecordProcessor``, for the log records to reach it.
+    encodes to nothing writes no line at all. Register this exporter with a log record processor,
+    such as ``opentelemetry.sdk._logs.export.BatchLogRecordProcessor``, for the log records to
+    reach it.
+
+    The destination is bound when the exporter is built, so replacing ``sys.stdout`` afterwards,
+    with ``contextlib.redirect_stdout`` or in any other way, does not redirect the output.
 
     Args:
         path: File to append the log records to, opened with UTF-8 encoding. The exporter closes

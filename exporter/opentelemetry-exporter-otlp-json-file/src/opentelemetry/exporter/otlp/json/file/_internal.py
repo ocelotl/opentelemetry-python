@@ -29,7 +29,8 @@ class _FileExporter(Generic[T]):
     The destination is chosen once, when the exporter is built, and never changes afterwards.
     Giving ``path`` opens that file and makes this object responsible for closing it again on
     shutdown. Giving ``stream`` hands over a stream that the caller keeps responsible for. Giving
-    neither writes to ``sys.stdout``.
+    neither captures ``sys.stdout`` as it is at that moment, so replacing ``sys.stdout``
+    afterwards does not redirect the output.
 
     Concurrent calls to ``export`` on one instance are serialised with a lock, so two exporting
     threads cannot interleave halves of their lines. The lock belongs to the instance, so two

@@ -37,9 +37,12 @@ class FileSpanExporter(SpanExporter):
 
     A line written by this exporter always holds one whole ``ExportTraceServiceRequest``, so the
     output can be read back a line at a time and a batch is never split across lines. A batch
-    that encodes to nothing writes no line at all.
-    Register this exporter with ``opentelemetry.sdk.trace.export.BatchSpanProcessor`` or
+    that encodes to nothing writes no line at all. Register this exporter with
+    ``opentelemetry.sdk.trace.export.BatchSpanProcessor`` or
     ``opentelemetry.sdk.trace.export.SimpleSpanProcessor`` for the spans to reach it.
+
+    The destination is bound when the exporter is built, so replacing ``sys.stdout`` afterwards,
+    with ``contextlib.redirect_stdout`` or in any other way, does not redirect the output.
 
     Args:
         path: File to append the spans to, opened with UTF-8 encoding. The exporter closes this
