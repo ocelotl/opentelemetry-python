@@ -442,6 +442,8 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
             ``OTEL_PYTHON_EXPORTER_OTLP_GRPC_RETRYABLE_ERROR_CODES``, parsed as
             a comma-separated list of status code names, and otherwise falls
             back to this module's own set.
+            An empty iterable is treated the same way as ``None``, so this
+            argument cannot ask for no retries at all.
         component_type: Semantic conventions component type recorded as an
             attribute on the exporter's own self-observability metrics.
             ``None`` records ``unknown_otlp_exporter`` instead, and does not

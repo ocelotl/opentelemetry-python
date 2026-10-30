@@ -189,6 +189,8 @@ class OTLPMetricExporter(
             ``OTEL_PYTHON_EXPORTER_OTLP_GRPC_RETRYABLE_ERROR_CODES``, which
             applies to all three signals and has no metrics-specific form, and
             otherwise falls back to the default set.
+            An empty iterable is treated the same way as ``None``, so this
+            argument cannot ask for no retries at all.
         meter_provider: Meter provider used to record the exporter's own
             self-observability metrics. ``None`` means the globally configured
             meter provider is used. Those metrics are recorded at all only
