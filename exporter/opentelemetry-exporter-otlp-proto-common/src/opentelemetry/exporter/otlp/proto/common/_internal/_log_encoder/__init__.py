@@ -55,9 +55,11 @@ def encode_logs(
 def _encode_log(readable_log_record: ReadableLogRecord) -> PB2LogRecord:
     """Encode one log record, without its resource or its instrumentation scope.
 
-    A trace or span identifier of 0 means the record was not emitted inside a
-    recording span, and is encoded as an absent field rather than as eight or
-    sixteen zero bytes, which is what the protocol asks for. A severity number
+    A trace identifier of 0, or a span identifier of 0, means the record was not
+    emitted inside a recording span, and is encoded as an absent field rather
+    than as sixteen or eight zero bytes. The protocol accepts either form: it
+    counts an all-zero identifier as invalid, and asks a receiver to read an
+    absent field and an invalid one the same way. A severity number
     that is ``None`` rather than an enum member leaves ``severity_number`` at
     ``SEVERITY_NUMBER_UNSPECIFIED``.
 
