@@ -381,6 +381,10 @@ def _create_console_metric_exporter(
 
     Returns:
         A ``ConsoleMetricExporter`` writing to standard output.
+
+    Raises:
+        ConfigurationError: If a preference field names something
+            unsupported.
     """
     preferred_temporality = _map_temporality(config.temporality_preference)
     preferred_aggregation = _map_histogram_aggregation(config.default_histogram_aggregation)
@@ -796,6 +800,9 @@ def _create_pull_metric_exporter(
             is not registered.
         MissingDependencyError: If the Prometheus exporter distribution is
             not installed.
+        OSError: If the Prometheus listener cannot bind the configured
+            port. ``_create_prometheus_metric_reader`` starts it before
+            returning, so the failure reaches this caller.
     """
     if config.prometheus_development is not None:
         return _create_prometheus_metric_reader(config.prometheus_development, cardinality_limits)
@@ -832,6 +839,8 @@ def _create_pull_metric_reader(
     Raises:
         ConfigurationError: If the exporter block selects nothing or cannot
             be built.
+        OSError: If the exporter block is ``prometheus/development`` and
+            its listener cannot bind the configured port.
     """
     if config.producers:
         _logger.warning(
@@ -855,6 +864,9 @@ def _create_metric_reader(config: MetricReaderConfig) -> MetricReader:
     Raises:
         ConfigurationError: If neither field is set, or if the reader
             cannot be built.
+        OSError: If the reader is a ``pull`` reader on
+            ``prometheus/development`` and its listener cannot bind the
+            configured port.
     """
     if config.periodic is not None:
         return _create_periodic_metric_reader(config.periodic)
