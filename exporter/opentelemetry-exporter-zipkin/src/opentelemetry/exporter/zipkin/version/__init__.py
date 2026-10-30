@@ -14,9 +14,14 @@ An exporter class is therefore imported from one of those two distributions.
 ``opentelemetry.exporter.zipkin.json.ZipkinExporter``, which sends spans as
 Zipkin JSON over HTTP, and ``opentelemetry-exporter-zipkin-proto-http``
 provides ``opentelemetry.exporter.zipkin.proto.http.ZipkinExporter``, which
-sends them as Zipkin protobuf over HTTP. Once the serialization is settled,
-depending on that one distribution directly leaves the other one, and the
-dependencies it brings, out of the environment.
+sends them as Zipkin protobuf over HTTP. Once the serialization is settled, a
+dependency on that one distribution is enough. The two choices are not
+symmetric. ``opentelemetry-exporter-zipkin-json`` on its own leaves
+``opentelemetry-exporter-zipkin-proto-http`` and its ``protobuf`` requirement
+out of the environment, while ``opentelemetry-exporter-zipkin-proto-http``
+itself depends on ``opentelemetry-exporter-zipkin-json`` and so installs both:
+the protobuf exporter imports ``opentelemetry.exporter.zipkin.node_endpoint``,
+which the JSON distribution ships.
 
 ``opentelemetry-exporter-zipkin`` also registers an
 ``opentelemetry_traces_exporter`` entry point named ``zipkin``, which resolves
