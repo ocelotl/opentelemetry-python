@@ -71,9 +71,10 @@ class FileMetricExporter(MetricExporter):
             bucket histogram by default, and also after a warning for an unrecognised value, or
             the base-2 exponential bucket histogram when that variable is set to
             ``BASE2_EXPONENTIAL_BUCKET_HISTOGRAM``. An entry here for ``Histogram`` overrides
-            that choice. Every other instrument class is left on the default aggregation the
-            metric reader picks, since neither this exporter nor that variable names one.
-            ``None`` overrides nothing.
+            that choice, and an entry for any of the other instrument classes is handed to the
+            metric reader as it stands. An instrument class with no entry here, ``Histogram``
+            aside, is left on the default aggregation the metric reader picks, since neither
+            this exporter nor that variable names one for it. ``None`` overrides nothing.
 
     Raises:
         ValueError: Both ``path`` and ``stream`` were given. Leaving both out selects
