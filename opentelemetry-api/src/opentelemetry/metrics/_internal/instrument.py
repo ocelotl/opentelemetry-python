@@ -11,10 +11,11 @@ called at the moment something happens, for example
 given callbacks instead, and the SDK invokes them when it collects.
 
 Each instrument type here has two implementations beside the abstract one. The
-``NoOp`` variant discards every measurement and is what a meter returns when
-no SDK is installed. The ``_Proxy`` variant is returned before a real
-:class:`~opentelemetry.metrics.MeterProvider` is set, and swaps itself for a
-real instrument once one is.
+``NoOp`` variant discards every measurement and is what a
+:class:`~opentelemetry.metrics.NoOpMeter` returns. The ``_Proxy`` variant is
+what a meter returns before a real
+:class:`~opentelemetry.metrics.MeterProvider` is set, which is the state with
+no SDK installed, and it swaps itself for a real instrument once one is set.
 """
 
 from abc import ABC, abstractmethod
