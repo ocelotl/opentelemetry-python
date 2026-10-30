@@ -896,7 +896,10 @@ class _CustomCollector:
             A string is returned unchanged. Anything else is serialized as
             JSON, so a sequence becomes ``["a", "b"]``, a boolean becomes
             ``true`` or ``false`` and ``None`` becomes ``null``. A value JSON
-            cannot represent falls back to its ``str``.
+            cannot represent falls back to its ``str``, which is then encoded
+            as a JSON string and so carries the surrounding quotes. Only a
+            direct call reaches that fallback: the SDK coerces an attribute
+            value of an unsupported type before the exporter sees it.
         """
         if not isinstance(value, str):
             return dumps(value, default=str)
