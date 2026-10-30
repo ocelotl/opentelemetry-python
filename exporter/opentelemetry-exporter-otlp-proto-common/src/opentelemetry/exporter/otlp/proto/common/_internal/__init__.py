@@ -59,10 +59,12 @@ def _encode_instrumentation_scope(
             left at their protobuf defaults.
 
     Returns:
-        The protobuf ``InstrumentationScope``, which carries a name, a version,
-        attributes and a dropped attribute count. It has no field for a schema
-        URL, so the callers put the schema URL of the scope on the enclosing
-        ``ScopeSpans``, ``ScopeMetrics`` or ``ScopeLogs`` message instead.
+        The protobuf ``InstrumentationScope``, carrying the name, the version
+        and the encoded attributes. Its ``dropped_attributes_count`` field is
+        left at 0, whatever the SDK dropped from the scope attributes. It has no
+        field for a schema URL, so the callers put the schema URL of the scope on
+        the enclosing ``ScopeSpans``, ``ScopeMetrics`` or ``ScopeLogs`` message
+        instead.
     """
     if instrumentation_scope is None:
         return PB2InstrumentationScope()
@@ -80,13 +82,14 @@ def _encode_resource(resource: Resource) -> PB2Resource:
         resource: The resource the SDK attached to the telemetry being exported.
 
     Returns:
-        The protobuf ``Resource``, carrying the encoded attributes. It has no
-        field for a schema URL, so the two callers, the span encoder and the log
-        record encoder, put the schema URL of the resource on the enclosing
-        ``ResourceSpans`` or ``ResourceLogs`` message instead. The metrics
-        encoder does not use this function: it builds its ``Resource`` inline and
-        sets the schema URL on ``ResourceMetrics``. Attributes that cannot be
-        encoded are dropped, as described on ``_encode_attributes``.
+        The protobuf ``Resource``, carrying the encoded attributes. Its
+        ``dropped_attributes_count`` field is left at 0, as on the scope message
+        above. It has no field for a schema URL, so the two callers, the span
+        encoder and the log record encoder, put the schema URL of the resource on
+        the enclosing ``ResourceSpans`` or ``ResourceLogs`` message instead. The
+        metrics encoder does not use this function: it builds its ``Resource``
+        inline and sets the schema URL on ``ResourceMetrics``. Attributes that
+        cannot be encoded are dropped, as described on ``_encode_attributes``.
     """
     return PB2Resource(attributes=_encode_attributes(resource.attributes))
 
@@ -189,10 +192,12 @@ def _encode_attributes(attributes: Attributes) -> list[PB2KeyValue]:
     An attribute whose value ``_encode_value`` cannot encode is dropped rather
     than failing the export: the exception is logged at ``ERROR`` with its
     traceback and the key that caused it, and the remaining attributes are still
-    encoded. The count of attributes the SDK itself dropped is reported
-    separately, in the ``dropped_attributes_count`` field of the message that
-    holds the attributes, so an attribute dropped here does not appear in that
-    count.
+    encoded. An attribute dropped here is counted nowhere. The count of
+    attributes the SDK itself dropped is a separate number, which only the span,
+    span event, span link and log record encoders copy into the
+    ``dropped_attributes_count`` field of the message they build;
+    ``_encode_instrumentation_scope`` and ``_encode_resource`` leave that field
+    at 0, and no metric data point message defines it.
 
     Args:
         attributes: The attribute mapping from the SDK. ``None`` and an empty
