@@ -459,8 +459,10 @@ class WeaverLiveCheck:
         """Build the ``weaver registry live-check`` command.
 
         Parameters are documented on the class docstring. No subprocess is
-        started here: the command is assembled and the ports are reserved, and
-        :meth:`start` runs it.
+        started here: the command is assembled and the port numbers are chosen,
+        and :meth:`start` runs it. Choosing a port does not hold it, as
+        ``_find_free_port`` explains, so another process can take it before
+        weaver binds.
         """
         if not isfinite(startup_timeout) or startup_timeout <= 0:
             raise ValueError("startup_timeout must be positive and finite")
@@ -683,8 +685,9 @@ class WeaverLiveCheck:
                 for the process to exit.
 
         Returns:
-            The exit status of the weaver process. Non-zero means weaver found
-            violations.
+            The exit status of the weaver process. Non-zero is how weaver
+            reports a failed check, which is usually violations but covers any
+            failure it reports, and is negative when a signal killed it.
 
         Raises:
             requests.RequestException: When the shutdown request fails or

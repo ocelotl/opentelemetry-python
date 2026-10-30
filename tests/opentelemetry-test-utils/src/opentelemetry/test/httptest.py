@@ -110,9 +110,10 @@ class HttpTestBase(unittest.TestCase):
     def tearDownClass(cls):
         """Stop the shared server and wait for its thread to finish.
 
-        Joining the thread matters even though it is a daemon: a request still
-        being answered would otherwise race the next test class binding a
-        socket.
+        ``shutdown`` already blocks until the serve loop has returned, so no
+        request is still being answered once it comes back and the ``join``
+        only reaps a thread that has already finished. The listening socket is
+        not closed here, since ``server_close`` is never called.
         """
         cls.server.shutdown()
         cls.server_thread.join()

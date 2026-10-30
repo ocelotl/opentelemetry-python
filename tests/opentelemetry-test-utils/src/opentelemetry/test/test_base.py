@@ -58,10 +58,14 @@ class TestBase(unittest.TestCase):
     them. Every test method gets its own providers, so nothing recorded by one
     test is visible to another.
 
-    Override ``setUp`` to pass arguments to the providers: call
-    ``create_tracer_provider`` or ``create_meter_provider`` with the keyword
-    arguments you need and assign the results over the attributes this class
-    sets.
+    Override the ``create_tracer_provider`` or ``create_meter_provider``
+    staticmethod to pass arguments to a provider, forwarding ``**kwargs`` to
+    the ``TestBase`` implementation. ``setUp`` calls the override and installs
+    what it returns as the API global. Reassigning ``self.tracer_provider``
+    after ``super().setUp()`` does not work: the provider built by ``setUp`` is
+    already the installed global, and ``set_tracer_provider`` will not replace
+    it, so instrumentation keeps reporting to it while the reassigned exporter
+    stays empty.
     """
 
     # pylint: disable=C0103
@@ -183,7 +187,7 @@ class TestBase(unittest.TestCase):
                 constructor, for example ``resource`` or ``sampler``.
 
         Returns:
-            A list with the tracer provider in the first element and the
+            A tuple with the tracer provider in the first element and the
             in-memory span exporter in the second.
         """
         tracer_provider = TracerProvider(**kwargs)

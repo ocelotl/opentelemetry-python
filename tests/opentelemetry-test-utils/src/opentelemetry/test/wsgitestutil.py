@@ -28,8 +28,8 @@ class WsgiTestBase(TestBase):
     ``setUp`` leaves four attributes to pass into the application and three to
     read back out of it. ``self.environ`` is the WSGI environment, filled with
     the defaults of ``wsgiref.util.setup_testing_defaults``, which describe a
-    ``GET /`` over HTTP/1.0 with no headers; edit it before the call to change
-    the request. ``self.start_response`` is the callable to hand to the
+    ``GET /`` over HTTP/1.0 whose only request header is ``HTTP_HOST``, set to
+    ``127.0.0.1``; edit it before the call to change the request. ``self.start_response`` is the callable to hand to the
     application, ``self.write`` is the write callable it returns, and
     ``self.write_buffer`` is the ``BytesIO`` that write callable appends to.
     After the call, ``self.status``, ``self.response_headers`` and

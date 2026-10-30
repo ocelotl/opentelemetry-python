@@ -35,6 +35,12 @@ class MockFunc:
     """
 
     def __init__(self) -> None:
+        """Build the lock, the call counter and the mock to hand back.
+
+        ``call_count`` starts at zero and is the number this class exists to
+        make reliable. ``mock`` is the object ``__call__`` returns and is never
+        called here. ``lock`` guards ``call_count`` and nothing else.
+        """
         self.lock = threading.Lock()
         self.call_count = 0
         self.mock = Mock()
