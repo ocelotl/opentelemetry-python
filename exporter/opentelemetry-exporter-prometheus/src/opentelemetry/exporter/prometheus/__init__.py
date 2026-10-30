@@ -548,15 +548,21 @@ class _CustomCollector:
         disable_target_info: Whether to leave out the ``target_info`` metric
             that carries the resource attributes. When it is left in, the
             attributes are read once, from the first batch ever queued, and the
-            metric is reused for the lifetime of the collector.
-        prefix: String placed in front of every exported metric name, joined to
-            it with an underscore. An empty string adds nothing.
-        scope_info_enabled: Whether to label every exported metric with the
-            instrumentation scope it came from.
+            metric is reused for the lifetime of the collector. It is built
+            apart from the instrument metrics, so none of the three options
+            below reaches it: its name never carries the prefix, it never
+            carries scope labels, and it carries the resource attributes whole
+            whatever the resource attribute filter says.
+        prefix: String placed in front of the name of every metric translated
+            from an instrument, joined to it with an underscore. An empty
+            string adds nothing.
+        scope_info_enabled: Whether to label every metric translated from an
+            instrument with the instrumentation scope it came from.
         resource_attribute_filter: Callback deciding which resource attributes
-            are copied onto every exported metric as labels. It receives the
-            unsanitized attribute key. ``None`` copies none of them, which
-            leaves the resource visible only through ``target_info``.
+            are copied as labels onto every metric translated from an
+            instrument. It receives the unsanitized attribute key. ``None``
+            copies none of them, which leaves the resource visible only through
+            ``target_info``.
     """
 
     def __init__(
@@ -765,7 +771,7 @@ class _CustomCollector:
         return attrs
 
     def _build_resource_attrs(self, resource: Resource) -> dict[str, AnyValue]:
-        """Select the resource attributes that become labels on every exported metric.
+        """Select the resource attributes that become labels on every translated metric.
 
         Args:
             resource: The resource of the meter provider the metrics came from.
@@ -776,7 +782,9 @@ class _CustomCollector:
             ``target_info``. Otherwise the attributes the filter accepted, with
             their keys still unsanitized. A scope label or a data point
             attribute that sanitizes to the same label name takes precedence
-            over the resource attribute.
+            over the resource attribute. ``target_info`` is built elsewhere and
+            carries the resource attributes whole, so the filter never narrows
+            what it reports.
         """
         if not self._resource_attribute_filter:
             return {}

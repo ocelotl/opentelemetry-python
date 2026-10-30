@@ -9,9 +9,10 @@ rewrites the OpenTelemetry to Prometheus compatibility specification requires,
 at
 https://github.com/open-telemetry/opentelemetry-specification/blob/v1.33.0/specification/compatibility/prometheus_and_openmetrics.md.
 ``_CustomCollector`` calls ``sanitize_full_name`` and ``map_unit`` once per
-exported metric, and ``sanitize_attribute`` once per attribute of every data
-point as well as once per resource attribute carried by ``target_info``. All
-of them operate on single strings and hold no state.
+translated metric, and ``sanitize_attribute`` once per resource label, scope
+label and data point attribute of every data point, plus once per resource
+attribute carried by ``target_info``. All of them operate on single strings
+and hold no state.
 """
 
 from re import UNICODE, compile
