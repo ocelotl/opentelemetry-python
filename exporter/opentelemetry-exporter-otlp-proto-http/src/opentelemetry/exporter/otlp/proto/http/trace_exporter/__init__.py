@@ -9,8 +9,11 @@ batching of its own, so it is normally registered with
 :class:`~opentelemetry.sdk.trace.export.BatchSpanProcessor`, which decides when
 a batch is complete and calls :meth:`OTLPSpanExporter.export` with it.
 
-The module-level ``DEFAULT_`` names record the values that apply when neither a
-constructor argument nor an environment variable supplies one.
+``DEFAULT_TRACES_EXPORT_PATH`` is the path appended to a base endpoint that
+carries no signal path of its own. The other module-level ``DEFAULT_`` names
+are kept for callers that import them. The resolution code reads its own
+fallbacks from ``opentelemetry.exporter.otlp.proto.http._common``, so rebinding
+one of these names does not change what an exporter does.
 """
 
 from __future__ import annotations
@@ -78,11 +81,15 @@ DEFAULT_TIMEOUT = 10  # in seconds
 class OTLPSpanExporter(SpanExporter):
     """OTLP HTTP span exporter.
 
-    Every argument may be left unset, in which case the value is resolved from
-    the environment: first the per-signal ``OTEL_EXPORTER_OTLP_TRACES_*``
-    variable, then the signal-independent ``OTEL_EXPORTER_OTLP_*`` one, then
-    the default recorded in this module. An argument given here overrides both
-    variables.
+    ``endpoint``, the three TLS file paths, ``headers``, ``timeout`` and
+    ``compression`` may each be left unset, in which case the value is resolved
+    from the environment: first the per-signal ``OTEL_EXPORTER_OTLP_TRACES_*``
+    variable, then the signal-independent ``OTEL_EXPORTER_OTLP_*`` one, then a
+    built-in fallback. An argument given here overrides both variables.
+
+    ``max_request_size`` and ``meter_provider`` have no environment variable of
+    either kind, so they can only be set here. ``session`` reverses the
+    precedence above, as its entry explains.
 
     Args:
         endpoint: Full URL of the OTLP/HTTP signal endpoint, including the signal
@@ -99,9 +106,13 @@ class OTLPSpanExporter(SpanExporter):
             retries and the waits between them, not one HTTP attempt.
         compression: Compression to use; one of none, gzip, deflate.
         session: Requests session to use at export. When it is not given and a
-            credential provider is configured through
-            ``OTEL_PYTHON_EXPORTER_OTLP_HTTP_TRACES_CREDENTIAL_PROVIDER``, the
-            session that provider returns is used instead.
+            credential provider is configured, the session that provider
+            returns is used instead. The provider is named by the
+            signal-independent
+            ``OTEL_PYTHON_EXPORTER_OTLP_HTTP_CREDENTIAL_PROVIDER``, and only if
+            that is unset by the per-signal
+            ``OTEL_PYTHON_EXPORTER_OTLP_HTTP_TRACES_CREDENTIAL_PROVIDER``,
+            which is the reverse of the precedence every other setting follows.
         max_request_size: Maximum size in bytes of a serialized request,
             measured before compression. A request exceeding this size is
             dropped before being sent. Defaults to 64 MiB; a value of 0 (or
