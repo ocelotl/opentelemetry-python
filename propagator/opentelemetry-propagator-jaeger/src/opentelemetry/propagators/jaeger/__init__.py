@@ -72,21 +72,22 @@ class JaegerPropagator(TextMapPropagator):
     ) -> Context:
         """Read a Jaeger trace context out of a carrier.
 
-        When the carrier holds no ``TRACE_ID_KEY`` header, the context is
-        returned unchanged and no baggage is read. Otherwise baggage is read
-        first, so a carrier whose trace identity header is malformed still
+        When the carrier has no ``TRACE_ID_KEY`` header, or has one with no
+        value, the context is returned unchanged and no baggage is read at
+        all. Otherwise baggage is read before the trace identity header is
+        parsed, so a carrier whose trace identity header is malformed still
         contributes its baggage entries.
 
-        A malformed trace identity header is reported by returning a context
-        without a span in it, never by raising. The header is malformed when it
-        does not split into exactly four colon-separated fields, when its flags
-        field is not hexadecimal, or when its trace id or span id field is not
-        hexadecimal or is zero.
+        A malformed trace identity header is reported by returning without
+        adding a span to the context, never by raising. The header is
+        malformed when it does not split into exactly four colon-separated
+        fields, when its flags field is not hexadecimal, or when its trace id
+        or span id field is not hexadecimal or is zero.
 
         Of the flags field only the sampled bit is kept, so the debug bit that
         ``inject`` writes does not survive a round trip. The parent span id
-        field is parsed and then discarded, because ``SpanContext`` has nowhere
-        to hold it.
+        field has to be present but is never read, because ``SpanContext`` has
+        nowhere to hold it.
 
         Args:
             carrier: the object holding the Jaeger headers, read through
@@ -215,13 +216,14 @@ class JaegerPropagator(TextMapPropagator):
         never read at all. A key whose value is absent or an empty sequence is
         skipped.
 
-        The byte limits are then measured on the value as it appears in the
-        carrier, before any decoding. An accepted value is percent-decoded and
-        stripped of surrounding whitespace before it is stored, so the stored
-        value can be shorter than the one that was measured.
+        Only the leading ``BAGGAGE_PREFIX`` is removed from a key, so the
+        carrier key ``uberctx-a-uberctx-b`` yields the baggage key
+        ``a-uberctx-b``.
 
-        Only the leading ``BAGGAGE_PREFIX`` is removed from a key, so the key
-        ``uberctx-a-uberctx-b`` yields the baggage key ``a-uberctx-b``.
+        The byte limits are then measured on that shortened key and on the
+        value as it appears in the carrier, before any decoding. An accepted
+        value is percent-decoded and stripped of surrounding whitespace before
+        it is stored, so the value stored can be shorter than the one measured.
 
         Args:
             getter: reads the values of a key out of ``carrier``.
@@ -310,8 +312,8 @@ def _limit_baggage_bytes(
 
     Args:
         pairs: the candidate key and value pairs, in the order they are to be
-            considered. Both halves are counted as they are given, so a caller
-            that encodes its values has to encode them first.
+            considered. Both halves are counted exactly as given, so a caller
+            that percent-encodes its values has to do so before calling.
         max_entry_bytes: the largest a single pair is allowed to be.
         max_total_bytes: the largest all yielded pairs together are allowed to
             be.
@@ -381,9 +383,9 @@ def _parse_trace_id_header(
 ) -> tuple[int, int, int]:
     """Split a ``uber-trace-id`` header value into a trace id, a span id and flags.
 
-    Only the first value is read. A value with no ``:`` in it is
-    percent-decoded first, because some Jaeger clients encode the delimiter
-    along with everything else.
+    Only the first value is read, and an empty ``items`` gives the invalid
+    result. A value with no ``:`` in it is percent-decoded first, because some
+    Jaeger clients encode the delimiter along with everything else.
 
     The value has to split into exactly four colon-separated fields and its
     flags field has to be hexadecimal. Failing either of those discards the
