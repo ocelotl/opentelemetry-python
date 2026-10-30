@@ -155,9 +155,12 @@ def _span_flags(parent_span_context: SpanContext | None) -> int:
             link always carries a context.
 
     Returns:
-        The two mask bits combined. A ``parent_span_context`` of ``None`` and
-        one with ``is_remote`` false give the same value, since both state that
-        the context is known not to be remote.
+        ``SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK`` on its own for a context that
+        is not remote, and that mask combined with
+        ``SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK`` for one that is. A
+        ``parent_span_context`` of ``None`` and one with ``is_remote`` false
+        give the same value, since both state that the context is known not to
+        be remote.
     """
     flags = JSONSpanFlags.SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK
     if parent_span_context and parent_span_context.is_remote:
