@@ -91,9 +91,13 @@ class RequestsHTTPResult(BaseHTTPResult):
         """Return the response body as text.
 
         This overrides the UTF-8 decoding of :meth:`BaseHTTPResult.text` and
-        hands the work to ``requests``, which decodes with the charset of the
-        ``Content-Type`` header, falls back to a guess when the header gives
-        none, and replaces undecodable bytes instead of raising.
+        hands the work to ``requests``, which picks the encoding in three
+        steps: the ``charset`` parameter of the ``Content-Type`` header when
+        there is one, then ISO-8859-1 for a ``text/*`` type that carries no
+        ``charset`` and UTF-8 for ``application/json``, and charset detection
+        only when the header is missing or names none of those types. Bytes
+        that do not decode become replacement characters rather than an
+        exception.
 
         Returns:
             The decoded body, or ``""`` when the request failed or the

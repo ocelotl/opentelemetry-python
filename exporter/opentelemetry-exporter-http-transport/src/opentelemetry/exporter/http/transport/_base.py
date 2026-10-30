@@ -166,9 +166,12 @@ class BaseHTTPTransport(ABC):
     def close(self) -> None:
         """Release any resources held by the transport.
 
-        Closes the connection pool, so an in-flight request on another thread
-        may fail. Calling it twice is harmless, and the transport is not
-        expected to be usable afterwards.
+        Empties the connection pools. A request already in flight on another
+        thread holds its connection and finishes normally, and that connection
+        is dropped instead of being reused afterwards. Calling it twice is
+        harmless. Both transports shipped here rebuild their pools on the next
+        request, so a closed transport still works, at the cost of a fresh
+        connection.
         """
 
     @abstractmethod

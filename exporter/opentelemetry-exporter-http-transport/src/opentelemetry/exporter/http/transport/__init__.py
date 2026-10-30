@@ -36,11 +36,13 @@ if TYPE_CHECKING:
     class BaseHTTPTransportFactory(Protocol):
         """What a registered transport has to be callable as.
 
-        A transport class satisfies this by its constructor signature, which is
-        why both built-in entries are classes rather than functions. Any
-        keyword argument beyond ``verify`` and ``cert`` is optional for the
-        caller and has to be tolerated by the callee, so an exporter can pass
-        the same keyword arguments whichever transport is selected.
+        Any callable with this signature qualifies. A class qualifies through
+        its constructor, which is what the two built-in entries are, and a
+        factory function qualifies just as well: ``_load_http_transport_factory``
+        checks only that the loaded entry point is callable. Any keyword
+        argument beyond ``verify`` and ``cert`` is optional for the caller and
+        has to be tolerated by the callee, so an exporter can pass the same
+        keyword arguments whichever transport is selected.
         """
 
         def __call__(

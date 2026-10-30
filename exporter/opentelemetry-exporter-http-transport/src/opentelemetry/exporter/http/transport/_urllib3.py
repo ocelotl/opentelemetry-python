@@ -146,7 +146,10 @@ class Urllib3HTTPTransport(BaseHTTPTransport):
     One ``urllib3.PoolManager`` is held for direct connections, and one more
     is built per proxy URL as proxies are encountered. All of them are built
     from the same pool settings, which fix the retry count at zero, turn
-    redirect following off and allow ten connections per host.
+    redirect following off, and keep up to ten connections per host for reuse.
+    Ten is a reuse budget and not a cap: concurrent requests beyond it open
+    further connections, which are closed once they are done instead of being
+    pooled.
 
     Args:
         verify: TLS verification setting. ``True`` verifies against the
@@ -209,10 +212,11 @@ class Urllib3HTTPTransport(BaseHTTPTransport):
     def _get_pool_manager(self, url: str) -> PoolManager:
         """Return the pool manager that should carry a request to a URL.
 
-        The proxy lookup is memoized per URL on this transport, so the
-        environment is read once per distinct URL. The proxy managers
-        themselves are kept in a dictionary keyed by proxy URL, so two
-        endpoints behind the same proxy share one pool.
+        The proxy lookup is memoized per URL on this transport, in a 32 entry
+        cache that :meth:`close` empties, so the environment is read again
+        only after an eviction or a close. The proxy managers themselves are
+        kept in a dictionary that has no size limit, keyed by proxy URL, so
+        two endpoints behind the same proxy share one pool.
 
         Args:
             url: The absolute URL the request is about to be sent to.
@@ -304,7 +308,11 @@ class Urllib3HTTPTransport(BaseHTTPTransport):
                 lets ``urllib3`` send only the headers it adds itself.
             timeout: Optional request timeout in seconds, applied as a total
                 budget for the whole exchange rather than per socket
-                operation. ``None`` uses the ``urllib3`` default.
+                operation. ``None`` is passed on to ``urllib3`` as an explicit
+                absence of a timeout, which is not the same as leaving the
+                default in place: the connect and read operations then block
+                without a deadline, and the process-wide socket timeout that
+                the default would have honoured does not apply.
             data: Optional request body, sent as given with no encoding step.
 
         Returns:

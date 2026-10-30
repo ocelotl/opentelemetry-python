@@ -99,8 +99,10 @@ def _should_bypass_proxies(url: str) -> bool:
     port), then the platform's bypass rules
     are consulted via :func:`urllib.request.proxy_bypass`.
 
-    An entry that is only dots is skipped, so a stray ``.`` or an empty
-    element left by two adjacent commas does not exempt every host.
+    An empty element, which two adjacent commas produce, is dropped when the
+    list is split. An entry made only of dots survives that and is skipped
+    separately, so a stray ``.`` does not exempt a hostname written with a
+    trailing dot such as ``example.com.``.
 
     Args:
         url: The absolute URL the request is about to be sent to.
@@ -152,9 +154,10 @@ def _get_environ_proxy(url: str) -> str | None:
     ``all_proxy``. Proxy URLs without a scheme are treated as ``http://``.
 
     The environment is read on every call, so the caller is expected to cache
-    the answer per URL. ``Urllib3HTTPTransport`` does, which means a change to
-    the proxy environment variables after the first request to a given URL is
-    not picked up.
+    the answer per URL. ``Urllib3HTTPTransport`` does, in a 32 entry cache
+    that its ``close`` empties, so a change to the proxy environment variables
+    reaches a transport that stays open only once the entry for the URL has
+    been evicted by 32 other URLs.
 
     Args:
         url: The absolute URL the request is about to be sent to. Its scheme
