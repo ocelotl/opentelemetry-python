@@ -30,7 +30,8 @@ The type checking is not total, and each gap is written out on the function that
 ``decode_hex`` and ``decode_base64`` return empty bytes for any falsy value before they check its
 type. ``decode_repeated`` checks an element only as far as the ``item_parser`` it is given does,
 which for a repeated field of an already valid JSON type is not at all. ``validate_type`` checks
-with ``isinstance``, so a JSON ``true`` passes as an integer wherever one is accepted.
+with ``isinstance``, so a JSON ``true`` passes as an integer everywhere an integer is accepted
+except in ``decode_enum``, which rejects it explicitly.
 """
 
 from __future__ import annotations
