@@ -152,6 +152,11 @@ class Link(_LinkBase):
         context: "SpanContext",
         attributes: types.Attributes = None,
     ) -> None:
+        """Build the link.
+
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
+        """
         super().__init__(context)
         self._attributes = attributes
 

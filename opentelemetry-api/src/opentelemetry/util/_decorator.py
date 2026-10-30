@@ -81,6 +81,15 @@ class _AgnosticContextManager(
 
             @functools.wraps(func)  # type: ignore
             async def async_wrapper(*args: Pargs, **kwargs: Pkwargs) -> R:  # pyright: ignore [reportInvalidTypeVarUse]
+                """Await the coroutine with a fresh context manager entered.
+
+                Args:
+                    *args: Positional arguments forwarded to the coroutine.
+                    **kwargs: Keyword arguments forwarded to the coroutine.
+
+                Returns:
+                    Whatever the coroutine returns.
+                """
                 with self._recreate_cm():  # type: ignore
                     return await func(*args, **kwargs)  # type: ignore
 
