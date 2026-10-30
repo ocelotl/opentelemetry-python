@@ -623,11 +623,13 @@ class NoOpLoggerProvider(LoggerProvider):
 class ProxyLoggerProvider(LoggerProvider):
     """The provider returned before a real one has been set globally.
 
-    It holds no implementation of its own. Each logger it hands out is a
-    :class:`ProxyLogger`, which starts discarding records and switches to the
-    real provider as soon as :func:`set_logger_provider` installs one. This is
-    what lets a library call :func:`get_logger` at import time, before the
-    application has configured the SDK.
+    It holds no implementation of its own. Every logger this logger provider
+    hands out before a real logger provider is set is a :class:`ProxyLogger`,
+    which starts out discarding records and switches to the real logger
+    provider as soon as :func:`set_logger_provider` installs one. Every logger
+    handed out after that call comes from the real logger provider directly.
+    This is what lets a library call :func:`get_logger` at import time, before
+    the application has configured the SDK.
     """
 
     def get_logger(
