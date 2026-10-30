@@ -8,10 +8,12 @@ serializes the metrics a metric reader collected to OTLP JSON and posts them to
 an OTLP/HTTP endpoint. Register it with ``PeriodicExportingMetricReader``
 instead of calling it directly.
 
-The exporter also decides, for the meter provider that uses it, which
+The exporter also decides, for the metric reader that holds it, which
 aggregation temporality and which default histogram aggregation apply to each
-instrument kind. Those two preferences come from the constructor arguments and
-from the ``OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE`` and
+instrument kind. A second reader on the same meter provider, holding a
+different exporter, keeps its own preferences. Both preferences come from the
+constructor arguments and from the
+``OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE`` and
 ``OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION`` environment
 variables.
 """
