@@ -175,7 +175,7 @@ class OTLPLogExporter(LogRecordExporter):
         The whole batch becomes one JSON document and one request, whatever its
         size, so the caller is responsible for keeping batches small enough for
         the collector to accept. The call blocks until the export succeeds, is
-        refused, or exhausts the timeout.
+        refused, runs out of attempts, or exhausts the timeout.
 
         A record that cannot be encoded fails the whole batch: the error is
         logged and nothing is sent. The same applies after :meth:`shutdown`
