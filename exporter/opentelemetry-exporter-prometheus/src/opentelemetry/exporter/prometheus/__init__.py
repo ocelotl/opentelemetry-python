@@ -845,7 +845,8 @@ class _CustomCollector:
             ``explicit_bounds`` and ``sum`` for a ``HistogramDataPoint``.
             Resource, scope and data point attributes are merged in that order,
             so a later one wins when two of them sanitize to the same label
-            name.
+            name. Nothing here reads the ``exemplars`` field of a data point,
+            so an exemplar the SDK recorded never reaches the exposition.
 
         Raises:
             AttributeError: If a data point is neither a ``NumberDataPoint``
