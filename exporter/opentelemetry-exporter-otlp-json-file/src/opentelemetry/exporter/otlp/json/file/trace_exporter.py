@@ -35,8 +35,9 @@ def _encode_spans_to_dict(
 class FileSpanExporter(SpanExporter):
     """Writes finished spans to a file, to a stream or to ``sys.stdout`` as OTLP JSON Lines.
 
-    Every call to :meth:`export` appends one line holding a whole ``ExportTraceServiceRequest``,
-    so the output can be read back a line at a time and a batch is never split across lines.
+    A line written by this exporter always holds one whole ``ExportTraceServiceRequest``, so the
+    output can be read back a line at a time and a batch is never split across lines. A batch
+    that encodes to nothing writes no line at all.
     Register this exporter with ``opentelemetry.sdk.trace.export.BatchSpanProcessor`` or
     ``opentelemetry.sdk.trace.export.SimpleSpanProcessor`` for the spans to reach it.
 

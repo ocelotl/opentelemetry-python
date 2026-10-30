@@ -49,8 +49,9 @@ def _encode_logs_to_dict(
 class FileLogExporter(LogRecordExporter):
     """Writes log records to a file, to a stream or to ``sys.stdout`` as OTLP JSON Lines.
 
-    Every call to :meth:`export` appends one line holding a whole ``ExportLogsServiceRequest``, so
-    the output can be read back a line at a time and a batch is never split across lines. Register
+    A line written by this exporter always holds one whole ``ExportLogsServiceRequest``, so the
+    output can be read back a line at a time and a batch is never split across lines. A batch that
+    encodes to nothing writes no line at all. Register
     this exporter with a log record processor, such as
     ``opentelemetry.sdk._logs.export.BatchLogRecordProcessor``, for the log records to reach it.
 

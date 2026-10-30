@@ -45,8 +45,9 @@ def _encode_metrics_to_dict(
 class FileMetricExporter(MetricExporter):
     """Writes collected metrics to a file, to a stream or to ``sys.stdout`` as OTLP JSON Lines.
 
-    Every call to :meth:`export` appends one line holding a whole ``ExportMetricsServiceRequest``,
-    so the output can be read back a line at a time and a collection is never split across lines.
+    A line written by this exporter always holds one whole ``ExportMetricsServiceRequest``, so the
+    output can be read back a line at a time and a collection is never split across lines. A
+    collection that encodes to nothing writes no line at all.
     Register this exporter with ``opentelemetry.sdk.metrics.export.PeriodicExportingMetricReader``
     for the metrics to reach it.
 
