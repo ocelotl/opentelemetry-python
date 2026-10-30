@@ -146,11 +146,12 @@ class OpenCensusSpanExporter(SpanExporter):
     def shutdown(self) -> None:
         """Do nothing.
 
-        The method exists because ``SpanExporter`` requires it. It releases
-        nothing: the insecure gRPC channel opened by the constructor stays
-        open, and no flag is set, so a later call to ``export`` still sends
-        spans instead of refusing them. A process that has to free the
-        channel has to close it itself.
+        ``SpanExporter.shutdown`` is itself a no-op and no base class
+        requires an override, so this method adds nothing to the one it
+        replaces. It releases nothing: the insecure gRPC channel opened by
+        the constructor stays open, and no flag is set, so a later call to
+        ``export`` still sends spans instead of refusing them. A process that
+        has to free the channel has to close it itself.
         """
 
     def generate_span_requests(self, spans):
@@ -201,7 +202,9 @@ def translate_to_collector(spans: Sequence[ReadableSpan]):
     ``opentelemetry.exporter.opencensus.util.proto_timestamp_from_time_ns``,
     so a span that has not ended reports the Unix epoch as its end time.
 
-    What the OpenCensus model cannot hold is dropped here:
+    Information the OpenTelemetry span carries that does not reach the
+    collector, whether because OpenCensus has no field for it or because this
+    function leaves the field it has unfilled:
 
     - The status code number is copied across without being mapped. An
       OpenCensus status code is a canonical gRPC code, where 0 means OK and 1

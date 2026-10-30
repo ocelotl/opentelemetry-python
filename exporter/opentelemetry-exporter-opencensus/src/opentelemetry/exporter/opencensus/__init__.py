@@ -17,7 +17,7 @@ OpenCensus API is a different job, done by ``opentelemetry-opencensus-shim``.
 calls. The two models do not line up field for field, and each docstring in
 those two modules names what its own conversion drops.
 
-The receiver port defaults to ``localhost:55678`` and the channel opened to
-it is insecure, so a collector reached over an untrusted network needs a
+The receiver endpoint defaults to ``localhost:55678`` and the channel opened
+to it is insecure, so a collector reached over an untrusted network needs a
 ``TraceServiceStub`` built elsewhere and passed to the exporter.
 """
