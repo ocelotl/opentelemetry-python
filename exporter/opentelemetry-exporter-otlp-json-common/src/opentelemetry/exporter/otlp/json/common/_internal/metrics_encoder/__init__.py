@@ -133,6 +133,10 @@ def split_metrics_data(
     """Split an ExportMetricsServiceRequest into batches of at most
     max_export_batch_size data points, preserving resource/scope hierarchy.
 
+    That limit holds only for a ``max_export_batch_size`` above zero. ``None``
+    hands the request back unsplit, whatever it holds, and a value of zero or
+    less puts one data point in each batch.
+
     Every batch repeats the resource and the instrumentation scope that its
     data points belong to, so each one is a request a receiver can accept on
     its own. A metric whose data points span a batch boundary appears in both
@@ -381,8 +385,11 @@ def _encode_metric(metric: Metric) -> JSONMetric:
 
     A gauge, a histogram, a sum and an exponential histogram each map to the
     OTLP field of that name. Anything else is logged as a warning and produces
-    a metric with no data field set, which a receiver reads as a metric with no
-    data points rather than as an error.
+    a metric with no data field set. Exported unsplit, such a metric reaches a
+    receiver as a metric with no data points rather than as an error. Passed to
+    ``split_metrics_data`` with a ``max_export_batch_size`` that is not
+    ``None``, it is warned about a second time and left out of every batch, so
+    it reaches no receiver at all.
 
     Args:
         metric: the metric to encode, carrying its aggregated data.
