@@ -193,10 +193,12 @@ class OTLPMetricExporter(
             An empty iterable is treated the same way as ``None``, so this
             argument cannot ask for no retries at all.
         meter_provider: Meter provider used to record the exporter's own
-            self-observability metrics. ``None`` means the globally configured
-            meter provider is used. Those metrics are recorded at all only
-            when :envvar:`OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED` is set to
-            ``true``.
+            self-observability metrics. Those metrics exist at all only when
+            :envvar:`OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED` is set to
+            ``true``; when it is not, no instrument is created and no meter
+            provider is consulted, so this argument is discarded without
+            being looked at. When it is set, ``None`` means the globally
+            configured meter provider is used.
 
     Raises:
         RuntimeError: When either credential provider environment variable
