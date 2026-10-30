@@ -27,10 +27,16 @@ Several fields the schema accepts are not supported by the Python SDK.
 Five are ignored with a warning naming them: the excluded half of a
 view's attribute keys, a pull reader's metric producers, the Prometheus
 scope info and resource constant labels, and cardinality limits on a
-plugin pull exporter. Three more are ignored with no warning at all, so
-a configuration file that sets one looks as though it took effect:
-``periodic.producers``, ``periodic.max_export_batch_size/development``
-and ``prometheus/development.translation_strategy``.
+plugin pull exporter. Three more of those are ignored with no warning at
+all, so a configuration file that sets one looks as though it took
+effect: ``periodic.producers``,
+``periodic.max_export_batch_size/development`` and
+``prometheus/development.translation_strategy``.
+
+The ``tls`` block of the ``otlp_http`` and ``otlp_grpc`` exporters is a
+separate case and is dropped just as quietly. The SDK exporters do
+support TLS through their own parameters; this module simply never reads
+the block, as the two exporter factories record.
 """
 
 from __future__ import annotations
