@@ -14,12 +14,23 @@ exists under both ``opentelemetry.exporter.otlp.proto.grpc`` and
 ``opentelemetry.exporter.otlp.proto.http``. The package you import from
 decides whether telemetry is sent over gRPC or over HTTP.
 
-The entry points this distribution registers under the ``otlp`` name, for the
+This distribution registers an entry point named ``otlp`` in each of the
 ``opentelemetry_traces_exporter``, ``opentelemetry_metrics_exporter`` and
-``opentelemetry_logs_exporter`` groups, all point at the gRPC exporters, so
-``OTEL_TRACES_EXPORTER=otlp`` selects gRPC. Depend on the single distribution
-you need once that choice is settled, since depending on this one pulls in
-both.
+``opentelemetry_logs_exporter`` groups, all three pointing at the gRPC
+exporters. The SDK's environment-variable configuration does not load those
+entry points. Reading ``OTEL_TRACES_EXPORTER=otlp``, it first rewrites the
+name ``otlp`` to either ``otlp_proto_grpc`` or ``otlp_proto_http`` and then
+loads the entry point of that rewritten name, which the gRPC and HTTP
+distributions register. The choice comes from
+``OTEL_EXPORTER_OTLP_TRACES_PROTOCOL``, or from ``OTEL_EXPORTER_OTLP_PROTOCOL``
+when the signal-specific variable is unset: ``http/protobuf`` gives HTTP,
+``grpc`` gives gRPC, an unset pair gives gRPC, and any other value raises
+``RuntimeError``. ``OTEL_METRICS_EXPORTER`` and ``OTEL_LOGS_EXPORTER`` work the
+same way, against ``OTEL_EXPORTER_OTLP_METRICS_PROTOCOL`` and
+``OTEL_EXPORTER_OTLP_LOGS_PROTOCOL``.
+
+Depend on the single distribution you need once that choice is settled, since
+depending on this one installs both.
 """
 
 __version__ = "1.46.0.dev"
