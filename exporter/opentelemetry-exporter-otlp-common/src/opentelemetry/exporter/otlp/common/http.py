@@ -163,7 +163,7 @@ class Compression(enum.Enum):
 
 @dataclass(slots=True, frozen=True)
 class _ExportResult:
-    """Outcome of an OTLP export attempt, including retry exhaustion.
+    """Outcome of one ``_OTLPHTTPClient.export`` call, retries included.
 
     Attributes:
         success: Whether the server answered with a status code in the range
@@ -177,7 +177,7 @@ class _ExportResult:
             that had just failed.
         reason: The reason phrase the transport reported alongside
             ``status_code``, or ``None`` on the same conditions.
-        error: The exception that ended the attempt, either the one raised
+        error: The exception that ended the export, either the one raised
             while submitting the request or the one the transport attached to
             the last response, and ``None`` when there was neither. It is
             ``None`` as well when shutdown interrupted a wait between attempts,
@@ -211,8 +211,9 @@ class _OTLPHTTPClient:
             messages only, so that an operator reading the log can tell the
             exporters of a process apart.
         timeout: How many seconds the whole export may take, retries included.
-            The deadline starts when ``export`` is called, and each attempt is
-            given whatever is left of it.
+            The deadline starts once ``export`` has compressed the payload, so
+            the time compression takes is not counted against it, and each
+            attempt is given whatever is left of it.
         compression: How to compress the payload. Anything other than
             ``Compression.NONE`` also adds a ``Content-Encoding`` header,
             unless ``headers`` already carries one under any capitalisation.
@@ -350,9 +351,10 @@ class _OTLPHTTPClient:
         """Export a serialized payload, retrying on transient failures.
 
         The payload is compressed once and a deadline of ``timeout`` seconds is
-        set, counted from this call. At most six attempts are made, and each
-        attempt may repeat its request once after a connection error, so up to
-        twelve requests can be sent. A status code in the range 200 to 399 ends
+        then set, counted from the end of the compression rather than from the
+        start of this call. At most six attempts are made, and each attempt may
+        repeat its request once after a connection error, so up to twelve
+        requests can be sent. A status code in the range 200 to 399 ends
         the export as a success. A status code of 429, 502, 503 or 504 is
         retried, and so is a response that carried no status code at all and
         whose error the transport recognises as a connection error. Anything
@@ -369,8 +371,8 @@ class _OTLPHTTPClient:
         error.
 
         The call blocks for the wait between attempts, so an export can occupy
-        the calling thread for close to ``timeout`` seconds. ``shutdown`` wakes
-        it early.
+        the calling thread for close to ``timeout`` seconds on top of whatever
+        the compression took. ``shutdown`` wakes it early.
 
         A failure of the request, whether the transport reported it in a
         response or raised it, is reported in the value returned rather than

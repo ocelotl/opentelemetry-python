@@ -8,11 +8,15 @@ by ``ExporterMetricsT.export_operation`` and records three instruments defined
 by the semantic conventions: an up-down counter of the telemetry handed to the
 exporter but not yet exported, a counter of the telemetry whose export has
 finished whether it succeeded or failed, and a histogram of how long the
-operation took in seconds. An export operation is the delivery of one batch
-from the moment the exporter receives it to the moment it succeeds or gives up,
-so an exporter that retries holds the ``with`` body open across every retry and
-every backoff wait between them, and each instrument is recorded once for the
-batch rather than once per request. The instrument names depend on the
+operation took in seconds. An export operation is the delivery of one payload
+to the server, from the moment the exporter starts that delivery to the moment
+it succeeds or gives up, so an exporter that retries holds the ``with`` body
+open across every retry and every backoff wait between them, and each
+instrument is recorded once for the payload rather than once per request. What
+else falls inside the ``with`` body is up to the exporter: the span and log
+exporters serialize inside it, while ``OTLPMetricExporter`` of
+``opentelemetry-exporter-otlp-proto-http`` encodes and splits first and then
+opens one export operation per sub-batch. The instrument names depend on the
 signal, so a span exporter records ``otel.sdk.exporter.span.inflight`` and
 ``otel.sdk.exporter.span.exported`` while a metric exporter records
 ``otel.sdk.exporter.metric_data_point.inflight`` and
