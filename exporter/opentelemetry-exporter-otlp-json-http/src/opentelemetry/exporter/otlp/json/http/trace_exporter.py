@@ -197,10 +197,14 @@ class OTLPSpanExporter(SpanExporter):
         nothing, so the method is safe to call from more than one place.
 
         Args:
-            timeout_millis: Accepted for compatibility with the ``SpanExporter``
-                interface and ignored.
-            **kwargs: Accepted for compatibility with the ``SpanExporter``
-                interface and ignored.
+            timeout_millis: Milliseconds remaining of the shutdown budget of
+                the span processor, which this exporter ignores.
+                ``BatchSpanProcessor`` passes it when the exporter's
+                ``shutdown`` declares the parameter.
+                ``SpanExporter.shutdown`` declares no parameters of its own, so
+                ``SimpleSpanProcessor`` calls this method with none.
+            **kwargs: Any further keyword argument a span processor passes,
+                which this exporter ignores.
         """
         if self._shutdown:
             _logger.warning("Exporter already shutdown, ignoring call")
