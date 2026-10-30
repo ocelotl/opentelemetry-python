@@ -70,13 +70,106 @@ class OTLPSpanExporter(
     # pylint: disable=unsubscriptable-object
     """OTLP span exporter
 
+    Sends finished spans to an OTLP receiver over gRPC. The ``endpoint``,
+    ``insecure``, ``credentials``, ``headers``, ``timeout`` and ``compression``
+    arguments, when left as ``None``, are read from the traces-specific
+    environment variable first and from the generic OTLP variable second, so a
+    deployment can configure traces apart from the other signals. The
+    remaining arguments have no traces-specific variable, and each entry below
+    says what it does read.
+
     Args:
-        endpoint: OpenTelemetry Collector receiver endpoint
-        insecure: Connection type
-        credentials: Credentials object for server authentication
-        headers: Headers to send when exporting
-        timeout: Backend request timeout in seconds
-        compression: gRPC compression method to use
+        endpoint: OpenTelemetry Collector receiver endpoint. Falls back to
+            :envvar:`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, then to
+            :envvar:`OTEL_EXPORTER_OTLP_ENDPOINT`, then to
+            ``http://localhost:4317``.
+        insecure: Connection type. ``True`` sends plain HTTP/2 with no TLS.
+            ``None`` means the value is taken from
+            :envvar:`OTEL_EXPORTER_OTLP_TRACES_INSECURE`, then from
+            :envvar:`OTEL_EXPORTER_OTLP_INSECURE`, and finally from the scheme
+            of the endpoint. An ``https`` scheme forces ``False`` whatever the
+            argument and the two variables say, and an endpoint written
+            without a scheme matches neither ``http`` nor ``https``, so it
+            too resolves to ``False`` and opens a TLS channel.
+        credentials: Credentials object for server authentication. ``None``
+            means they are resolved from the environment. The traces-specific
+            sources are consulted when
+            :envvar:`OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE` is set and neither
+            the ``insecure`` argument nor
+            :envvar:`OTEL_EXPORTER_OTLP_TRACES_INSECURE` says the connection
+            is insecure: the entry point named by
+            ``OTEL_PYTHON_EXPORTER_OTLP_GRPC_TRACES_CREDENTIAL_PROVIDER`` takes
+            precedence, and the traces-specific certificate, client key and
+            client certificate files are read when that variable is unset. The
+            generic sources are consulted when nothing has been resolved yet
+            and the connection ends up secure:
+            ``OTEL_PYTHON_EXPORTER_OTLP_GRPC_CREDENTIAL_PROVIDER``, then
+            :envvar:`OTEL_EXPORTER_OTLP_CERTIFICATE` with its own companions,
+            then the root certificates gRPC finds for itself. An ``http``
+            endpoint and :envvar:`OTEL_EXPORTER_OTLP_INSECURE` do not stop the
+            traces-specific variables from being read and their files from
+            being opened, because the first condition tests only the argument
+            and the traces-specific insecure variable, and the credentials
+            built that way are then never used. An ``https`` endpoint combined
+            with an insecure setting makes a TLS connection that skips the
+            traces-specific variables and uses the generic ones.
+        headers: Headers to send when exporting, as a mapping, as a sequence
+            of pairs, or as the comma-separated string form used by
+            :envvar:`OTEL_EXPORTER_OTLP_TRACES_HEADERS`. ``None`` means that
+            variable is read, then :envvar:`OTEL_EXPORTER_OTLP_HEADERS`.
+            An empty mapping, sequence or string is treated the same way
+            as ``None``, so this argument cannot suppress the headers the
+            environment configures.
+        timeout: Backend request timeout in seconds, covering the whole export
+            including retries. ``None`` means the value is taken from
+            :envvar:`OTEL_EXPORTER_OTLP_TRACES_TIMEOUT`, then from
+            :envvar:`OTEL_EXPORTER_OTLP_TIMEOUT`, defaulting to 10 seconds. A
+            ``0`` in the argument or in
+            :envvar:`OTEL_EXPORTER_OTLP_TRACES_TIMEOUT` is treated the same
+            way as ``None`` and the next source is used, while a ``0`` in
+            :envvar:`OTEL_EXPORTER_OTLP_TIMEOUT` is kept and makes every
+            export fail on its first attempt.
+        compression: gRPC compression method to use. ``None`` means the value
+            is taken from :envvar:`OTEL_EXPORTER_OTLP_TRACES_COMPRESSION`,
+            then from :envvar:`OTEL_EXPORTER_OTLP_COMPRESSION`, and no
+            compression is used when neither is set. The generic variable is
+            read only when the signal-specific one is unset: a value of
+            ``gzip`` in :envvar:`OTEL_EXPORTER_OTLP_TRACES_COMPRESSION`
+            settles the choice and leaves
+            :envvar:`OTEL_EXPORTER_OTLP_COMPRESSION` unread, whatever it
+            holds. A value other than ``gzip`` in whichever
+            variable is read makes the constructor raise
+            ``InvalidCompressionValueException``.
+        channel_options: gRPC channel options, as a sequence of name and value
+            pairs, merged over this package's own options. No environment
+            variable is read for this.
+        retryable_error_codes: gRPC status codes that cause an export to be
+            retried. ``None`` means the set is read from
+            ``OTEL_PYTHON_EXPORTER_OTLP_GRPC_RETRYABLE_ERROR_CODES``, which
+            applies to all three signals and has no traces-specific form, and
+            otherwise falls back to the default set.
+            An empty iterable is treated the same way as ``None``, so this
+            argument cannot ask for no retries at all.
+        meter_provider: Meter provider used to record the exporter's own
+            self-observability metrics. Those metrics exist at all only when
+            :envvar:`OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED` is set to
+            ``true``; when it is not, no instrument is created and no meter
+            provider is consulted, so this argument is discarded without
+            being looked at. When it is set, ``None`` means the globally
+            configured meter provider is used.
+
+    Raises:
+        RuntimeError: When either credential provider environment variable
+            names an entry point that is not installed, or one whose return
+            value is not a ``grpc.ChannelCredentials``. The constructor is
+            where this surfaces.
+        KeyError: When ``retryable_error_codes`` is ``None`` and
+            ``OTEL_PYTHON_EXPORTER_OTLP_GRPC_RETRYABLE_ERROR_CODES`` holds a
+            name that is not a ``grpc.StatusCode`` member. The key is that
+            name, uppercased, and the message names neither the variable nor
+            the rest of the list.
+        OSError: When a certificate file path read from the environment exists
+            and still cannot be opened.
     """
 
     def __init__(
@@ -92,6 +185,10 @@ class OTLPSpanExporter(
         *,
         meter_provider: MeterProvider | None = None,
     ):
+        """Resolve the traces-specific configuration and open the gRPC channel.
+
+        The parameters are documented on the class.
+        """
         insecure_spans = environ.get(OTEL_EXPORTER_OTLP_TRACES_INSECURE)
         if insecure is None and insecure_spans is not None:
             insecure = insecure_spans.lower() == "true"
@@ -129,21 +226,71 @@ class OTLPSpanExporter(
         )
 
     def _translate_data(self, data: Sequence[ReadableSpan]) -> ExportTraceServiceRequest:
+        """Encode finished spans as an OTLP trace export request.
+
+        Args:
+            data: Finished spans to encode.
+
+        Returns:
+            The export request, with the spans grouped by resource and then by
+            instrumentation scope.
+        """
         return encode_spans(data)
 
     def _count_data(self, data: Sequence[ReadableSpan]):
+        """Count the spans in a batch, for the exporter's own metrics.
+
+        Args:
+            data: Finished spans about to be exported.
+
+        Returns:
+            The number of spans in the batch.
+        """
         return len(data)
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        """Send a batch of finished spans to the receiver.
+
+        Called by the span processor the exporter is installed in. Transient
+        failures are retried inside the configured timeout.
+
+        Args:
+            spans: Finished spans to export.
+
+        Returns:
+            ``SpanExportResult.SUCCESS`` when the receiver accepted the batch,
+            and ``SpanExportResult.FAILURE`` otherwise, which includes the
+            case where the exporter has already been shut down.
+        """
         return self._export(spans)
 
     def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
+        """Shut down the exporter and close its gRPC channel.
+
+        Args:
+            timeout_millis: Timeout in milliseconds, accepted for interface
+                compatibility and not used.
+            kwargs: Accepted and ignored.
+        """
         OTLPExporterMixin.shutdown(self, timeout_millis=timeout_millis)
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
-        """Nothing is buffered in this exporter, so this method does nothing."""
+        """Nothing is buffered in this exporter, so this method does nothing.
+
+        Args:
+            timeout_millis: Timeout in milliseconds, accepted for interface
+                compatibility and not used.
+
+        Returns:
+            ``True``, always, since there is never anything left to flush.
+        """
         return True
 
     @property
     def _exporting(self):
+        """Name of the signal, used in the retry and failure log messages.
+
+        Returns:
+            The string ``traces``.
+        """
         return "traces"
