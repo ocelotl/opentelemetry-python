@@ -11,8 +11,8 @@ without ``opentelemetry-codegen-json`` being installed. Nothing here is itself g
 
 Two consequences follow from being copied rather than imported. A change here reaches a generated
 package only at its next regeneration, so the copy committed under ``opentelemetry-proto-json``
-can be older than this file. And the module may not import anything that the generated
-distribution does not depend on, since it is the generated distribution that will run it.
+can be older than this file. And every import written here becomes a runtime requirement of the
+generated distribution, since it is the generated distribution that will run this code.
 
 The functions implement the Proto3 JSON mapping described at
 https://protobuf.dev/programming-guides/json/, with one OTLP deviation: ``encode_hex`` and

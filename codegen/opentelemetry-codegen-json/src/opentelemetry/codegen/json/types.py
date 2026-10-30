@@ -10,9 +10,9 @@ Every value this module returns is a fragment of Python source for
 string ``"builtins.int"`` is a type hint to be written out, and the string ``'""'`` is the source
 text of an empty string literal.
 
-Names are fully qualified against ``builtins`` throughout, because a generated module may define a
-message class whose name shadows a builtin, and a type hint written as a bare ``str`` would then
-resolve to the wrong thing.
+Names are fully qualified against ``builtins`` throughout. Qualifying keeps a type hint from
+resolving to a generated class that happens to carry a builtin's name, which a bare ``str`` or
+``int`` in a generated module would.
 
 The mappings follow the Proto3 JSON specification at
 https://protobuf.dev/programming-guides/json/, with one OTLP deviation that

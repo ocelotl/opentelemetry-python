@@ -34,8 +34,8 @@ class CodeWriter:
     built on it append one line each, prefixed with the current level's worth of spaces, and the
     block context managers raise the level for the duration of a ``with`` statement and lower it
     again on exit, including when the body raises. ``to_string`` and ``to_lines`` read the result
-    out; neither clears the instance, and there is no way to remove or rewrite a line once it has
-    been appended.
+    out; neither clears the instance, and no method removes or rewrites a line once it has been
+    appended.
 
     Args:
         indent_size: Number of spaces that one indentation level is worth. Four matches the
