@@ -387,9 +387,11 @@ def _encode_metric(metric, pb2_metric):
 
     Nothing is returned: ``pb2_metric`` is mutated, and which of its ``gauge``,
     ``histogram``, ``sum`` and ``exponential_histogram`` fields gets set is
-    decided by the runtime type of ``metric.data``. A numeric data point is
-    written to ``as_int`` when its value is an ``int`` and to ``as_double``
-    otherwise.
+    decided by the runtime type of ``metric.data``. Each of those four fields is
+    set while the first data point is encoded, so a data type this function does
+    recognise but that carries no data points leaves all four unset, exactly as
+    an unrecognised one does. A numeric data point is written to ``as_int`` when
+    its value is an ``int`` and to ``as_double`` otherwise.
 
     An exponential histogram data point whose positive or negative bucket counts
     are empty leaves that side of the point unset rather than writing an empty
