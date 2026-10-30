@@ -14,8 +14,11 @@ across several requests: setting ``max_export_batch_size`` caps the number of
 data points in one request, and the remaining data points go into further
 requests sent one after another.
 
-The module-level ``DEFAULT_`` names record the values that apply when neither a
-constructor argument nor an environment variable supplies one.
+``DEFAULT_METRICS_EXPORT_PATH`` is the path appended to a base endpoint that
+carries no signal path of its own. The other module-level ``DEFAULT_`` names
+are kept for callers that import them. The resolution code reads its own
+fallbacks from ``opentelemetry.exporter.otlp.proto.http._common``, so rebinding
+one of these names does not change what an exporter does.
 """
 
 from __future__ import annotations
@@ -123,11 +126,16 @@ DEFAULT_TIMEOUT = 10  # in seconds
 class OTLPMetricExporter(MetricExporter):
     """OTLP HTTP metrics exporter.
 
-    Every argument may be left unset, in which case the value is resolved from
-    the environment: first the per-signal ``OTEL_EXPORTER_OTLP_METRICS_*``
-    variable, then the signal-independent ``OTEL_EXPORTER_OTLP_*`` one, then
-    the default recorded in this module. An argument given here overrides both
-    variables.
+    ``endpoint``, the three TLS file paths, ``headers``, ``timeout`` and
+    ``compression`` may each be left unset, in which case the value is resolved
+    from the environment: first the per-signal ``OTEL_EXPORTER_OTLP_METRICS_*``
+    variable, then the signal-independent ``OTEL_EXPORTER_OTLP_*`` one, then a
+    built-in fallback. An argument given here overrides both variables.
+
+    ``max_export_batch_size``, ``max_request_size`` and ``meter_provider`` have
+    no environment variable of either kind, so they can only be set here.
+    ``preferred_temporality``, ``preferred_aggregation`` and ``session`` each
+    follow a rule of their own, given in their entries below.
 
     Args:
         endpoint: Full URL of the OTLP/HTTP signal endpoint, including the signal
@@ -145,18 +153,31 @@ class OTLPMetricExporter(MetricExporter):
             request separately when a collection is split into several.
         compression: Compression to use; one of none, gzip, deflate
         session: Requests session to use at export. When it is not given and a
-            credential provider is configured through
-            ``OTEL_PYTHON_EXPORTER_OTLP_HTTP_METRICS_CREDENTIAL_PROVIDER``, the
-            session that provider returns is used instead.
+            credential provider is configured, the session that provider
+            returns is used instead. The provider is named by the
+            signal-independent
+            ``OTEL_PYTHON_EXPORTER_OTLP_HTTP_CREDENTIAL_PROVIDER``, and only if
+            that is unset by the per-signal
+            ``OTEL_PYTHON_EXPORTER_OTLP_HTTP_METRICS_CREDENTIAL_PROVIDER``,
+            which is the reverse of the precedence every other setting follows.
         preferred_temporality: Map of preferred temporality for each metric type.
             See `opentelemetry.sdk.metrics.export.MetricReader` for more details on what
-            preferred temporality is.
+            preferred temporality is. This does not replace the map that
+            ``OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE`` selects, it is
+            merged over it entry by entry, and that variable has no
+            signal-independent counterpart.
         preferred_aggregation: Map of preferred aggregation for each metric type.
             See `opentelemetry.sdk.metrics.export.MetricReader` for more details on what
-            preferred aggregation is.
+            preferred aggregation is. It is merged the same way over the map
+            that ``OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION``
+            selects, which likewise has no signal-independent counterpart.
         max_export_batch_size: Maximum number of data points to export in a single request.
             If not set there is no limit to the number of data points in a request.
             If it is set and the number of data points exceeds the max, the request will be split.
+            A non-positive value is not a way to disable the limit. Setting it
+            to 0 makes every export drop its data points and report success,
+            and a negative value puts one data point in each request. Leave it
+            unset to send a collection as one request.
         max_request_size: Maximum size in bytes of a serialized request, measured before
             compression. A request exceeding this size is dropped before being sent. Defaults
             to 64 MiB; a value of 0 (or any non-positive value) disables the limit. Requests
@@ -414,9 +435,14 @@ class OTLPMetricExporter(MetricExporter):
         recorded at all still depends on
         ``OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED``, which is read again here.
 
-        Nothing inside this repository calls this method. It lets a caller that
-        built the exporter before its meter provider existed point the exporter
-        at that provider afterwards, instead of leaving it on the global one.
+        No code path inside the SDK reaches this method. A meter provider calls
+        ``MetricReader._set_meter_provider`` on the readers registered with it
+        and nothing on the exporter behind them, and
+        :class:`~opentelemetry.sdk.metrics.export.MetricExporter` declares no
+        method of this name for this one to override. It is here so that a
+        caller that built the exporter before its meter provider existed can
+        point the exporter at that provider afterwards, instead of leaving it
+        on the global one.
 
         Args:
             meter_provider: The provider the new instruments are created from.
@@ -649,11 +675,11 @@ def _get_split_resource_metrics_pb2(
 
     Args:
         split_resource_metrics: A list of dict representations of ResourceMetrics,
-            ScopeMetrics, Metrics, and data points.
+            ScopeMetrics, Metric, and data points.
 
     Returns:
         List[pb2.ResourceMetrics]: A list of pb2.ResourceMetrics objects containing
-            pb2.ScopeMetrics, pb2.Metrics, and data points
+            pb2.ScopeMetrics, pb2.Metric, and data points
     """
     split_resource_metrics_pb = []
     for resource_metrics in split_resource_metrics:
