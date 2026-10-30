@@ -48,6 +48,13 @@ def encode_logs(
     Returns:
         The ``ExportLogsServiceRequest`` to send over gRPC or, serialized, as the
         body of an HTTP request.
+
+    Raises:
+        Exception: If the body of any record is of a type the protocol has no
+            field for. Nothing is exported in that case: the whole batch is
+            lost, not only the one record. An attribute of such a type is
+            dropped and logged instead, so the body is the one value in a record
+            that can fail an export.
     """
     return ExportLogsServiceRequest(resource_logs=_encode_resource_logs(batch))
 
@@ -70,6 +77,11 @@ def _encode_log(readable_log_record: ReadableLogRecord) -> PB2LogRecord:
 
     Returns:
         The protobuf ``LogRecord``.
+
+    Raises:
+        Exception: If ``_encode_value`` has no protobuf field for the type of
+            the record body. The body is passed to it with nothing catching the
+            failure, unlike the record attributes, which are dropped one by one.
     """
     span_id = (
         None if readable_log_record.log_record.span_id == 0 else _encode_span_id(readable_log_record.log_record.span_id)
