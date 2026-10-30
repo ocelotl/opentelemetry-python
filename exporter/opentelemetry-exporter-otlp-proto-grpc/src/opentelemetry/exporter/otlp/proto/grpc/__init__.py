@@ -83,11 +83,24 @@ def _timeout_from_env(*environ_keys: str, default: None = None) -> float | None:
 
 
 def _timeout_from_env(*environ_keys: str, default: float | None = None) -> float | None:
-    """Return the first environment variable in ``environ_keys`` holding a
-    valid float, or ``default`` if none does.
+    """Read an export timeout in seconds from the first usable environment variable.
 
-    Unset or empty variables are skipped silently; variables with a
-    non-numeric value are skipped with a warning.
+    The variables are examined in the order they are given, so a caller passes
+    the signal-specific variable first and the generic one second.
+
+    Args:
+        environ_keys: Names of the environment variables to examine, in order
+            of decreasing precedence. A variable that is unset or holds only
+            whitespace is skipped silently. A variable whose value is not a
+            float is skipped with a warning, so a typo does not stop the
+            exporter from starting.
+        default: Value to return when no variable holds a float. ``None``
+            means the caller has no fallback of its own and will decide what
+            to do with the missing value.
+
+    Returns:
+        The float parsed from the first variable that holds one, or
+        ``default`` when none of them does.
     """
     for environ_key in environ_keys:
         value = environ.get(environ_key)
