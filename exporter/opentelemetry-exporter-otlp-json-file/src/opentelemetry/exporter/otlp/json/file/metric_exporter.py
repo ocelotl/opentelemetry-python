@@ -52,7 +52,9 @@ class FileMetricExporter(MetricExporter):
     it.
 
     The destination is bound when the exporter is built, so replacing ``sys.stdout`` afterwards,
-    with ``contextlib.redirect_stdout`` or in any other way, does not redirect the output.
+    with ``contextlib.redirect_stdout`` or in any other way, does not redirect the output. The two
+    environment variables named below are read at that same moment, so setting either of them once
+    this exporter exists leaves its temporality and its aggregation as they were.
 
     Args:
         path: File to append the metrics to, opened with UTF-8 encoding. The exporter closes this
