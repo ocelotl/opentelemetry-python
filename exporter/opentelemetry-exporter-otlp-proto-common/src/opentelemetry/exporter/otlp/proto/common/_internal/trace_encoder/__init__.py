@@ -64,6 +64,13 @@ def encode_spans(
     Returns:
         The ``ExportTraceServiceRequest`` to send over gRPC or, serialized, as
         the body of an HTTP request.
+
+    Raises:
+        KeyError: If the kind of any span is not one of the five
+            :class:`opentelemetry.trace.SpanKind` members that ``_SPAN_KIND_MAP``
+            covers, which includes the case of a span whose kind is ``None``.
+            Nothing is exported in that case: the whole batch is lost, not only
+            the one span.
     """
     return PB2ExportTraceServiceRequest(resource_spans=_encode_resource_spans(sdk_spans))
 
