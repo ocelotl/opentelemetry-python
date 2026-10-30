@@ -5,8 +5,9 @@
 
 A span carries a :class:`Status` saying whether the operation it covers
 succeeded. The status is :attr:`StatusCode.UNSET` unless instrumentation sets
-it, and a description may accompany it only when the code is
-:attr:`StatusCode.ERROR`.
+it, and a non-empty description may accompany it only when the code is
+:attr:`StatusCode.ERROR`. A description that is ``None`` or the empty string
+is stored whatever the code is.
 """
 
 import enum
