@@ -178,9 +178,7 @@ def _map_temporality(
         because its temporality is fixed.
 
     Raises:
-        ConfigurationError: If ``pref`` is some other enum member, which
-            happens when the schema gains a preference this function has not
-            been taught.
+        ConfigurationError: If ``pref`` is some other enum member.
     """
     if pref is None or pref == ExporterTemporalityPreference.cumulative:
         return {
@@ -310,14 +308,20 @@ def _create_view(config: ViewConfig) -> View:
             with them.
 
     Returns:
-        A ``View``. Every selector field left absent is passed as ``None``,
-        which matches any instrument on that dimension, so a view with an
-        empty selector applies to every instrument.
+        A ``View``. A selector field left absent is passed as ``None``,
+        which matches any instrument on that dimension.
 
     Raises:
         ConfigurationError: If ``selector.instrument_type`` names an
             instrument kind this module has no SDK class for, or if the
             stream's aggregation block selects nothing.
+        Exception: Raised by the ``View`` constructor itself, as a bare
+            ``Exception``, in three cases: the selector sets none of its
+            six matching fields; the stream sets ``name`` while the
+            selector leaves ``instrument_name`` absent; the stream sets
+            ``name`` while ``instrument_name`` holds a wildcard character.
+            None of the three is translated into a ConfigurationError, so
+            each reaches the caller of ``configure_sdk`` as it is.
     """
     selector = config.selector
     stream = config.stream
@@ -366,8 +370,7 @@ def _create_console_metric_exporter(
             configuration. Its only fields are the two preferences.
 
     Returns:
-        A ``ConsoleMetricExporter`` writing to standard output, with both
-        preferences passed explicitly.
+        A ``ConsoleMetricExporter`` writing to standard output.
     """
     preferred_temporality = _map_temporality(config.temporality_preference)
     preferred_aggregation = _map_histogram_aggregation(config.default_histogram_aggregation)
@@ -584,9 +587,7 @@ def _create_push_metric_exporter(
     Returns:
         The exporter the block selects. A plugin exporter is constructed
         with its nested configuration mapping splatted as keyword
-        arguments, so a plugin that does not accept them raises
-        ``TypeError``. The temporality and histogram aggregation
-        preferences are not translated for a plugin: whatever keys its
+        arguments, with no preference translation, so whatever keys the
         mapping holds reach its constructor unchanged.
 
     Raises:
@@ -626,10 +627,10 @@ def _create_cardinality_limits(config: CardinalityLimitsConfig | None) -> Cardin
 
     Returns:
         A mapping from instrument class to limit, holding only the
-        instrument types that ended up with a limit. ``None`` when
-        ``config`` is ``None``, and an empty mapping when the block was
-        present but set neither ``default`` nor any per-instrument field;
-        both leave every instrument on the SDK default.
+        instrument types that ended up with one. ``None`` for a ``None``
+        config, and an empty mapping for a block that set neither
+        ``default`` nor any per-instrument field; both leave every
+        instrument on the SDK default.
     """
     if config is None:
         return None
