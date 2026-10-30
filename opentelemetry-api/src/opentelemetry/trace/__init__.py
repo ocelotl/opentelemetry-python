@@ -308,11 +308,13 @@ class _DefaultTracerProvider(NoOpTracerProvider):
 class ProxyTracerProvider(TracerProvider):
     """The provider returned before a real one has been set globally.
 
-    Each tracer it hands out is a :class:`ProxyTracer`, which creates
-    non-recording spans and switches to the real provider as soon as
-    :func:`set_tracer_provider` installs one. This is what lets a library call
-    :func:`get_tracer` at import time, before the application configures the
-    SDK.
+    Every tracer this tracer provider hands out before a real tracer provider
+    is set is a :class:`ProxyTracer`, which creates non-recording spans and
+    switches to the real tracer provider as soon as
+    :func:`set_tracer_provider` installs one. Every tracer handed out after
+    that call comes from the real tracer provider directly. This is what lets
+    a library call :func:`get_tracer` at import time, before the application
+    configures the SDK.
     """
 
     def get_tracer(
