@@ -145,17 +145,17 @@ class LogRecord(ABC):
         event_name: str | None = None,
         exception: BaseException | None = None,
     ) -> None:
+        """Build the record, filling in the timestamps and trace fields.
+
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
+        """
         if not context:
             context = get_current()
         span_context = get_current_span(context).get_span_context()
         self.timestamp = timestamp
         if observed_timestamp is None:
             observed_timestamp = time_ns()
-        """Build the record, filling in the timestamps and trace fields.
-
-        Every parameter is documented on the class itself, since that is the
-        form the API reference renders.
-        """
         self.observed_timestamp = observed_timestamp
         self.context = context
         self.trace_id = trace_id or span_context.trace_id
