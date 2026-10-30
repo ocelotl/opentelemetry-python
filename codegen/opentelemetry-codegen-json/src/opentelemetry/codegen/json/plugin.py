@@ -82,12 +82,14 @@ def main() -> None:
 
     This is the callable behind the ``protoc-gen-otlp_json`` console script. It passes the request
     read from standard input to
-    ``opentelemetry.codegen.json.generator.generate_plugin_response``, then copies the feature
-    flags and every generated file from that result onto the response that ``code_generation``
-    writes out.
+    ``opentelemetry.codegen.json.generator.generate_plugin_response``, then merges the feature
+    flags of that result into the response that ``code_generation`` writes out and copies every
+    generated file across one at a time.
 
-    The copy is needed because ``code_generation`` owns the response object that gets serialized,
-    and a protobuf message field cannot be rebound to another message, only merged into.
+    Both steps are needed because ``code_generation`` owns the response object that gets
+    serialized. The flags are merged with ``|=`` rather than assigned, so a flag the response
+    already carries survives. The files are copied one at a time because a repeated protobuf
+    message field cannot be rebound to another message, only added to and merged into.
     """
     with code_generation() as (request, response):
         generated_response = generate_plugin_response(request)
