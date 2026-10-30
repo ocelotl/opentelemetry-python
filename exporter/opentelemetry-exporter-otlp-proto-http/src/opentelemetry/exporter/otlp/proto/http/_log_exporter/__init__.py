@@ -17,7 +17,9 @@ further one without end.
 carries no signal path of its own. The other module-level ``DEFAULT_`` names
 are kept for callers that import them. The resolution code reads its own
 fallbacks from ``opentelemetry.exporter.otlp.proto.http._common``, so rebinding
-one of these names does not change what an exporter does.
+one of those other three names does not change what an exporter does.
+Rebinding ``DEFAULT_LOGS_EXPORT_PATH`` does, because the constructor passes
+that name itself to the resolution code every time an exporter is built.
 """
 
 from __future__ import annotations
