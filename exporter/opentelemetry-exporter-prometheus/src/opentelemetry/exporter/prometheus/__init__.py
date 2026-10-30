@@ -405,6 +405,17 @@ def _populate_histogram_family(
 class PrometheusMetricReader(MetricReader):
     """Prometheus metric exporter for OpenTelemetry.
 
+    Constructing the reader registers a ``prometheus_client`` collector on a
+    Prometheus registry, so no metric is produced until something scrapes that
+    registry. Each scrape calls back into the SDK for a fresh collection,
+    translates the result into Prometheus metric families and serves them.
+    This reader does not serve HTTP itself: start a server with
+    ``prometheus_client.start_http_server``, or let ``opentelemetry-instrument``
+    do it, which uses the entry point backed by ``_AutoPrometheusMetricReader``.
+
+    Every instrument is read with cumulative temporality, which is the only
+    temporality Prometheus can represent, and that choice cannot be overridden.
+
     Args:
         disable_target_info: Whether to disable the ``target_info`` metric.
         prefix: Prefix added to exported Prometheus metric names.
@@ -419,6 +430,12 @@ class PrometheusMetricReader(MetricReader):
             that are copied as labels on exported metrics. The callback receives
             the original resource attribute key. Selected keys are sanitized to
             valid Prometheus label names.
+        registry: The ``prometheus_client`` registry the collector is
+            registered on. It defaults to the process-wide default registry,
+            which is the one ``prometheus_client.start_http_server`` serves.
+            Pass a separate ``CollectorRegistry`` to keep these metrics off
+            that endpoint, for example to serve two meter providers on two
+            different ports.
         cardinality_limits: A mapping between instrument classes and the
             maximum number of metric points a metric stream of that class may
             export per collection cycle. Classes not included in the mapping
@@ -437,6 +454,11 @@ class PrometheusMetricReader(MetricReader):
         registry: CollectorRegistry = REGISTRY,
         cardinality_limits: CardinalityLimits | None = None,
     ) -> None:
+        """Register a Prometheus collector that serves this reader.
+
+        The parameters are documented on the class, which is what the API
+        reference renders.
+        """
         super().__init__(
             preferred_temporality={
                 Counter: AggregationTemporality.CUMULATIVE,
@@ -467,11 +489,43 @@ class PrometheusMetricReader(MetricReader):
         timeout_millis: float = 10_000,
         **kwargs,
     ) -> None:
+        """Hand a freshly collected batch of metrics to the Prometheus collector.
+
+        ``MetricReader.collect`` calls this from inside the scrape that the
+        collector started, so the batch is queued and then drained by that same
+        scrape. A batch of ``None`` is discarded.
+
+        Args:
+            metrics_data: The metrics the SDK collected, or ``None`` when it
+                collected nothing.
+            timeout_millis: Accepted for the signature of
+                :class:`~opentelemetry.sdk.metrics.export.MetricReader` and
+                ignored, because queueing the batch does no blocking work.
+            kwargs: Accepted for the same reason and ignored.
+        """
         if metrics_data is None:
             return
         self._collector.add_metrics_data(metrics_data)
 
     def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
+        """Unregister the collector, so later scrapes no longer report these metrics.
+
+        Any batch still queued on the collector is dropped with it. No HTTP
+        server is stopped, including the one ``_AutoPrometheusMetricReader``
+        starts, because serving is not this reader's responsibility.
+
+        Args:
+            timeout_millis: Accepted for the signature of
+                :class:`~opentelemetry.sdk.metrics.export.MetricReader` and
+                ignored, because unregistering does no blocking work.
+            kwargs: Accepted for the same reason and ignored.
+
+        Raises:
+            KeyError: If the collector is no longer on the registry, which
+                happens when this method is called a second time directly.
+                Shutting the meter provider down instead is guarded against
+                that and calls this once.
+        """
         self._registry.unregister(self._collector)
 
 
@@ -679,10 +733,22 @@ class _AutoPrometheusMetricReader(PrometheusMetricReader):
     """Thin wrapper around PrometheusMetricReader used for the opentelemetry_metrics_exporter entry point.
 
     This allows users to use the prometheus exporter with opentelemetry-instrument. It handles
-    starting the Prometheus http server on the the correct port and host.
+    starting the Prometheus http server on the correct port and host.
+
+    Every option of :class:`PrometheusMetricReader` keeps its default here,
+    because an entry point is constructed with no arguments. The host and the
+    port are the only things configurable, through
+    ``OTEL_EXPORTER_PROMETHEUS_HOST`` and ``OTEL_EXPORTER_PROMETHEUS_PORT``.
     """
 
     def __init__(self) -> None:
+        """Register the collector and start a Prometheus HTTP server.
+
+        The server binds to ``OTEL_EXPORTER_PROMETHEUS_HOST``, defaulting to
+        ``localhost``, and to the port ``_port_from_env`` resolves. It runs on
+        a daemon thread that nothing here stops, so it outlives a call to
+        ``shutdown``.
+        """
         super().__init__()
 
         # Default values are specified in
