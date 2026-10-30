@@ -123,10 +123,17 @@ def add_proto_attribute_value(pb_attributes, key, value):
 def get_node(service_name, host_name):
     """Build the OpenCensus ``Node`` message that identifies this process.
 
-    OpenCensus has no equivalent of an OpenTelemetry resource. The collector
-    instead expects a ``Node`` on every export request, describing the process
-    the spans came from, so this function fills that message from the service
-    name taken from the resource plus values read from the running process.
+    OpenCensus describes the process the spans came from with a ``Node``
+    rather than with a resource. The agent protocol asks for the node on the
+    first request of a stream and on any later request that changes it, and
+    this exporter opens a fresh call per batch, so every request it sends
+    carries one. The message is filled from the service name taken from the
+    OpenTelemetry resource plus values read from the running process.
+
+    OpenCensus does have a ``Resource`` message, carried by both
+    ``ExportTraceServiceRequest`` and ``Span``, and a free-form ``attributes``
+    map on the node itself. This exporter fills none of the three, so the
+    service name is the only resource attribute that travels.
 
     ``start_timestamp`` is the moment this function runs, which is when the
     exporter was constructed or when a later batch replaced the node, and not

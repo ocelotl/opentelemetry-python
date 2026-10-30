@@ -219,12 +219,20 @@ def translate_to_collector(spans: Sequence[ReadableSpan]):
     - Every event becomes an annotation, with the event name as the
       annotation description. OpenCensus also has message events, and none
       are produced.
-    - The instrumentation scope of the span, and every resource attribute
-      other than ``service.name``, which ``OpenCensusSpanExporter.export``
-      reads separately, have no field to go into and are not sent.
+    - The instrumentation scope of the span has no OpenCensus field at all
+      and is not sent.
+    - Every resource attribute other than ``service.name``, which
+      ``OpenCensusSpanExporter.export`` reads on its own, is not sent either,
+      although OpenCensus has room for it. Both ``Span`` and
+      ``ExportTraceServiceRequest`` carry a ``Resource`` message, whose
+      ``labels`` field maps string to string, and this exporter fills neither
+      of them.
     - The counts of attributes, events and links that the span limits
-      dropped are not sent either, so the collector cannot tell a truncated
-      span from a complete one.
+      dropped are left at zero, so the collector cannot tell a truncated span
+      from a complete one. OpenCensus has a counter for each of the three:
+      ``Span.Attributes.dropped_attributes_count``,
+      ``Span.TimeEvents.dropped_annotations_count`` and
+      ``Span.Links.dropped_links_count``.
 
     Args:
         spans: The ended OpenTelemetry spans to translate.
