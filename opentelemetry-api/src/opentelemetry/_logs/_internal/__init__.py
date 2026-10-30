@@ -365,11 +365,13 @@ class NoOpLogger(Logger):
     ) -> bool:
         """Report that nothing is ever emitted.
 
+        The body is ``return False`` and reads no argument, so none of the
+        three is consulted and no context lookup happens.
+
         Args:
-            context: The context the record would belong to. Defaults to the
-                current context.
-            severity_number: The severity the record would carry.
-            event_name: The name of the event the record would carry.
+            context: Ignored.
+            severity_number: Ignored.
+            event_name: Ignored.
 
         Returns:
             Always ``False``, so instrumentation skips building a record it
