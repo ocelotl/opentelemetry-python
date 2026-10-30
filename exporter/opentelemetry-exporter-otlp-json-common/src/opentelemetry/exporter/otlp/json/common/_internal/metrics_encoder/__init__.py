@@ -388,10 +388,15 @@ def _encode_metric(metric: Metric) -> JSONMetric:
         metric: the metric to encode, carrying its aggregated data.
 
     Returns:
-        A ``Metric`` with the name, the description and the unit of ``metric``,
-        and with one of its five data fields holding the encoded data points.
-        For a sum and for both kinds of histogram the aggregation temporality
-        is copied across, and for a sum so is whether it is monotonic.
+        A ``Metric`` with the name, the description and the unit of ``metric``.
+        When the aggregated data is a gauge, a histogram, a sum or an
+        exponential histogram, the matching one of the five data fields holds
+        the encoded data points and the other four are left unset. Any other
+        aggregated type leaves all five unset. The fifth field, ``summary``,
+        is never written here, so only four of the five can ever carry data
+        points. For a sum and for both kinds of histogram the aggregation
+        temporality is copied across, and for a sum so is whether it is
+        monotonic.
 
     Raises:
         ValueError: if an exemplar on one of the data points carries a value
