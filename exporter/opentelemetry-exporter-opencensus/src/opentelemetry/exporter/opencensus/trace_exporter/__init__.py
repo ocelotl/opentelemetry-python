@@ -46,11 +46,15 @@ class OpenCensusSpanExporter(SpanExporter):
     ``SimpleSpanProcessor``.
 
     The service name the collector is told comes from the ``service.name``
-    resource attribute. It is sampled once from the global tracer provider
-    when the exporter is constructed, and replaced on every later batch whose
-    first span carries one, which is why an exporter built before the tracer
-    provider is set still reports the right name from its first export
-    onwards.
+    resource attribute, sampled once when the exporter is constructed and
+    replaced on every later batch whose first span carries one. The
+    constructor takes it from the resource of the global tracer provider when
+    that provider has one, and otherwise builds a fresh ``Resource``, which
+    runs the resource detectors and falls back to
+    ``unknown_service:<executable>`` when none of them supplies a service
+    name. An exporter built before the tracer provider is set therefore
+    starts on whatever that detection found and reports the name carried by
+    the spans from its first non-empty export onwards.
 
     Args:
         endpoint: Host and port of the OpenCensus receiver of the collector,
