@@ -74,10 +74,14 @@ class OTLPMetricExporterMixin:
     :class:`opentelemetry.sdk.metrics.export.MetricExporter`, and calls
     ``_common_configuration`` from its constructor. The mixin reads the two OTLP
     environment variables that select an aggregation temporality and a default
-    histogram aggregation per instrument class. The HTTP metric exporter reaches
-    the same decisions through its own
-    ``opentelemetry.exporter.otlp.common._aggregation`` module rather than
-    through this mixin.
+    histogram aggregation per instrument class. The HTTP metric exporter reads the
+    same two variables through the shared
+    ``opentelemetry.exporter.otlp.common._aggregation`` module instead. The two
+    do not agree in every case: that module upper-cases and strips
+    ``OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION`` before comparing
+    it, while this mixin compares it exactly, so a value spelled in anything but
+    lower case selects an exponential histogram under the HTTP exporter and falls
+    back to explicit buckets under the gRPC one.
 
     The mixin defines no state of its own and takes no constructor arguments.
     """
@@ -491,11 +495,20 @@ def _encode_exemplars(sdk_exemplars: list[Exemplar]) -> list[pb2.Exemplar]:
     """
     Converts a list of SDK Exemplars into a list of protobuf Exemplars.
 
+    An exemplar whose span identifier or trace identifier is ``None`` is encoded
+    without either of them, so a measurement taken outside a recording span keeps
+    its value and its filtered attributes and loses only the trace linkage.
+
     Args:
         sdk_exemplars (list): The list of exemplars from the OpenTelemetry SDK.
 
     Returns:
         list: A list of protobuf exemplars.
+
+    Raises:
+        ValueError: If an exemplar value is neither a ``float`` nor an ``int``.
+            ``_encode_resource_metrics`` turns this into an ``EncodingException``,
+            which loses the whole export batch, not only the one exemplar.
     """
     pb_exemplars = []
     for sdk_exemplar in sdk_exemplars:

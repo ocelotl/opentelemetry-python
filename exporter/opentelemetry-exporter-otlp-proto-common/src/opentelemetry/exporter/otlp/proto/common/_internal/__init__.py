@@ -6,9 +6,9 @@
 The functions here convert the pieces of SDK telemetry that all three signals
 have in common: a resource, an instrumentation scope, an attribute mapping, an
 arbitrary attribute or log body value, and the integer trace and span
-identifiers. Each one builds the value the protocol expects, a message from
-``opentelemetry-proto`` for most of them and raw bytes for the two identifier
-encoders, and none of them performs any input or output.
+identifiers. What each one hands back is whatever the protocol expects in that
+position: a single message from ``opentelemetry-proto``, a list of such messages,
+or raw bytes. None of them performs any input or output.
 
 Everything in this subpackage is private to
 ``opentelemetry-exporter-otlp-proto-common`` and may change in any release.
@@ -81,10 +81,12 @@ def _encode_resource(resource: Resource) -> PB2Resource:
 
     Returns:
         The protobuf ``Resource``, carrying the encoded attributes. It has no
-        field for a schema URL, so the callers put the schema URL of the resource
-        on the enclosing ``ResourceSpans``, ``ResourceMetrics`` or
-        ``ResourceLogs`` message instead. Attributes that cannot be encoded are
-        dropped, as described on ``_encode_attributes``.
+        field for a schema URL, so the two callers, the span encoder and the log
+        record encoder, put the schema URL of the resource on the enclosing
+        ``ResourceSpans`` or ``ResourceLogs`` message instead. The metrics
+        encoder does not use this function: it builds its ``Resource`` inline and
+        sets the schema URL on ``ResourceMetrics``. Attributes that cannot be
+        encoded are dropped, as described on ``_encode_attributes``.
     """
     return PB2Resource(attributes=_encode_attributes(resource.attributes))
 

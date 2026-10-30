@@ -168,7 +168,9 @@ def _encode_span(sdk_span: ReadableSpan) -> PB2SPan:
         The protobuf ``Span``.
 
     Raises:
-        KeyError: If the span kind is not one of the five the protocol defines.
+        KeyError: If the span kind is not one of the five
+            :class:`opentelemetry.trace.SpanKind` members that ``_SPAN_KIND_MAP``
+            covers, which includes the case of a span whose kind is ``None``.
     """
     span_context = sdk_span.get_span_context()
     return PB2SPan(
