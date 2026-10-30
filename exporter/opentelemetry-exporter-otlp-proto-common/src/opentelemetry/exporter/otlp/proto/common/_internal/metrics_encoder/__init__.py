@@ -3,9 +3,9 @@
 """Conversion of SDK metrics into the protobuf metrics export request.
 
 ``encode_metrics`` is the only name the OTLP exporters import from here by way of
-``opentelemetry.exporter.otlp.proto.common.metrics_encoder``. The gRPC and HTTP
-metric exporters additionally import ``OTLPMetricExporterMixin`` from this module
-directly, to share the reading of the two environment variables that decide
+``opentelemetry.exporter.otlp.proto.common.metrics_encoder``. The gRPC metric
+exporter additionally imports ``OTLPMetricExporterMixin`` from this module
+directly, for the reading of the two environment variables that decide
 aggregation temporality and the default histogram aggregation.
 
 The SDK has already grouped metrics by resource and by instrumentation scope
@@ -67,14 +67,17 @@ _logger = logging.getLogger(__name__)
 
 
 class OTLPMetricExporterMixin:
-    """Shared configuration for the gRPC and HTTP OTLP metric exporters.
+    """Environment-driven configuration for the gRPC OTLP metric exporter.
 
-    Both exporters subclass this mixin together with
-    :class:`opentelemetry.sdk.metrics.export.MetricExporter`, and call
-    ``_common_configuration`` from their own constructors. The mixin reads the
-    two OTLP environment variables that select a temporality and a default
-    histogram aggregation per instrument class, so that the two exporters cannot
-    disagree about what those variables mean.
+    ``opentelemetry.exporter.otlp.proto.grpc.metric_exporter.OTLPMetricExporter``
+    subclasses this mixin together with
+    :class:`opentelemetry.sdk.metrics.export.MetricExporter`, and calls
+    ``_common_configuration`` from its constructor. The mixin reads the two OTLP
+    environment variables that select an aggregation temporality and a default
+    histogram aggregation per instrument class. The HTTP metric exporter reaches
+    the same decisions through its own
+    ``opentelemetry.exporter.otlp.common._aggregation`` module rather than
+    through this mixin.
 
     The mixin defines no state of its own and takes no constructor arguments.
     """
@@ -87,8 +90,9 @@ class OTLPMetricExporterMixin:
         """Initialise the ``MetricExporter`` half of the exporter.
 
         Calls ``MetricExporter.__init__`` explicitly rather than through
-        ``super()``, so the exporter gets the temporality and aggregation
-        mappings that the environment and the arguments produce together.
+        ``super()``, so that the exporter gets the temporality and aggregation
+        mappings that the environment and these arguments produce together,
+        whatever its own position in the method resolution order.
 
         Args:
             preferred_temporality: Per instrument class, the aggregation
