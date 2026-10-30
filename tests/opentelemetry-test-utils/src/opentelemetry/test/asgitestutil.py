@@ -64,8 +64,10 @@ class AsgiTestBase(TestBase):
 
     Call ``seed_app`` with the application first, then ``send_input`` or
     ``send_default_request``, then ``get_output`` or ``get_all_output``.
-    ``self.scope`` is the scope the application will see; edit it before
-    ``seed_app``, because the communicator is given the scope at construction.
+    ``self.scope`` is the scope the application will see. The communicator
+    keeps a reference to it and does not start the application, which begins on
+    the first ``send_input`` or ``get_output``, so an edit made any time before
+    that first call still reaches the application.
 
     ``tearDown`` waits for the application to finish but does not call
     ``TestBase.tearDown``, so the trace and metrics globals this class installed
@@ -85,12 +87,16 @@ class AsgiTestBase(TestBase):
         self.communicator = None
 
     def tearDown(self):
-        """Wait for the seeded application to finish, if there is one.
+        """Wait up to one second for the seeded application to finish.
 
         Waiting surfaces an exception the application raised after the last
-        message a test read, which would otherwise be swallowed. This override
-        does not call ``super().tearDown()``, so the trace and metrics globals
-        are not reset here.
+        message a test read, which would otherwise be swallowed. One second is
+        the default of ``ApplicationCommunicator.wait`` and this call does not
+        override it, so an application still running when that second expires
+        is cancelled rather than awaited, and a test that leaves one running
+        pays the full second. This override does not call
+        ``super().tearDown()``, so the trace and metrics globals are not reset
+        here.
         """
         if self.communicator:
             asyncio.get_event_loop().run_until_complete(self.communicator.wait())
@@ -102,9 +108,11 @@ class AsgiTestBase(TestBase):
         abandons the previous application without waiting for it.
 
         Args:
-            app: The ASGI application to drive. It is instantiated against
-                ``self.scope`` as it stands at this moment, so later edits to
-                ``self.scope`` do not reach the application.
+            app: The ASGI application to drive. The communicator is given a
+                reference to ``self.scope`` and does not instantiate the
+                application here: that happens on the first ``send_input`` or
+                ``get_output``, so an edit to ``self.scope`` made before that
+                first call does reach the application.
         """
         self.communicator = ApplicationCommunicator(app, self.scope)
 
@@ -135,7 +143,9 @@ class AsgiTestBase(TestBase):
         Raises:
             asyncio.TimeoutError: When no message is already queued. The wait
                 is zero seconds, so this reads what the application has
-                produced rather than waiting for it to produce more.
+                produced rather than waiting for it to produce more. A read
+                that times out also cancels the application when it has not
+                finished, so this ends the conversation rather than pausing it.
         """
         output = asyncio.get_event_loop().run_until_complete(self.communicator.receive_output(0))
         return output
@@ -146,7 +156,9 @@ class AsgiTestBase(TestBase):
         Returns:
             A list of ASGI messages, in the order the application sent them,
             emptied out until nothing is queued. An application that has sent
-            nothing yields an empty list rather than an error.
+            nothing yields an empty list rather than an error. Draining ends
+            with a read that times out, which cancels an application that has
+            not finished, so do not drain one that still has input to receive.
         """
         outputs = []
         while True:
@@ -181,10 +193,13 @@ class AsyncAsgiTestBase(TestBase, IsolatedAsyncioTestCase):
         self.communicator = None
 
     def tearDown(self):
-        """Wait for the seeded application to finish, if there is one.
+        """Wait up to one second for the seeded application to finish.
 
-        This override does not call ``super().tearDown()``, so the trace and
-        metrics globals are not reset here.
+        One second is the default of ``ApplicationCommunicator.wait``, which
+        this call does not override, so an application still running when that
+        second expires is cancelled rather than awaited. This override does not
+        call ``super().tearDown()``, so the trace and metrics globals are not
+        reset here.
         """
         if self.communicator:
             asyncio.get_event_loop().run_until_complete(self.communicator.wait())
@@ -193,9 +208,11 @@ class AsyncAsgiTestBase(TestBase, IsolatedAsyncioTestCase):
         """Attach an ASGI application to the scope built by ``setUp``.
 
         Args:
-            app: The ASGI application to drive. It is instantiated against
-                ``self.scope`` as it stands at this moment, so later edits to
-                ``self.scope`` do not reach the application.
+            app: The ASGI application to drive. The communicator is given a
+                reference to ``self.scope`` and does not instantiate the
+                application here: that happens on the first ``send_input`` or
+                ``get_output``, so an edit to ``self.scope`` made before that
+                first call does reach the application.
         """
         self.communicator = ApplicationCommunicator(app, self.scope)
 
@@ -223,11 +240,13 @@ class AsyncAsgiTestBase(TestBase, IsolatedAsyncioTestCase):
 
         Raises:
             asyncio.TimeoutError: When no message arrives within ``timeout``.
+                The timed-out read also cancels the application when it has not
+                finished, so this ends the conversation rather than pausing it.
         """
         return await self.communicator.receive_output(timeout)
 
     async def get_all_output(self, timeout=0.01):
-        """Collect messages until the application stops sending them.
+        """Collect every message the application sends, then cancel it.
 
         Args:
             timeout: Seconds to wait for each further message. The call takes
@@ -236,7 +255,9 @@ class AsyncAsgiTestBase(TestBase, IsolatedAsyncioTestCase):
 
         Returns:
             A list of ASGI messages in the order the application sent them.
-            An application that sends nothing yields an empty list.
+            An application that sends nothing yields an empty list. The read
+            that ends the loop cancels an application that has not finished, so
+            do not drain one that still has input to receive.
         """
         outputs = []
         while True:
