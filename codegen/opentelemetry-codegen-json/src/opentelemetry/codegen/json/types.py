@@ -198,7 +198,11 @@ def to_json_field_name(snake_name: str) -> str:
 
 def is_numeric_type(proto_type: int) -> bool:
     """
-    Check if the protobuf field type is a numeric type (int32, int64, uint32, uint64, float, double).
+    Check if the protobuf field type is a numeric type.
+
+    This is every integer type and both floating point types, twelve in all: the five members of
+    ``INT64_TYPES``, the 32-bit integers ``int32``, ``uint32``, ``fixed32``, ``sfixed32`` and
+    ``sint32``, and ``float`` and ``double``. ``bool`` is not one of them.
 
     Args:
         proto_type: The protobuf field type as an integer (from FieldDescriptorProto).
