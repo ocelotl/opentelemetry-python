@@ -75,7 +75,8 @@ class CodeWriter:
 
         A blank line is written as the empty string rather than as the current indentation's worth
         of spaces, which keeps trailing whitespace out of the generated file. Every other method
-        that writes a single line goes through this one.
+        that writes a single line goes through this one, except ``blank_line``, which appends
+        directly.
 
         Args:
             line: The line of code to write (default: empty string for a blank line)
