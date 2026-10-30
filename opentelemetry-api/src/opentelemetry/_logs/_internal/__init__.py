@@ -338,32 +338,22 @@ class NoOpLogger(Logger):
         event_name: str | None = None,
         exception: BaseException | None = None,
     ) -> None:
-        """Discard the log record.
+        """Discard the call, since this logger builds no record at all.
+
+        Nothing here is read. No :class:`LogRecord` is built from the keyword
+        arguments, so no timestamp is taken and no context is consulted.
 
         Args:
-            record: A fully built :class:`LogRecord` to emit. When it is
-                given, every keyword argument below is ignored. When it is
-                ``None``, a record is built from the keyword arguments.
-            timestamp: When the event occurred, as nanoseconds since the Unix
-                epoch. Left unset when omitted, so the record carries ``None``
-                rather than a time the API invented.
-            observed_timestamp: When the event was observed by the collection
-                system, as nanoseconds since the Unix epoch. Defaults to the
-                time the record is built.
-            context: The context the record belongs to, used to associate it
-                with the active span. Defaults to the current context.
-            severity_number: The severity of the event on the OpenTelemetry
-                scale.
-            severity_text: The severity of the event as the originating system
-                spelled it, for example ``"WARN"``.
-            body: The payload of the event. A string for an ordinary log line,
-                or any other ``AnyValue`` for
-                structured content.
-            attributes: Further name/value pairs describing the event.
-            event_name: The name identifying the class of event, for a
-                structured event rather than a free-form log line.
-            exception: An exception to record alongside the event. Its type,
-                message and stack trace are attached to the record.
+            record: Ignored.
+            timestamp: Ignored.
+            observed_timestamp: Ignored.
+            context: Ignored.
+            severity_number: Ignored.
+            severity_text: Ignored.
+            body: Ignored.
+            attributes: Ignored.
+            event_name: Ignored.
+            exception: Ignored.
         """
 
     def enabled(
