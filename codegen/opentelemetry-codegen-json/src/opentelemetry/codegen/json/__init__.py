@@ -9,11 +9,12 @@
 ``opentelemetry.codegen.json.plugin.main``, which hands the request to
 ``opentelemetry.codegen.json.generator``.
 
-For each ``.proto`` file the generator emits one Python module holding a ``slots=True`` dataclass
-per protobuf message and an ``enum.IntEnum`` per protobuf enum. Every generated message class
-carries ``to_dict`` and ``from_dict`` methods that implement the Proto3 JSON mapping, with the
-OTLP deviation that ``trace_id``, ``span_id`` and ``parent_span_id`` are hex encoded rather than
-base64 encoded. Alongside those modules it copies
+For each ``.proto`` file named in ``file_to_generate`` on the request, and not for the descriptors
+that are only dependencies, the generator emits one Python module holding a ``slots=True``
+dataclass per protobuf message and an ``enum.IntEnum`` per protobuf enum. Every generated message
+class carries ``to_dict`` and ``from_dict`` methods that implement the Proto3 JSON mapping, with
+the OTLP deviation that ``trace_id``, ``span_id`` and ``parent_span_id`` are hex encoded rather
+than base64 encoded. Alongside those modules it copies
 ``opentelemetry.codegen.json.runtime.json_codec`` into the output tree as ``_json_codec``. The
 generated code imports that copy, which belongs to the generated distribution, so no part of
 ``opentelemetry-codegen-json`` is imported at runtime.
