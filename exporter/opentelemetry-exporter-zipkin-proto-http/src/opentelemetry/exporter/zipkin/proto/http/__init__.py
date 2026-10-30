@@ -83,6 +83,51 @@ logger = logging.getLogger(__name__)
 
 
 class ZipkinExporter(SpanExporter):
+    """Exports spans to a Zipkin collector as version 2 protobuf over HTTP.
+
+    Each batch is serialized by ``ProtobufEncoder`` and sent as the body of a
+    single HTTP POST to the collector. The session used for that POST carries a
+    ``Content-Type`` of ``application/x-protobuf``, set when the exporter is
+    constructed.
+
+    The three ``local_node_`` arguments together describe the network context of
+    the node that produced the spans, which Zipkin records as the local endpoint
+    of every span in the batch. The service name of that local endpoint is not
+    taken from an argument: it is read from the ``service.name`` resource
+    attribute of the first span of each batch, falling back to the service name
+    resolved when the exporter was constructed.
+
+    Args:
+        endpoint: Full URL of the Zipkin collector endpoint that receives the
+            spans. When ``None``, the value of the
+            :envvar:`OTEL_EXPORTER_ZIPKIN_ENDPOINT` environment variable is used,
+            and when that variable is unset or empty the endpoint falls back to
+            ``http://localhost:9411/api/v2/spans``.
+        local_node_ipv4: Primary IPv4 address associated with this connection,
+            given either as a dotted-quad string or as the integer form of the
+            address. ``None`` omits the IPv4 address from the local endpoint. A
+            value that does not parse as an IPv4 address raises ``ValueError``.
+        local_node_ipv6: Primary IPv6 address associated with this connection,
+            given either as a string or as the integer form of the address.
+            ``None`` omits the IPv6 address from the local endpoint. A value that
+            does not parse as an IPv6 address raises ``ValueError``.
+        local_node_port: Depending on context, this could be a listen port or the
+            client-side of a socket. ``None`` omits the port from the local
+            endpoint.
+        max_tag_value_length: Maximum length a string tag value may reach before
+            it is truncated. ``None`` disables truncation, which is the default
+            for this exporter and differs from the encoder default of 128
+            characters.
+        timeout: Maximum number of seconds to wait for each batch export. When
+            ``None`` or zero, the value of the
+            :envvar:`OTEL_EXPORTER_ZIPKIN_TIMEOUT` environment variable is used,
+            and when that is unset the timeout is 10 seconds.
+        session: Connection session used to reach the Zipkin collector endpoint.
+            Pass one to control connection pooling, retries or authentication.
+            When ``None``, this exporter creates its own session and closes it
+            on shutdown.
+    """
+
     def __init__(
         self,
         endpoint: str | None = None,
@@ -93,22 +138,9 @@ class ZipkinExporter(SpanExporter):
         timeout: int | None = None,
         session: requests.Session | None = None,
     ):
-        """Zipkin exporter.
+        """Build a Zipkin protobuf exporter.
 
-        Args:
-            version: The protocol version to be used.
-            endpoint: The endpoint of the Zipkin collector.
-            local_node_ipv4: Primary IPv4 address associated with this connection.
-            local_node_ipv6: Primary IPv6 address associated with this connection.
-            local_node_port: Depending on context, this could be a listen port or the
-                client-side of a socket.
-            max_tag_value_length: Max length string attribute values can have.
-            timeout: Maximum time the Zipkin exporter will wait for each batch export.
-                The default value is 10s.
-            session: Connection session to the Zipkin collector endpoint.
-
-            The tuple (local_node_ipv4, local_node_ipv6, local_node_port) is used to represent
-            the network context of a node in the service graph.
+        The parameters are documented on the class.
         """
         self.local_node = NodeEndpoint(local_node_ipv4, local_node_ipv6, local_node_port)
 
