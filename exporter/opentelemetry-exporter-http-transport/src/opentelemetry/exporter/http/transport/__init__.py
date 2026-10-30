@@ -1,6 +1,19 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+"""Selection of the HTTP client library an HTTP exporter sends through.
+
+An exporter names a transport by a string, ``_load_http_transport_factory``
+turns that string into a factory, and calling the factory with ``verify`` and
+``cert`` gives a ``BaseHTTPTransport`` in
+``opentelemetry.exporter.http.transport._base``.
+
+Two names are built in: ``"requests"`` and ``"urllib3"``. Each needs the
+matching extra of this package to be installed, since neither client library
+is a hard dependency. A third party registers another name under the
+``opentelemetry_http_transport`` entry point group.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
@@ -21,6 +34,15 @@ if TYPE_CHECKING:
     from opentelemetry.exporter.http.transport._base import BaseHTTPTransport
 
     class BaseHTTPTransportFactory(Protocol):
+        """What a registered transport has to be callable as.
+
+        A transport class satisfies this by its constructor signature, which is
+        why both built-in entries are classes rather than functions. Any
+        keyword argument beyond ``verify`` and ``cert`` is optional for the
+        caller and has to be tolerated by the callee, so an exporter can pass
+        the same keyword arguments whichever transport is selected.
+        """
+
         def __call__(
             self,
             *,
@@ -44,11 +66,25 @@ def _load_http_transport_factory(name: str) -> BaseHTTPTransportFactory:
     discovery for user supplied transports registered under the
     ``opentelemetry_http_transport`` group.
 
-    :param name: Entry point name, e.g. ``"requests"`` or ``"urllib3"``.
-    :returns: A callable with signature
-        ``(*, verify, cert, **kwargs) -> BaseHTTPTransport``.
-    :raises ValueError: If no transport is registered under *name*.
-    :raises TypeError: If the loaded entry point is not callable.
+    The factory is returned, not called, so the client library behind a
+    built-in name is still not imported when this returns. Nothing is cached:
+    an entry point lookup is repeated on every call for a name that is not
+    built in.
+
+    Args:
+        name: Entry point name, e.g. ``"requests"`` or ``"urllib3"``.
+
+    Returns:
+        A callable with signature
+        ``(*, verify, cert, **kwargs) -> BaseHTTPTransport``. For a built-in
+        name this is the transport class itself.
+
+    Raises:
+        ValueError: If no transport is registered under ``name``. A built-in
+            name is found whether or not its extra is installed, so a missing
+            client library surfaces later as an ``ImportError`` raised by the
+            factory rather than here.
+        TypeError: If the loaded entry point is not callable.
     """
     if name in _KNOWN_TRANSPORTS:
         return _KNOWN_TRANSPORTS[name]
