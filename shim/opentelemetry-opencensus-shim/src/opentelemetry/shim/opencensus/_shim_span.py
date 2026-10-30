@@ -1,6 +1,18 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+"""The OpenCensus span interface implemented over the OpenTelemetry tracing API.
+
+``ShimSpan`` presents the method set of an OpenCensus span and records everything it is told on an
+OpenTelemetry span. ``ShimTracer.start_span`` creates these and hands them back to OpenCensus
+callers.
+
+Two parts of the OpenCensus span interface cannot be served, because OpenCensus allows them to be
+set after a span has started and OpenTelemetry does not: links and span kind. Both are accepted
+and discarded with a warning. The incompatibility is listed in
+https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/compatibility/opencensus.md#known-incompatibilities
+"""
+
 import logging
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -35,6 +47,22 @@ _MESSAGE_EVENT_TYPE_STR_MAPPING = {
 def _opencensus_time_to_nanos(timestamp: str) -> int:
     """Converts an OpenCensus formatted time string (ISO 8601 with Z) to time.time_ns style
     unix timestamp
+
+    ``datetime.strptime`` produces a naive datetime, and ``datetime.timestamp`` then reads a naive
+    datetime as local time. OpenCensus writes these strings in UTC, so on a process whose local
+    timezone is not UTC the result is displaced by the local UTC offset.
+
+    Args:
+        timestamp: An OpenCensus time string, as produced by
+            ``opencensus.common.utils.to_iso_str``, for example ``2023-01-01T00:00:00.000000Z``.
+            The fractional second part and the trailing ``Z`` are both required.
+
+    Returns:
+        The same instant as a whole number of nanoseconds since the unix epoch, rounded, which is
+        what the OpenTelemetry API takes for an event timestamp.
+
+    Raises:
+        ValueError: When ``timestamp`` does not have that exact format.
     """
     # format taken from
     # https://github.com/census-instrumentation/opencensus-python/blob/c38c71b9285e71de94d0185ff3c5bf65ee163345/opencensus/common/utils/__init__.py#L76
@@ -46,6 +74,28 @@ def _opencensus_time_to_nanos(timestamp: str) -> int:
 
 # pylint: disable=abstract-method
 class ShimSpan(wrapt.ObjectProxy):
+    """The OpenCensus span interface, backed by an OpenTelemetry span.
+
+    ``ShimTracer.start_span`` creates these and hands them to OpenCensus callers in place of an
+    OpenCensus span. The methods that record data are overridden here and reach the OpenTelemetry
+    span. Being a ``wrapt.ObjectProxy``, everything else is handled by the wrapped OpenCensus
+    ``BlankSpan``, whose methods do nothing, so an unsupported OpenCensus call is silently
+    accepted rather than raising ``AttributeError``.
+
+    Two OpenCensus span members that are read by instrumentations, although they are not part of
+    the documented OpenCensus ``BaseSpan`` interface, are set from the OpenTelemetry span at
+    construction so they do not report the values the ``BlankSpan`` made up for itself:
+    ``span_id`` is the span ID of the OpenTelemetry span as an integer, and
+    ``same_process_as_parent_span`` is false exactly when the OpenTelemetry span context is
+    remote.
+
+    Args:
+        wrapped: The OpenCensus ``BlankSpan`` to proxy.
+        otel_span: The OpenTelemetry span that records everything this span is told.
+        shim_tracer: The shim tracer that created this span. It starts the child spans and
+            supplies the span to restore as current when this span is exited.
+    """
+
     def __init__(
         self,
         wrapped: BlankSpan,
@@ -53,6 +103,7 @@ class ShimSpan(wrapt.ObjectProxy):
         otel_span: trace.Span,
         shim_tracer: "ShimTracer",
     ) -> None:
+        """The parameters are documented on the class docstring."""
         super().__init__(wrapped)
         self._self_otel_span = otel_span
         self._self_shim_tracer = shim_tracer
@@ -67,15 +118,63 @@ class ShimSpan(wrapt.ObjectProxy):
         self.span_id = sc.span_id
 
     def span(self, name="child_span"):
+        """Start a child span through the shim tracer and make it current.
+
+        OpenCensus ``BlankSpan.span`` returns a child that is not attached to any context. This
+        override goes through ``ShimTracer.start_span`` instead, so the returned span is attached.
+        The parent of the child is therefore the span current in the OpenTelemetry context, which
+        is this span only while this span is still the current one.
+
+        Args:
+            name: The name given to the child span.
+
+        Returns:
+            The started child shim span.
+        """
         return self._self_shim_tracer.start_span(name=name)
 
     def add_attribute(self, attribute_key, attribute_value):
+        """Set an attribute on the OpenTelemetry span.
+
+        Args:
+            attribute_key: The name of the attribute.
+            attribute_value: The value of the attribute. It reaches the OpenTelemetry span
+                unchanged, so a value of a type OpenTelemetry does not accept is dropped there
+                with a warning rather than converted here.
+        """
         self._self_otel_span.set_attribute(attribute_key, attribute_value)
 
     def add_annotation(self, description, **attrs):
+        """Record an OpenCensus annotation as an OpenTelemetry span event.
+
+        The event is timestamped by the OpenTelemetry span at the moment of this call, because the
+        OpenCensus annotation API carries no time of its own here.
+
+        Args:
+            description: The text of the annotation, which becomes the name of the event.
+            **attrs: The attributes of the annotation, which become the attributes of the event.
+        """
         self._self_otel_span.add_event(description, attrs)
 
     def add_message_event(self, message_event: MessageEvent):
+        """Record an OpenCensus message event as an OpenTelemetry span event.
+
+        The name of the event is the string form of ``message_event.id`` and its timestamp is the
+        one the message event carries. The type and the two sizes become the attributes
+        ``message.event.type``, ``message.event.size.uncompressed`` and
+        ``message.event.size.compressed``, the names the OpenCensus shim of opentelemetry-java
+        uses. A size that is ``None`` contributes no attribute. The type attribute is the name of
+        the OpenCensus type rather than its number, so ``TYPE_UNSPECIFIED``, ``SENT`` or
+        ``RECEIVED``.
+
+        Args:
+            message_event: The OpenCensus ``MessageEvent`` to record.
+
+        Raises:
+            KeyError: When ``message_event.type`` is not one of the three values of
+                ``opencensus.trace.time_event.Type``.
+            ValueError: When ``message_event.timestamp`` is not an OpenCensus time string.
+        """
         attrs = {
             _MESSAGE_EVENT_ATTRIBUTE_KEY_TYPE: _MESSAGE_EVENT_TYPE_STR_MAPPING[message_event.type],
         }
@@ -93,9 +192,15 @@ class ShimSpan(wrapt.ObjectProxy):
 
     # pylint: disable=no-self-use
     def add_link(self, link):
-        """span links do not work with the shim because the OpenCensus Tracer does not accept
+        """Log a warning and discard the link.
+
+        span links do not work with the shim because the OpenCensus Tracer does not accept
         links in start_span(). Same issue applies to SpanKind. Also see:
         https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/compatibility/opencensus.md#known-incompatibilities
+
+        Args:
+            link: The OpenCensus ``Link`` the caller wants to add. It is discarded, so the
+                OpenTelemetry span is exported with no links at all.
         """
         _logger.warning("OpenTelemetry does not support links added after a span is created.")
 
@@ -104,14 +209,42 @@ class ShimSpan(wrapt.ObjectProxy):
         """Setting span_kind does not work with the shim because the OpenCensus Tracer does not
         accept the param in start_span() and there's no way to set OTel span kind after
         start_span().
+
+        Returns:
+            Always ``opencensus.trace.span.SpanKind.UNSPECIFIED``, whatever kind the OpenTelemetry
+            span underneath has.
         """
         return SpanKind.UNSPECIFIED
 
     @span_kind.setter
     def span_kind(self, value):
+        """Log a warning and discard the span kind.
+
+        OpenTelemetry fixes the kind of a span when the span starts, and the OpenCensus ``Tracer``
+        offers no way to pass one to ``start_span``, so every span the shim creates keeps the
+        OpenTelemetry default kind of ``INTERNAL``.
+
+        Args:
+            value: The OpenCensus ``SpanKind`` the caller wants to set. It is discarded, and a
+                later read of ``span_kind`` still reports ``UNSPECIFIED``.
+        """
         _logger.warning("OpenTelemetry does not support setting span kind after a span is created.")
 
     def set_status(self, status: Status):
+        """Set the status of the OpenTelemetry span from an OpenCensus status.
+
+        An OpenCensus status carries a gRPC code, of which there are many, while an OpenTelemetry
+        status is one of ``UNSET``, ``OK`` and ``ERROR``. Every OpenCensus code other than ``OK``
+        becomes ``ERROR``, so the particular code does not survive the translation.
+
+        The description is passed on, but OpenTelemetry keeps a description only on an ``ERROR``
+        status, so a description accompanying an ``OK`` OpenCensus status is dropped, with a
+        warning from the OpenTelemetry API.
+
+        Args:
+            status: The OpenCensus ``Status`` to translate. Its ``is_ok`` property chooses between
+                ``OK`` and ``ERROR``, and its ``description`` property supplies the description.
+        """
         self._self_otel_span.set_status(
             trace.StatusCode.OK if status.is_ok else trace.StatusCode.ERROR,
             status.description,
@@ -124,11 +257,32 @@ class ShimSpan(wrapt.ObjectProxy):
         self._self_otel_span.end()
 
     def __enter__(self):
+        """Enter the context manager of the OpenTelemetry span and return this shim span.
+
+        Returns:
+            This shim span, so that ``with tracer.span() as span:`` binds the OpenCensus facing
+            object rather than the OpenTelemetry span underneath it.
+        """
         self._self_otel_span.__enter__()
         return self
 
     # pylint: disable=arguments-differ
     def __exit__(self, exception_type, exception_value, traceback):
+        """End the OpenTelemetry span and restore the context from before the span was started.
+
+        Ending goes through the context manager of the OpenTelemetry span rather than through
+        ``finish``, so an exception leaving the block reaches the span: an SDK span records it as
+        an event and sets its own status to ``ERROR``, unless it was started with those two
+        defaults turned off. OpenCensus ``Span.__exit__`` would end the span through
+        ``Tracer.end_span``, which here would end the OpenTelemetry span a second time, so this
+        method does the context teardown itself instead.
+
+        Args:
+            exception_type: The class of the exception leaving the block, or ``None`` when the
+                block completed normally.
+            exception_value: The exception leaving the block, or ``None``.
+            traceback: The traceback of that exception, or ``None``.
+        """
         self._self_otel_span.__exit__(exception_type, exception_value, traceback)
         # OpenCensus Span.__exit__() calls Tracer.end_span()
         # https://github.com/census-instrumentation/opencensus-python/blob/2e08df591b507612b3968be8c2538dedbf8fab37/opencensus/trace/span.py#L390
