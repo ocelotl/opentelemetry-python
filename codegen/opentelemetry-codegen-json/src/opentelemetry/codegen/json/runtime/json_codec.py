@@ -25,6 +25,11 @@ than only the position in the payload. A ``decode_`` function raises ``TypeError
 value is of the wrong Python type and ``ValueError`` when the type is right but the content is
 not, and it chains neither, so the traceback stops at the field rather than exposing the internals
 of ``base64`` or ``int``.
+
+The type checking is not total, and the two gaps are written out on the functions that have them.
+``decode_hex`` and ``decode_base64`` return empty bytes for any falsy value before they check its
+type, and ``decode_repeated`` checks an element only as far as the ``item_parser`` it is given
+does, which for a repeated field of an already valid JSON type is not at all.
 """
 
 from __future__ import annotations
@@ -85,7 +90,8 @@ class JsonMessage(abc.ABC):
 
         Raises:
             TypeError: If ``data`` is not a dictionary, or if a value in it is of a Python type
-                that its field cannot accept.
+                that its field cannot accept. Not every wrong type is caught: see the two gaps
+                described on this module.
             ValueError: If a value is of an acceptable type but cannot be decoded, such as a
                 malformed hex string or an integer that no member of the field's enum carries.
         """
@@ -226,7 +232,9 @@ def decode_hex(value: str | None, field_name: str) -> bytes:
         The decoded bytes, or empty bytes if input is None or empty.
 
     Raises:
-        TypeError: If ``value`` is neither ``None`` nor a ``str``.
+        TypeError: If ``value`` is truthy and not a ``str``. The emptiness check runs first, so a
+            falsy value of any type, ``0`` and ``[]`` included, returns ``b""`` rather than
+            raising.
         ValueError: If ``value`` is a string of odd length or holds a character that is not a hex
             digit.
     """
@@ -254,7 +262,8 @@ def decode_base64(value: str | None, field_name: str) -> bytes:
         The decoded bytes, or empty bytes if input is None or empty.
 
     Raises:
-        TypeError: If ``value`` is neither ``None`` nor a ``str``.
+        TypeError: If ``value`` is truthy and not a ``str``. As in ``decode_hex``, the emptiness
+            check runs first, so a falsy value of any type returns ``b""`` rather than raising.
         ValueError: If ``base64.b64decode`` rejects the string. Any exception it raises is
             reported as a ``ValueError`` naming the field.
     """
@@ -339,9 +348,15 @@ def decode_repeated(
     """
     Parse a list of values using the provided item parser function.
 
-    The list itself is type checked here; each element is checked by ``item_parser``, which the
-    generated code supplies as a lambda closing over nothing. An element that fails stops the
-    whole call, so a partially decoded list is never returned.
+    The list itself is always type checked here. Whether the elements are checked depends on what
+    ``item_parser`` does, and for a repeated field whose element type needs no conversion, such as
+    ``string`` or ``bool``, the generator passes the identity lambda ``lambda _v: _v``. Those
+    elements are therefore not checked at all: a repeated ``string`` field given ``[1, {"a": 2}]``
+    decodes to that same list, despite the generated type hint saying
+    ``builtins.list[builtins.str]``.
+
+    An element that ``item_parser`` does reject stops the whole call, so a partially decoded list
+    is never returned.
 
     Args:
         values: The list of values to decode, or None.
