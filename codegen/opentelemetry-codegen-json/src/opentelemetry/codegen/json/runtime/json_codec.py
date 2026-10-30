@@ -26,10 +26,11 @@ value is of the wrong Python type and ``ValueError`` when the type is right but 
 not, and it chains neither, so the traceback stops at the field rather than exposing the internals
 of ``base64`` or ``int``.
 
-The type checking is not total, and the two gaps are written out on the functions that have them.
+The type checking is not total, and each gap is written out on the function that has it.
 ``decode_hex`` and ``decode_base64`` return empty bytes for any falsy value before they check its
-type, and ``decode_repeated`` checks an element only as far as the ``item_parser`` it is given
-does, which for a repeated field of an already valid JSON type is not at all.
+type. ``decode_repeated`` checks an element only as far as the ``item_parser`` it is given does,
+which for a repeated field of an already valid JSON type is not at all. ``validate_type`` checks
+with ``isinstance``, so a JSON ``true`` passes as an integer wherever one is accepted.
 """
 
 from __future__ import annotations
@@ -90,7 +91,7 @@ class JsonMessage(abc.ABC):
 
         Raises:
             TypeError: If ``data`` is not a dictionary, or if a value in it is of a Python type
-                that its field cannot accept. Not every wrong type is caught: see the two gaps
+                that its field cannot accept. Not every wrong type is caught: see the gaps
                 described on this module.
             ValueError: If a value is of an acceptable type but cannot be decoded, such as a
                 malformed hex string or an integer that no member of the field's enum carries.

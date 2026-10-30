@@ -161,8 +161,9 @@ def is_hex_encoded_field(field_name: str) -> bool:
     Check if field is a hex-encoded field (trace_id, span_id, parent_span_id).
 
     OTLP/JSON departs from Proto3 JSON for these three, carrying them as lowercase hex strings
-    instead of base64. The decision is made on the field name alone and the field's type is never
-    consulted, so any field anywhere carrying one of those three names is treated as hex encoded.
+    instead of base64. This function looks at the name alone and never at the type. The generator
+    does check the type first, so a message-typed or enum-typed field never reaches this test,
+    but among the remaining types the name is the whole decision.
 
     Args:
         field_name: The name of the protobuf field.
@@ -181,8 +182,8 @@ def to_json_field_name(snake_name: str) -> str:
 
     The conversion uses ``str.title`` on each component after the first, which lowercases the rest
     of a component as well as uppercasing its first character, so ``trace_ID`` gives ``traceId``.
-    A leading underscore produces an empty first component and therefore a name that starts with
-    an uppercase letter.
+    A leading underscore produces an empty first component, so the result begins with whatever
+    ``str.title`` makes of the second one: ``_foo`` gives ``Foo``, and ``_1abc`` gives ``1Abc``.
 
     Args:
         snake_name: The field name in snake_case.
