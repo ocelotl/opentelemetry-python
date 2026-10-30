@@ -108,8 +108,12 @@ def _load_session_from_envvar(
     """Build the ``requests`` session named by a credential provider variable.
 
     A credential provider is an entry point in the
-    ``opentelemetry_otlp_credential_provider`` group whose callable returns a
-    ``requests.Session`` carrying whatever authentication the backend needs.
+    ``opentelemetry_otlp_credential_provider`` group. This function requires
+    the one it loads to return a ``requests.Session`` carrying whatever
+    authentication the backend needs. The group is shared with the gRPC
+    exporters, whose providers return a ``grpc.ChannelCredentials`` instead, so
+    a distribution that supports both signalling protocols registers one entry
+    point of each kind and the name given here has to be the HTTP one.
     The signal-independent
     ``OTEL_PYTHON_EXPORTER_OTLP_HTTP_CREDENTIAL_PROVIDER`` variable is read
     first and ``cred_envvar`` only if it is unset or empty, which is the
