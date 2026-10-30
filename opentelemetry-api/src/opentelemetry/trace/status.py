@@ -1,6 +1,14 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+"""The outcome recorded on a finished span.
+
+A span carries a :class:`Status` saying whether the operation it covers
+succeeded. The status is :attr:`StatusCode.UNSET` unless instrumentation sets
+it, and a description may accompany it only when the code is
+:attr:`StatusCode.ERROR`.
+"""
+
 import enum
 import logging
 
@@ -27,6 +35,11 @@ class Status:
         status_code: The canonical status code that describes the result
             status of the operation.
         description: An optional description of the status.
+
+    A description is kept only when ``status_code`` is
+    :attr:`StatusCode.ERROR` and the description is a :class:`str`. Otherwise
+    it is discarded and a warning is logged, which is what the specification
+    requires.
     """
 
     def __init__(
@@ -34,6 +47,11 @@ class Status:
         status_code: StatusCode = StatusCode.UNSET,
         description: str | None = None,
     ):
+        """Build the status, discarding a description that is not permitted.
+
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
+        """
         self._status_code = status_code
         self._description = None
 
@@ -49,20 +67,41 @@ class Status:
 
     @property
     def status_code(self) -> StatusCode:
-        """Represents the canonical status code of a finished Span."""
+        """Represents the canonical status code of a finished Span.
+
+        Returns:
+            The code this status was built with.
+        """
         return self._status_code
 
     @property
     def description(self) -> str | None:
-        """Status description"""
+        """Status description.
+
+        Returns:
+            The description, or ``None`` when none was supplied or the one
+            supplied was discarded for accompanying a non-error status code.
+        """
         return self._description
 
     @property
     def is_ok(self) -> bool:
-        """Returns false if this represents an error, true otherwise."""
+        """Returns false if this represents an error, true otherwise.
+
+        Returns:
+            ``True`` when the status code is :attr:`StatusCode.OK` or
+            :attr:`StatusCode.UNSET`, ``False`` when it is
+            :attr:`StatusCode.ERROR`.
+        """
         return self.is_unset or self._status_code is StatusCode.OK
 
     @property
     def is_unset(self) -> bool:
-        """Returns true if unset, false otherwise."""
+        """Returns true if unset, false otherwise.
+
+        Returns:
+            ``True`` when no status code has been set on this status, which is
+            the state of a span that finished without instrumentation deciding
+            its outcome.
+        """
         return self._status_code is StatusCode.UNSET
