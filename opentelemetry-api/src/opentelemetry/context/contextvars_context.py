@@ -1,6 +1,15 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+"""Runtime context backed by :mod:`contextvars`.
+
+This is the only runtime context implementation shipped with the API. Storing
+the current :class:`~opentelemetry.context.Context` in a
+:class:`~contextvars.ContextVar` gives each thread, each task and each
+generator its own view, so a span started in one task does not become current
+in another.
+"""
+
 from __future__ import annotations
 
 from contextvars import ContextVar, Token
@@ -16,6 +25,11 @@ class ContextVarsRuntimeContext(_RuntimeContext):
     _CONTEXT_KEY = "current_context"
 
     def __init__(self) -> None:
+        """Create the backing :class:`~contextvars.ContextVar`.
+
+        The variable starts out holding an empty
+        :class:`~opentelemetry.context.Context`.
+        """
         self._current_context = ContextVar(self._CONTEXT_KEY, default=Context())
 
     def attach(self, context: Context) -> Token[Context]:
@@ -24,11 +38,21 @@ class ContextVarsRuntimeContext(_RuntimeContext):
 
         Args:
             context: The Context to set.
+
+        Returns:
+            A token to pass to :meth:`detach` to restore the context that was
+            current before this call.
         """
         return self._current_context.set(context)
 
     def get_current(self) -> Context:
-        """Returns the current `Context` object."""
+        """Returns the current `Context` object.
+
+        Returns:
+            The context attached to the current execution, or an empty
+            :class:`~opentelemetry.context.Context` when nothing has been
+            attached.
+        """
         return self._current_context.get()
 
     def detach(self, token: Token[Context]) -> None:
