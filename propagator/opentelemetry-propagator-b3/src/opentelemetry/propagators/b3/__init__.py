@@ -235,8 +235,11 @@ class B3MultiFormat(TextMapPropagator):
         A caller that has to clear any propagation headers already present in a
         carrier before injecting into it, such as an instrumentation that
         reuses a request object, reads the names from here instead of hard
-        coding them. ``x-b3-flags`` is absent because ``inject`` never writes
-        it, even though ``extract`` reads it.
+        coding them. ``b3`` and ``x-b3-flags`` are absent because ``inject``
+        never writes either, even though ``extract`` reads both. A caller
+        reusing a carrier that already holds a ``b3`` header has to delete that
+        header as well, because ``extract`` at the next hop prefers it over the
+        three names returned here.
 
         Returns:
             The three multi-header names, ``x-b3-traceid``, ``x-b3-spanid`` and
