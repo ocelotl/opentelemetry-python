@@ -191,8 +191,9 @@ class W3CBaggagePropagator(textmap.TextMapPropagator):
         See
         `opentelemetry.propagators.textmap.TextMapPropagator.inject`
 
-        Nothing is written when the context holds no baggage, or when every
-        entry was dropped for breaking a size limit.
+        Nothing is written when the context holds no baggage, and nothing is
+        written when every entry was dropped, whether for carrying a key that
+        is not a valid baggage token or for breaking a size limit.
 
         Args:
             carrier: The object to write the outgoing header into, for example
