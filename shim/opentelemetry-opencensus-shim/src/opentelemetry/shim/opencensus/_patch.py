@@ -44,8 +44,8 @@ def install_shim(
     most recently used ones.
 
     Calling this function a second time installs a fresh property and a fresh cache. The shim
-    tracers of the previous call are then reachable only from spans that are still open and hold a
-    reference to one.
+    tracers of the previous call are then reachable only from the shim spans that hold a reference
+    to one, which every shim span keeps for its whole lifetime, ended or not.
 
     Args:
         tracer_provider: The :class:`opentelemetry.trace.TracerProvider` to obtain the tracer from.

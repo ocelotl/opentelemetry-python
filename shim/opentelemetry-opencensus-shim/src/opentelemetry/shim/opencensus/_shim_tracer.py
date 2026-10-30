@@ -87,8 +87,9 @@ def set_oc_span_in_context(oc_span_context: SpanContext, ctx: context.Context) -
         oc_span_context: The OpenCensus ``SpanContext`` to translate.
         ctx: The OpenTelemetry context returned unchanged when ``oc_span_context`` has no span ID.
             It is not read on the other path: the context returned there is built on the context
-            current at the time of the call. The only caller, ``ShimTracer.start_span``, passes the
-            current context, so the two agree.
+            current at the time of the call. The only caller in this package,
+            ``ShimTracer.start_span``, passes the current context, and so does every call in
+            ``tests/test_shim.py``, so the two agree.
 
     Returns:
         An OpenTelemetry context whose current span is the non-recording span built from

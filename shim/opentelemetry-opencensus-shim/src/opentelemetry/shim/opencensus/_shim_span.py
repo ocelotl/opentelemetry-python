@@ -288,9 +288,12 @@ class ShimSpan(wrapt.ObjectProxy):
         """End the OpenTelemetry span and restore the context from before the span was started.
 
         Ending goes through the context manager of the OpenTelemetry span rather than through
-        ``finish``, so an exception leaving the block reaches the span: an SDK span records it as
-        an event and sets its own status to ``ERROR``, unless it was started with those two
-        defaults turned off. OpenCensus ``Span.__exit__`` would end the span through
+        ``finish``, so an exception leaving the block reaches the span: an SDK span that is still
+        recording records it as an event and sets its own status to ``ERROR``. An ``ERROR`` is
+        rejected on a span that already carries an ``OK`` status, so a caller that set an ``OK``
+        status inside the block keeps that status and still gets the event. A caller that called
+        ``finish`` inside the block gets neither, because the span has stopped recording by then.
+        OpenCensus ``Span.__exit__`` would end the span through
         ``Tracer.end_span``, which here would end the OpenTelemetry span a second time, so this
         method does the context teardown itself instead.
 
