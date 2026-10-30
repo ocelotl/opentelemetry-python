@@ -134,10 +134,14 @@ def _resolve_headers(
 def _resolve_timeout(
     timeout_env_var: str,
 ) -> float:
-    """Resolve how long one export of a signal may take, in seconds.
+    """Resolve the timeout given to the OTLP HTTP client of one signal, in seconds.
 
-    The timeout covers the whole export, retries included, and not a single
-    HTTP request. The per-signal environment variable is read first, then
+    The resolved value is handed to the OTLP HTTP client, where it bounds one
+    call into that client together with the retries of that call. The span and
+    log exporters make one such call per export, so for them it bounds the
+    whole export. The metric exporter makes one call per request when
+    ``max_export_batch_size`` splits a collection, and each of those calls gets
+    the value afresh. The per-signal environment variable is read first, then
     ``OTEL_EXPORTER_OTLP_TIMEOUT``, then a default of 10 seconds. A value that
     ``float`` cannot parse is logged at warning level and replaced by that same
     default, so the exporter is still constructed.
