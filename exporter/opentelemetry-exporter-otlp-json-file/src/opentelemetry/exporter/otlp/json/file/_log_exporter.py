@@ -108,10 +108,10 @@ class FileLogExporter(LogRecordExporter):
     def export(self, batch: Sequence[ReadableLogRecord]) -> LogRecordExportResult:
         """Append the batch to the destination as one line of OTLP JSON, then flush.
 
-        A failure is logged with its traceback and reported through the return value. This
-        exporter raises nothing, so the caller does not need the exception handling that
+        A failure is logged with its traceback and reported through the return value. This method
+        raises nothing, so the caller does not need the exception handling that
         ``opentelemetry.sdk._logs.export.LogRecordExporter`` warns other implementations may
-        require.
+        require. :meth:`shutdown` is not covered by that: closing the file can still raise.
 
         Args:
             batch: Log records to write.
