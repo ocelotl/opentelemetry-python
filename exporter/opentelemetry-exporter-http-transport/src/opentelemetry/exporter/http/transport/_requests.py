@@ -94,10 +94,13 @@ class RequestsHTTPResult(BaseHTTPResult):
         hands the work to ``requests``, which picks the encoding in three
         steps: the ``charset`` parameter of the ``Content-Type`` header when
         there is one, then ISO-8859-1 for a ``text/*`` type that carries no
-        ``charset`` and UTF-8 for ``application/json``, and charset detection
-        only when the header is missing or names none of those types. Bytes
-        that do not decode become replacement characters rather than an
-        exception.
+        ``charset`` and UTF-8 for ``application/json`` on ``requests`` 2.25.1
+        and later, and charset detection only when the header is missing or
+        names none of those types. On ``requests`` 2.25.0, which
+        ``pyproject.toml`` still admits because it requires only
+        ``requests ~= 2.25``, ``application/json`` without a ``charset`` takes
+        the charset detection path instead. Bytes that do not decode become
+        replacement characters rather than an exception.
 
         Returns:
             The decoded body, or ``""`` when the request failed or the

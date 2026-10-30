@@ -110,7 +110,10 @@ class BaseHTTPResult(ABC):
             server sent: usually a ``dict``, but any JSON value is possible.
 
         Raises:
-            json.JSONDecodeError: If the body is not a valid JSON document.
+            UnicodeDecodeError: If the body is not valid UTF-8, which
+                :meth:`text` raises before :func:`json.loads` is reached.
+            json.JSONDecodeError: If the body decodes but is not a valid JSON
+                document.
         """
         return json.loads(self.text())
 
@@ -123,9 +126,11 @@ class BaseHTTPTransport(ABC):
     the factory that ``_load_http_transport_factory`` returns, called with the
     keyword arguments ``verify`` and ``cert``.
 
-    Both transports shipped with this package turn redirect following off, so
-    a request to an endpoint that answers ``3xx`` gives back that status rather
-    than sending the telemetry on to the redirect target.
+    ``RequestsHTTPTransport`` turns redirect following off, so a request to an
+    endpoint that answers ``3xx`` gives back that status rather than sending
+    the telemetry on to the redirect target. ``Urllib3HTTPTransport`` asks for
+    the same, and gets it only on ``urllib3`` 2.5.0 and later; see its
+    ``request`` method for what an older ``urllib3`` does instead.
     """
 
     @abstractmethod

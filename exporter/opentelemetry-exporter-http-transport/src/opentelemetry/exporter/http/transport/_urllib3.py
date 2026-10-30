@@ -145,11 +145,15 @@ class Urllib3HTTPTransport(BaseHTTPTransport):
 
     One ``urllib3.PoolManager`` is held for direct connections, and one more
     is built per proxy URL as proxies are encountered. All of them are built
-    from the same pool settings, which fix the retry count at zero, turn
-    redirect following off, and keep up to ten connections per host for reuse.
-    Ten is a reuse budget and not a cap: concurrent requests beyond it open
-    further connections, which are closed once they are done instead of being
-    pooled.
+    from the same pool settings, which fix the retry count at zero, ask for
+    redirect following to be off, and keep up to ten connections per host for
+    reuse. Ten bounds how many connections are kept, leaving the number open
+    at any moment unbounded: concurrent requests beyond ten open further
+    connections, which are closed once they are done.
+
+    The request for no redirect following reaches the connection pool, and on
+    ``urllib3`` below 2.5.0 the pool manager above it follows redirects
+    anyway. :meth:`request` describes what that means for a caller.
 
     Args:
         verify: TLS verification setting. ``True`` verifies against the
@@ -293,12 +297,21 @@ class Urllib3HTTPTransport(BaseHTTPTransport):
     ) -> BaseHTTPResult:
         """Send an HTTP request through the right pool manager and return the result.
 
-        Redirects are not followed and no retry is attempted, so a ``3xx``
-        status reaches the caller as the status of the request. Every exception
-        raised by ``urllib3`` is caught and placed in the result, including
-        ones that are not connection errors, so this method does not raise.
-        The ``ImportError`` for a missing PySocks is raised inside the same
-        ``try``, so it too comes back as a result rather than as an exception.
+        A failed request is not retried. On ``urllib3`` 2.5.0 and later a
+        redirect is not followed either, so a ``3xx`` status reaches the caller
+        as the status of the request. On an earlier ``urllib3``, which
+        ``pyproject.toml`` still admits because it requires only
+        ``urllib3 >= 1.26``, ``PoolManager.urlopen`` runs its own redirect
+        handling and never sees the ``redirect=False`` that was put in the
+        pool settings, so it follows up to three redirects, re-sending the body
+        and the headers to each target, and the caller gets the status of the
+        final hop.
+
+        Every exception raised by ``urllib3`` is caught and placed in the
+        result, including ones that are not connection errors, so this method
+        does not raise. The ``ImportError`` for a missing PySocks is raised
+        inside the same ``try``, so it too comes back as a result rather than
+        as an exception.
 
         Args:
             method: HTTP method (e.g. ``"POST"``).

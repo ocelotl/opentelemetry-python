@@ -5,8 +5,12 @@
 
 ``urllib3`` reads no proxy configuration of its own, while ``requests`` does,
 so the ``urllib3`` transport of this package calls ``_get_environ_proxy`` for
-every request URL to reach the same decision ``requests`` would have reached.
-The ``requests`` transport does not use this module.
+every request URL to reach the decision ``requests`` reaches. The two agree on
+``requests`` 2.34 and later. On an earlier ``requests`` they differ over a
+``NO_PROXY`` entry that a hostname ends with on no ``.`` boundary: this module
+leaves ``notexample.com`` proxied under ``NO_PROXY=example.com``, while
+``requests`` sends it directly. The ``requests`` transport does not use this
+module.
 
 The decision is made in two steps. ``_should_bypass_proxies`` answers whether
 the URL is exempt, by the ``NO_PROXY`` environment variable and then by the
@@ -33,10 +37,11 @@ def _get_no_proxy() -> str | None:
     unparsed, as the comma separated list the caller splits.
 
     Returns:
-        The value of ``no_proxy``, or of ``NO_PROXY`` when ``no_proxy`` is
-        unset or empty, or ``None`` when neither holds a non-empty value. An
-        empty value is reported as ``None`` because an empty list exempts
-        nothing.
+        The value of ``no_proxy`` when that variable is set and non-empty.
+        Otherwise the value of ``NO_PROXY`` exactly as found, which is ``""``
+        when it is set but empty and ``None`` when it is unset. The caller
+        tests the result for truth rather than against ``None``, so an empty
+        string and ``None`` both mean that no host is exempt.
     """
     return os.environ.get("no_proxy") or os.environ.get("NO_PROXY")
 
