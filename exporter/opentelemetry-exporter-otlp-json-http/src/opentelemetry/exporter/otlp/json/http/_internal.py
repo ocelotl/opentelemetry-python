@@ -12,8 +12,13 @@ generic ``OTEL_EXPORTER_OTLP_*`` variable, then a built-in default.
 the environment and default steps only; the exporter applies its own
 constructor argument before it calls them. ``_resolve_headers`` and
 ``_build_transport`` take the constructor values as arguments and apply the
-whole precedence themselves, because each of the several values they resolve
-falls back independently of the others.
+whole precedence themselves. ``_build_transport`` does so because it resolves
+three file paths, each falling back through its own chain.
+``_resolve_headers`` does so because it merges the constructor headers over the
+environment ones entry by entry instead of replacing them wholesale. The choice
+between the per-signal and the generic headers variable is still made once, for
+the whole variable rather than per entry, so one entry in the per-signal
+variable suppresses every entry of the generic one.
 
 Every helper takes the names of the environment variables it reads as
 arguments, since those names are what differs between the three exporters.
