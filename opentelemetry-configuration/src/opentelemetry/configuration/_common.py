@@ -335,9 +335,11 @@ def _map_compression(
     """Map a compression string to the given Compression enum value.
 
     Each OTLP exporter package defines its own ``Compression`` enum, and the
-    member names differ between them (``Gzip`` in the HTTP exporters,
-    ``GZIP`` in ``grpc``), so the member is looked up by trying both
-    spellings rather than imported.
+    member names differ between them: ``Gzip`` in
+    ``opentelemetry.exporter.otlp.proto.http`` and in ``grpc``, and ``GZIP``
+    in ``opentelemetry.exporter.otlp.common.http``, which is the enum the
+    JSON encoding of the OTLP HTTP exporters uses. The member is therefore
+    looked up by trying both spellings rather than imported.
 
     Args:
         value: The ``compression`` field of an exporter configuration block.
