@@ -16,7 +16,10 @@ manager rather than called directly.
 The implementation backing :func:`get_current` is chosen once at import time.
 It is ``ContextVarsRuntimeContext``
 unless the ``OTEL_PYTHON_CONTEXT`` environment variable names a different
-``opentelemetry_context`` entry point.
+``opentelemetry_context`` entry point. A named entry point that cannot be
+found or cannot be constructed is logged and falls back to
+``ContextVarsRuntimeContext`` as well, so setting the variable is not by itself
+proof that the named implementation is in use.
 """
 
 from __future__ import annotations
