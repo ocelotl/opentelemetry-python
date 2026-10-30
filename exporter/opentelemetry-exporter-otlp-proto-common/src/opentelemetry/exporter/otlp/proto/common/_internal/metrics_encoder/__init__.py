@@ -83,8 +83,10 @@ class OTLPMetricExporterMixin:
     ``base2_exponential_bucket_histogram`` spelled in anything but lower case, or
     written with surrounding whitespace, selects an exponential histogram under
     the HTTP exporter and falls back to explicit buckets under the gRPC one.
-    Every other value lands on explicit buckets either way, and only the gRPC
-    exporter logs a warning for it.
+    Every other value lands on explicit buckets either way. A value that
+    neither of them recognises is logged at ``WARNING`` by both. A spelling of
+    ``explicit_bucket_histogram`` that is not exactly lower case and unpadded is
+    logged at ``WARNING`` by the gRPC exporter only.
 
     The mixin defines no state of its own and takes no constructor arguments.
     """
