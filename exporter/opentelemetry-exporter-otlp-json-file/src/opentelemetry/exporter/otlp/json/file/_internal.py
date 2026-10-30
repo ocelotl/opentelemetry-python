@@ -5,7 +5,9 @@
 
 Nothing in this module is public API. The span, metric and log exporters of this package each own
 a ``_FileExporter``, which holds the destination stream, serialises one encoded batch per line and
-turns every failure into a logged message and a ``False`` return value.
+turns every failure on the export path into a logged message and a ``False`` return value. Building
+a ``_FileExporter`` can still raise, which is the one place in this module where a caller sees an
+exception.
 """
 
 import json
