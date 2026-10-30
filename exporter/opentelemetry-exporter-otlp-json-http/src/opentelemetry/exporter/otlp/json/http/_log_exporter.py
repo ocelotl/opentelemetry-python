@@ -65,9 +65,11 @@ class OTLPLogExporter(LogRecordExporter):
 
     Each call to :meth:`export` encodes the batch it is handed as one JSON
     document and posts it to a single endpoint. A transient failure is retried
-    with exponential backoff, over at most six attempts and for no longer than
-    the timeout. A permanent failure is logged and reported to the caller, which
-    drops the batch.
+    over at most six attempts and for no longer than the timeout. The wait
+    between attempts doubles each time, unless the response carries a
+    ``Retry-After`` header, in which case that value is waited instead. A
+    permanent failure is logged and reported to the caller, which drops the
+    batch.
 
     Every argument may be left as ``None``. Each one is then taken from the
     per-signal ``OTEL_EXPORTER_OTLP_LOGS_*`` environment variable, then from
