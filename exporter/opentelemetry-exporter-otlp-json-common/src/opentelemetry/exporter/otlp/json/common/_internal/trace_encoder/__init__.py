@@ -136,22 +136,28 @@ def _encode_resource_spans(
 
 
 def _span_flags(parent_span_context: SpanContext | None) -> int:
-    """Build the OTLP ``flags`` field recording whether a parent was remote.
+    """Build the OTLP ``flags`` field recording whether a span context was remote.
 
     ``SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK`` is always set, which tells a
     receiver that the ``is_remote`` bit beside it carries a real answer rather
     than meaning "unknown". ``SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK`` is set on top
-    of it only for a parent that came from a remote caller. The eight low bits
+    of it only for a context that came from a remote caller. The eight low bits
     that OTLP reserves for the W3C trace flags are left at zero.
 
+    Both the ``flags`` of a span and the ``flags`` of a link are built here, so
+    which span the answer is about depends on the caller. On a span it is the
+    parent of that span, and on a link it is the span the link points at.
+
     Args:
-        parent_span_context: the span context of the parent, or ``None`` for a
-            root span or an unparented link.
+        parent_span_context: the span context being asked about, which is the
+            parent context of a span or the context a link points at. ``None``
+            stands for a root span, and only a span reaches that case, since a
+            link always carries a context.
 
     Returns:
         The two mask bits combined. A ``parent_span_context`` of ``None`` and
         one with ``is_remote`` false give the same value, since both state that
-        the parent is known not to be remote.
+        the context is known not to be remote.
     """
     flags = JSONSpanFlags.SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK
     if parent_span_context and parent_span_context.is_remote:
