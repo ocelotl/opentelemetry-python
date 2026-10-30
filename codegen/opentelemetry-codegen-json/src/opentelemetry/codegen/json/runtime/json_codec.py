@@ -296,8 +296,8 @@ def decode_int64(value: int | str | None, field_name: str) -> int:
         The decoded integer, or 0 if input is None.
 
     Raises:
-        TypeError: If ``value`` is neither an ``int`` nor a ``str``. A ``bool`` passes this check,
-            for the reason given on ``validate_type``.
+        TypeError: If ``value`` is none of ``None``, ``int`` or ``str``. A ``bool`` passes this
+            check, for the reason given on ``validate_type``.
         ValueError: If ``value`` is a string that does not spell an integer.
     """
     if value is None:
