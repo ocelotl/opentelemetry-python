@@ -61,6 +61,13 @@ class ContextVarsRuntimeContext(_RuntimeContext):
 
         Args:
             token: A reference to a previous Context.
+
+        Raises:
+            ValueError: When ``token`` came from a different
+                :class:`ContextVarsRuntimeContext` instance, since each one
+                owns its own :class:`~contextvars.ContextVar`.
+            RuntimeError: When ``token`` has already been passed to this
+                method once.
         """
         self._current_context.reset(token)
 
