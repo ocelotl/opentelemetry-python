@@ -3,6 +3,22 @@
 
 # pylint: disable=no-member
 
+"""The ``protoc`` plugin entry point for the OTLP/JSON generator.
+
+``protoc`` invokes a plugin as a separate process. It writes a serialized
+``CodeGeneratorRequest`` to the standard input of that process and reads a serialized
+``CodeGeneratorResponse`` back from its standard output, so a plugin must keep both streams free
+of anything else. Diagnostics therefore go to standard error, which is what the logging setup
+under ``if __name__ == "__main__"`` configures.
+
+``protoc`` finds this module through the ``protoc-gen-otlp_json`` console script, which the
+``opentelemetry-codegen-json`` distribution declares. The name after ``protoc-gen-`` is the plugin
+name, so ``--otlp_json_out=<directory>`` on a ``protoc`` command line is what runs ``main``.
+
+The actual generation lives in ``opentelemetry.codegen.json.generator``. This module only handles
+the process protocol around it.
+"""
+
 import logging
 import sys
 from collections.abc import Iterator
@@ -18,7 +34,22 @@ _logger = logging.getLogger(__name__)
 @contextmanager
 def code_generation() -> Iterator[tuple[plugin.CodeGeneratorRequest, plugin.CodeGeneratorResponse],]:
     """
-    Context manager for handling the code generation process.
+    Read the ``protoc`` request from standard input and write the response to standard output.
+
+    On entry this reads every byte of standard input, parses it as a ``CodeGeneratorRequest``, and
+    yields that request together with an empty ``CodeGeneratorResponse`` for the body of the
+    ``with`` statement to fill in. On exit it serializes the response and writes it to standard
+    output.
+
+    Two cases never reach the body. A first command line argument of ``-V`` or ``--version``
+    prints the version and calls ``sys.exit``, which is how ``protoc`` probes a plugin. An
+    exception raised inside the body propagates, and because the serialization is placed after the
+    ``yield`` rather than in a ``finally`` block, no response is written at all, so ``protoc``
+    reports the failure instead of accepting a partial result.
+
+    Returns:
+        A context manager yielding the parsed ``CodeGeneratorRequest`` and the empty
+        ``CodeGeneratorResponse`` that the caller is expected to populate.
     """
     if len(sys.argv) > 1 and sys.argv[1] in ("-V", "--version"):
         print("opentelemetry-codegen-json 0.0.0")
@@ -39,7 +70,16 @@ def code_generation() -> Iterator[tuple[plugin.CodeGeneratorRequest, plugin.Code
 
 def main() -> None:
     """
-    Main entry point for the protoc plugin.
+    Run one ``protoc`` plugin invocation.
+
+    This is the callable behind the ``protoc-gen-otlp_json`` console script. It passes the request
+    read from standard input to
+    ``opentelemetry.codegen.json.generator.generate_plugin_response``, then copies the feature
+    flags and every generated file from that result onto the response that ``code_generation``
+    writes out.
+
+    The copy is needed because ``code_generation`` owns the response object that gets serialized,
+    and a protobuf message field cannot be rebound to another message, only merged into.
     """
     with code_generation() as (request, response):
         generated_response = generate_plugin_response(request)
