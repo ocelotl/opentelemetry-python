@@ -163,10 +163,12 @@ class NoOpMeterProvider(MeterProvider):
 class _ProxyMeterProvider(MeterProvider):
     """The meter provider in use before a real one is set.
 
-    Every meter it hands out is a `_ProxyMeter`. When a real meter provider is
-    finally set, `on_set_meter_provider` gives each of those meters a real
-    backing meter, so instruments created before the SDK was installed start
-    recording from that moment on.
+    Every meter this meter provider hands out before a real meter provider is
+    set is a `_ProxyMeter`. When a real meter provider is finally set,
+    `on_set_meter_provider` gives each of those proxy meters a real backing
+    meter, so instruments created before the SDK was installed start recording
+    from that moment on. Every meter handed out after that call comes from the
+    real meter provider directly.
     """
 
     def __init__(self) -> None:
@@ -676,9 +678,11 @@ class Meter(ABC):
 class _ProxyMeter(Meter):
     """The meter a `_ProxyMeterProvider` hands out before a real one is set.
 
-    Every instrument it creates is a proxy instrument that records nothing.
-    When `on_set_meter_provider` is called, this meter acquires a real backing
-    meter and each of those instruments acquires a real backing instrument.
+    Every instrument this meter creates before a real meter is set is a proxy
+    instrument that records nothing. When `on_set_meter_provider` is called,
+    this meter acquires a real backing meter and each of those proxy
+    instruments acquires a real backing instrument. Every instrument this meter
+    creates after that call comes from the real meter directly.
     """
 
     def __init__(
