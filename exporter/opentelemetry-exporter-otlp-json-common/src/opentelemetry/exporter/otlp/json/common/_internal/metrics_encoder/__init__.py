@@ -544,8 +544,10 @@ def _encode_exponential_histogram_data_point(
         scale, the count of values that fell in the zero bucket and the flags,
         plus the minimum and the maximum, which are ``None`` when the
         aggregation was configured not to record them. The positive and the
-        negative bucket sets are each left unset when they hold no counts, so
-        a histogram of only positive values encodes no negative buckets.
+        negative bucket sets are each left unset only when the list of bucket
+        counts is empty, which a data point the SDK produced never has: a fresh
+        set of buckets already holds the single count zero, so a histogram of
+        only positive values still encodes a negative bucket set.
 
     Raises:
         ValueError: if an exemplar on the data point carries a value that is
