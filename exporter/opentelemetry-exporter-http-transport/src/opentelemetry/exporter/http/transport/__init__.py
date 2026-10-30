@@ -51,7 +51,31 @@ if TYPE_CHECKING:
             verify: bool | str,
             cert: str | tuple[str, str] | None,
             **kwargs: Any,
-        ) -> BaseHTTPTransport: ...
+        ) -> BaseHTTPTransport:
+            """Build a transport that carries the given TLS settings.
+
+            Both arguments are keyword only, so a factory is free to name its
+            remaining parameters as it likes.
+
+            Args:
+                verify: TLS verification setting. ``True`` verifies against
+                    the default certificate bundle of the factory, ``False``
+                    disables verification, and a string is the path of a CA
+                    bundle to verify against.
+                cert: Client certificate for mutual TLS. A string is the path
+                    of a file holding both the certificate and its unencrypted
+                    private key, a pair of strings is the certificate path and
+                    the key path, and ``None`` sends no client certificate.
+                **kwargs: Options that only some transports understand. A
+                    factory accepts them and ignores the ones it has no use
+                    for, so an exporter can pass one set of options whichever
+                    transport is selected.
+
+            Returns:
+                A transport ready to send requests. An exporter holds on to it
+                and calls :meth:`BaseHTTPTransport.close` when it shuts down.
+            """
+            ...  # pylint: disable=unnecessary-ellipsis
 
 
 _KNOWN_TRANSPORTS: dict[str, BaseHTTPTransportFactory] = {
