@@ -119,6 +119,7 @@ class ExporterMetricsT(Protocol):
             A context manager yielding the ``ExportResult`` the exporter fills
             in.
         """
+        ...  # pylint: disable=unnecessary-ellipsis
 
 
 class NoOpExporterMetrics:
