@@ -1,6 +1,15 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+"""OTLP Metric Exporter
+
+This module holds the metric exporter that sends metrics to an
+OTLP-compatible receiver over gRPC. It adds two things to the behaviour the
+other signals share: the temporality and aggregation preferences the SDK asks
+the exporter for, and an optional split of one collection into several
+requests so that no request exceeds the message size the receiver accepts.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -83,11 +92,61 @@ class OTLPMetricExporter(
 ):
     """OTLP metric exporter
 
+    Sends collected metrics to an OTLP receiver over gRPC. Each argument that
+    is left as ``None`` is read from the metrics-specific environment variable
+    first and from the generic OTLP variable second, so a deployment can
+    configure metrics apart from the other signals.
+
     Args:
-        endpoint: Target URL to which the exporter is going to send metrics
+        endpoint: Target URL to which the exporter is going to send metrics.
+            Falls back to :envvar:`OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`, then
+            to :envvar:`OTEL_EXPORTER_OTLP_ENDPOINT`, then to
+            ``http://localhost:4317``.
+        insecure: Connection type. ``True`` sends plain HTTP/2 with no TLS.
+            ``None`` means the value is taken from
+            :envvar:`OTEL_EXPORTER_OTLP_METRICS_INSECURE`, then from
+            :envvar:`OTEL_EXPORTER_OTLP_INSECURE`, and finally from the scheme
+            of the endpoint.
+        credentials: Credentials object for server authentication. ``None``
+            means credentials are built from
+            :envvar:`OTEL_EXPORTER_OTLP_METRICS_CERTIFICATE` and its client
+            key and client certificate companions when that variable is set,
+            and resolved from the generic OTLP variables otherwise.
+        headers: Headers to send when exporting, as a mapping, as a sequence
+            of pairs, or as the comma-separated string form used by
+            :envvar:`OTEL_EXPORTER_OTLP_METRICS_HEADERS`. ``None`` means that
+            variable is read, then :envvar:`OTEL_EXPORTER_OTLP_HEADERS`.
+        timeout: Backend request timeout in seconds, covering the whole export
+            including retries. ``None`` means the value is taken from
+            :envvar:`OTEL_EXPORTER_OTLP_METRICS_TIMEOUT`, then from
+            :envvar:`OTEL_EXPORTER_OTLP_TIMEOUT`, defaulting to 10 seconds.
+            When the collection is split, the timeout applies to each request
+            separately.
+        compression: gRPC compression method to use. ``None`` means the value
+            is taken from :envvar:`OTEL_EXPORTER_OTLP_METRICS_COMPRESSION`,
+            then from :envvar:`OTEL_EXPORTER_OTLP_COMPRESSION`, and no
+            compression is used when neither is set.
+        preferred_temporality: Aggregation temporality the SDK should use, per
+            instrument class. Entries given here are applied over the full set
+            of per-instrument defaults that
+            :envvar:`OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE`
+            selects, so an instrument class left out keeps the default from
+            that variable.
+        preferred_aggregation: Aggregation the SDK should use, per instrument
+            class. Entries given here are applied over the histogram default
+            that
+            :envvar:`OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION`
+            selects.
         max_export_batch_size: Maximum number of data points to export in a single request. This is to deal with
             gRPC's 4MB message size limit. If not set there is no limit to the number of data points in a request.
             If it is set and the number of data points exceeds the max, the request will be split.
+        channel_options: gRPC channel options, as a sequence of name and value
+            pairs, merged over this package's own options.
+        retryable_error_codes: gRPC status codes that cause an export to be
+            retried, overriding the default set.
+        meter_provider: Meter provider used to record the exporter's own
+            self-observability metrics. ``None`` means the globally configured
+            meter provider is used.
     """
 
     def __init__(
@@ -106,6 +165,10 @@ class OTLPMetricExporter(
         *,
         meter_provider: MeterProvider | None = None,
     ):
+        """Resolve the metrics-specific configuration and open the gRPC channel.
+
+        The parameters are documented on the class.
+        """
         insecure_metrics = environ.get(OTEL_EXPORTER_OTLP_METRICS_INSECURE)
         if insecure is None and insecure_metrics is not None:
             insecure = insecure_metrics.lower() == "true"
@@ -149,9 +212,28 @@ class OTLPMetricExporter(
     def _translate_data(  # type: ignore [reportIncompatibleMethodOverride]
         self, data: MetricsData
     ) -> ExportMetricsServiceRequest:
+        """Encode collected metrics as an OTLP metrics export request.
+
+        Args:
+            data: Metrics collected by the SDK, already grouped by resource
+                and instrumentation scope.
+
+        Returns:
+            The export request to send over the gRPC channel.
+        """
         return encode_metrics(data)
 
     def _count_data(self, data: MetricsData):
+        """Count the data points in a collection, for the exporter's own metrics.
+
+        Args:
+            data: Metrics collected by the SDK.
+
+        Returns:
+            The total number of data points across every metric of every
+            instrumentation scope of every resource, which is not the number
+            of metrics.
+        """
         num_items = 0
 
         for resource_metrics in data.resource_metrics:
@@ -167,6 +249,24 @@ class OTLPMetricExporter(
         timeout_millis: float = 10_000,
         **kwargs,
     ) -> MetricExportResult:
+        """Send a collection of metrics to the receiver.
+
+        Called by the metric reader the exporter is installed in. When
+        ``max_export_batch_size`` was given to the constructor, the collection
+        is split into several requests, each sent separately, and one failed
+        request does not stop the remaining ones from being sent.
+
+        Args:
+            metrics_data: Metrics collected by the SDK.
+            timeout_millis: Timeout in milliseconds. It is accepted for
+                interface compatibility and is not used: the deadline comes
+                from the ``timeout`` given to the constructor.
+            kwargs: Accepted and ignored.
+
+        Returns:
+            ``MetricExportResult.SUCCESS`` when every request was accepted,
+            and ``MetricExportResult.FAILURE`` when any of them was not.
+        """
         # TODO(#2663): OTLPExporterMixin should pass timeout to gRPC
         if self._max_export_batch_size is None:
             return self._export(data=metrics_data)
@@ -184,6 +284,21 @@ class OTLPMetricExporter(
         self,
         metrics_data: MetricsData,
     ) -> Iterable[MetricsData]:
+        """Split a collection into chunks of at most ``max_export_batch_size`` data points.
+
+        The resource and scope grouping is rebuilt in every chunk, so a metric
+        whose data points fall on both sides of a chunk boundary appears in
+        both chunks, each time carrying only the data points of that chunk. A
+        resource, scope or metric left with no data points is dropped rather
+        than emitted empty.
+
+        Args:
+            metrics_data: Metrics collected by the SDK.
+
+        Yields:
+            One collection per chunk, in the order the data points were
+            visited. Nothing is yielded when the input holds no data points.
+        """
         assert self._max_export_batch_size is not None
         batch_size: int = 0
         split_resource_metrics: list[ResourceMetrics] = []
@@ -263,15 +378,45 @@ class OTLPMetricExporter(
             yield MetricsData(resource_metrics=split_resource_metrics)
 
     def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
+        """Shut down the exporter and close its gRPC channel.
+
+        Args:
+            timeout_millis: Timeout in milliseconds, accepted for interface
+                compatibility and not used.
+            kwargs: Accepted and ignored.
+        """
         OTLPExporterMixin.shutdown(self, timeout_millis=timeout_millis)
 
     def set_meter_provider(self, meter_provider: MeterProvider):
+        """Rebuild the exporter's own self-observability metrics against another meter provider.
+
+        The SDK calls this when the exporter is installed under a meter
+        provider that was not known when the exporter was constructed. This
+        does not change where the exported metrics go.
+
+        Args:
+            meter_provider: Meter provider to record the exporter's own
+                metrics with.
+        """
         return self._set_meter_provider(meter_provider)
 
     @property
     def _exporting(self) -> str:
+        """Name of the signal, used in the retry and failure log messages.
+
+        Returns:
+            The string ``metrics``.
+        """
         return "metrics"
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:
-        """Nothing is buffered in this exporter, so this method does nothing."""
+        """Nothing is buffered in this exporter, so this method does nothing.
+
+        Args:
+            timeout_millis: Timeout in milliseconds, accepted for interface
+                compatibility and not used.
+
+        Returns:
+            ``True``, always, since there is never anything left to flush.
+        """
         return True
