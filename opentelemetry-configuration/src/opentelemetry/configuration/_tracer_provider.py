@@ -249,9 +249,13 @@ def _create_otlp_grpc_span_exporter(
             Its ``timeout``, in milliseconds, is converted to the seconds
             the exporter expects. Its ``tls`` block is not read at all, so a
             configuration that sets ``ca_file``, ``cert_file``, ``key_file``
-            or ``insecure`` gets no effect from them and the exporter uses
-            whatever it derives from the endpoint scheme and from
-            ``OTEL_EXPORTER_OTLP_CERTIFICATE``.
+            or ``insecure`` gets no effect from them. The exporter
+            decides for itself: ``OTEL_EXPORTER_OTLP_TRACES_INSECURE``, then
+            ``OTEL_EXPORTER_OTLP_INSECURE``, then the endpoint scheme for
+            the channel, and the
+            ``OTEL_EXPORTER_OTLP_[TRACES_]CERTIFICATE``, ``..._CLIENT_KEY``
+            and ``..._CLIENT_CERTIFICATE`` family for the three file
+            fields.
 
     Returns:
         An ``OTLPSpanExporter`` from the gRPC distribution.
