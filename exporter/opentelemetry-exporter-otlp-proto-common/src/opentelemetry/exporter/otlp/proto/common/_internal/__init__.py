@@ -152,6 +152,9 @@ def _encode_key_value(key: str, value: Any) -> PB2KeyValue:
     Raises:
         Exception: If ``_encode_value`` has no protobuf field for the type of
             ``value``.
+        TypeError: If ``key`` is not a string. The protobuf ``key`` field accepts
+            no other type, and this function does not convert the key, unlike the
+            recursion inside ``_encode_value``.
     """
     return PB2KeyValue(key=key, value=_encode_value(value))
 
@@ -189,10 +192,11 @@ def _encode_trace_id(trace_id: int) -> bytes:
 def _encode_attributes(attributes: Attributes) -> list[PB2KeyValue]:
     """Encode an attribute mapping as a list of protobuf ``KeyValue`` messages.
 
-    An attribute whose value ``_encode_value`` cannot encode is dropped rather
-    than failing the export: the exception is logged at ``ERROR`` with its
-    traceback and the key that caused it, and the remaining attributes are still
-    encoded. An attribute dropped here is counted nowhere. The count of
+    An attribute that ``_encode_key_value`` cannot encode is dropped rather than
+    failing the export: the exception is logged at ``ERROR`` with its traceback
+    and the key that caused it, and the remaining attributes are still encoded.
+    That covers both causes, a value of a type the protocol has no field for and
+    a key that is not a string. An attribute dropped here is counted nowhere. The count of
     attributes the SDK itself dropped is a separate number, which only the span,
     span event, span link and log record encoders copy into the
     ``dropped_attributes_count`` field of the message they build;
