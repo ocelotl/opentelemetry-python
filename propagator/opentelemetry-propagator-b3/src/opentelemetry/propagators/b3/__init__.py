@@ -210,7 +210,9 @@ class B3MultiFormat(TextMapPropagator):
             carrier: the object the headers are written to. It is never
                 subscripted here, only passed to ``setter``.
             context: the context to take the current span from. ``None`` means
-                the context currently active on this thread.
+                whichever context is currently attached. That context is held
+                in a ``ContextVar``, so each thread has its own and, under
+                asyncio, so does each task.
             setter: writes one header into ``carrier`` under a given name.
         """
         span = trace.get_current_span(context=context)
@@ -292,7 +294,9 @@ class B3SingleFormat(B3MultiFormat):
             carrier: the object the header is written to. It is never
                 subscripted here, only passed to ``setter``.
             context: the context to take the current span from. ``None`` means
-                the context currently active on this thread.
+                whichever context is currently attached. That context is held
+                in a ``ContextVar``, so each thread has its own and, under
+                asyncio, so does each task.
             setter: writes the header into ``carrier`` under the name ``b3``.
         """
         span = trace.get_current_span(context=context)
