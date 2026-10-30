@@ -9,8 +9,9 @@ restricted wildcard syntax the configuration schema uses, which is not
 component name from the configuration file into the class an entry
 point group registers under that name, and ``_resolve_component`` goes
 one step further and returns a constructed component, built-in or
-plugin. Only ``load_entry_point`` is called from anywhere in the
-package. ``_additional_properties`` is the decorator the code generator
+plugin. Of those two, only ``load_entry_point`` is called from anywhere
+in the package; the glob matchers, ``_additional_properties`` and the
+value translators all have callers. ``_additional_properties`` is the decorator the code generator
 puts on a model that accepts a plugin component name; it rewrites the
 generated ``__init__`` so an undeclared key is captured rather than
 rejected. The value translators turn one configuration field into the
@@ -346,18 +347,21 @@ def _map_compression(
             ``None`` means the field was absent.
         compression_enum: The ``Compression`` enum of the exporter package
             that will receive the result.
-        allow_deflate: Whether ``"deflate"`` is an accepted value. The OTLP
-            HTTP exporters support it; the gRPC exporter does not, so its
-            callers leave this ``False`` and a configuration file asking for
-            deflate over gRPC fails rather than silently sending gzip.
+        allow_deflate: Whether ``"deflate"`` is an accepted value. The HTTP
+            exporter factories pass ``True`` and the gRPC ones leave it
+            ``False``, so a configuration file asking for deflate over gRPC
+            fails rather than silently sending gzip. That is this package's
+            choice rather than a limit of the exporter: ``grpc.Compression``
+            carries a ``Deflate`` member, which the ``supports_deflate``
+            test below finds.
 
     Returns:
         The enum member for ``value``, or ``None`` when ``value`` is ``None``
         or ``"none"``. The two cases are indistinguishable to the exporter,
         which reads ``None`` as "consult the environment", so an explicit
-        ``compression: none`` disables compression only when
-        ``OTEL_EXPORTER_OTLP_COMPRESSION`` and its signal-specific variant
-        are both unset.
+        ``compression: none`` disables compression unless
+        ``OTEL_EXPORTER_OTLP_COMPRESSION`` or its signal-specific variant
+        names one.
 
     Raises:
         ConfigurationError: If ``value`` is anything else, including
