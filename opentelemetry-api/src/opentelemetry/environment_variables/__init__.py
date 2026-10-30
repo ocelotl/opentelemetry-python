@@ -1,10 +1,40 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+"""Names of the environment variables the API reads.
+
+Each name in this module is the name of an ``OTEL_*`` environment variable,
+bound to a constant so that code refers to the variable by symbol rather than
+by a repeated string literal. Variables read only by the SDK live in
+:mod:`opentelemetry.sdk.environment_variables` instead.
+"""
+
 OTEL_LOGS_EXPORTER = "OTEL_LOGS_EXPORTER"
 """
 .. envvar:: OTEL_LOGS_EXPORTER
 
+Specifies which exporter is used for logs. See `General SDK Configuration
+<https://opentelemetry.io/docs/concepts/sdk-configuration/general-sdk-configuration/#otel_logs_exporter>`_.
+
+**Default value:** ``"otlp"``
+
+**Example:**
+
+``export OTEL_LOGS_EXPORTER="console"``
+
+Accepted values for ``OTEL_LOGS_EXPORTER`` are:
+
+- ``"otlp"``
+- ``"console"``
+- ``"none"``: No automatically configured exporter for logs.
+
+.. note::
+
+    Exporter packages may add entry points for group ``opentelemetry_logs_exporter`` which
+    can then be used with this environment variable by name. The entry point should point to
+    a `opentelemetry.sdk._logs.export.LogRecordExporter` subclass; it must be constructable
+    without any required arguments. This mechanism is considered experimental and may change
+    in the future.
 """
 
 OTEL_METRICS_EXPORTER = "OTEL_METRICS_EXPORTER"
