@@ -50,10 +50,14 @@ def install_shim(
     Args:
         tracer_provider: The :class:`opentelemetry.trace.TracerProvider` to obtain the tracer from.
             When ``None``, the tracer comes from the global tracer provider. If no global provider
-            has been set at the moment of this call, the tracer is a proxy that looks the global
-            provider up on every span start and keeps the first real one it finds, so a provider
-            set after the shim is installed is still honoured. A span started before that provider
-            is set is non-recording, and it does not stop later spans from being recorded.
+            has been set at the moment of this call, and ``OTEL_PYTHON_TRACER_PROVIDER`` is absent
+            from the environment, the tracer is a proxy that looks the global provider up on every
+            span start and keeps the first real one it finds, so a provider set after the shim is
+            installed is still honoured. A span started before that provider is set is
+            non-recording, and it does not stop later spans from being recorded. When
+            ``OTEL_PYTHON_TRACER_PROVIDER`` is set, this call loads the provider it names and
+            makes it the global one, so the tracer is a real tracer from the start and a later
+            ``opentelemetry.trace.set_tracer_provider`` is refused with a warning.
     """
     otel_tracer = trace.get_tracer(
         "opentelemetry-opencensus-shim",
@@ -126,8 +130,12 @@ def install_shim(
 def uninstall_shim() -> None:
     """Remove the ``tracer`` property from the OpenCensus ``Tracer`` class.
 
-    An OpenCensus ``Tracer`` created after this call records through OpenCensus again, because its
-    constructor can store a real OpenCensus tracer on the instance once more.
+    An OpenCensus ``Tracer`` created after this call has its OpenCensus sampling decision honoured
+    again, because its constructor can store a real OpenCensus tracer on the instance once more.
+    The sampler a ``Tracer`` built with no sampler uses is
+    ``opencensus.trace.samplers.ProbabilitySampler`` at a rate of 0.0001, so what the constructor
+    usually stores is an ``opencensus.trace.tracers.noop_tracer.NoopTracer``, which records
+    nothing.
 
     An OpenCensus ``Tracer`` created while the shim was installed is left with no ``tracer``
     attribute at all: the property setter dropped the value its constructor assigned, and there is
