@@ -158,10 +158,13 @@ def _make_handler(
             """Decode one export request and answer with the success response.
 
             The path decides which signal the body holds. A path matching none
-            of the three is answered with ``404`` and nothing is queued. Every
-            recognised path is answered with ``200`` and the empty success
-            response of that OTLP service, so partial success is never
-            reported and an exporter's retry path is not exercised.
+            of the three is answered with ``404`` and nothing is queued. A
+            recognised path whose body the protobuf parser accepts is answered
+            with ``200`` and the empty success response of that OTLP service,
+            so partial success is never reported. A body the parser rejects
+            raises out of this method instead, and the connection is closed
+            with no status line, so the exporter sees a transport failure and
+            takes the retry path.
             """
             content_length = int(self.headers.get("Content-Length", 0))
             body = self._decompress(self.rfile.read(content_length))
@@ -430,9 +433,10 @@ class OtlpProtoTestServer:
 
         Returns:
             The full ``http://`` URL of the traces path, including the base
-            path. Meaningful only after ``start``, since the port is part of
-            it. The scheme is plain HTTP, so an exporter has to be configured
-            not to use TLS.
+            path. Under the default ``port`` of ``0`` it is meaningful only
+            after ``start``, since the port is part of it; an explicit port is
+            already in the URL before that. The scheme is plain HTTP, so an
+            exporter has to be configured not to use TLS.
         """
         return f"http://{self._host}:{self._port}{self._base_path}/v1/traces"
 
@@ -442,7 +446,7 @@ class OtlpProtoTestServer:
 
         Returns:
             The full ``http://`` URL of the metrics path, including the base
-            path. Meaningful only after ``start``.
+            path, meaningful under the same condition as ``traces_endpoint``.
         """
         return f"http://{self._host}:{self._port}{self._base_path}/v1/metrics"
 
@@ -451,8 +455,8 @@ class OtlpProtoTestServer:
         """Return the URL to configure a log exporter with.
 
         Returns:
-            The full ``http://`` URL of the logs path, including the base path.
-            Meaningful only after ``start``.
+            The full ``http://`` URL of the logs path, including the base path,
+            meaningful under the same condition as ``traces_endpoint``.
         """
         return f"http://{self._host}:{self._port}{self._base_path}/v1/logs"
 
