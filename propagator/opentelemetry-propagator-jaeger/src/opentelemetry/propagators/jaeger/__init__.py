@@ -195,7 +195,7 @@ class JaegerPropagator(TextMapPropagator):
 
     @property
     def fields(self) -> set[str]:
-        """The carrier keys ``inject`` sets, which a reused carrier should be cleared of first.
+        """The one carrier key ``inject`` sets that can be named before it runs.
 
         Only ``TRACE_ID_KEY`` is reported. The baggage headers that ``inject``
         writes are named after the baggage keys of the context it is given, and
