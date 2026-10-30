@@ -108,16 +108,19 @@ class ZipkinExporter(SpanExporter):
             address. ``None`` omits the IPv4 address from the local endpoint. A
             value that does not parse as an IPv4 address raises ``ValueError``.
         local_node_ipv6: Primary IPv6 address associated with this connection,
-            given either as a string or as the integer form of the address.
-            ``None`` omits the IPv6 address from the local endpoint. A value that
-            does not parse as an IPv6 address raises ``ValueError``.
+            given as a string. ``None`` omits the IPv6 address from the local
+            endpoint. A value that does not parse as an IPv6 address raises
+            ``ValueError``, which includes any integer below 2 ** 32, since
+            ``ipaddress.ip_address`` reads those as IPv4 addresses.
         local_node_port: Depending on context, this could be a listen port or the
             client-side of a socket. ``None`` omits the port from the local
             endpoint.
-        max_tag_value_length: Maximum length a string tag value may reach before
-            it is truncated. ``None`` disables truncation, which is the default
-            for this exporter and differs from the encoder default of 128
-            characters.
+        max_tag_value_length: Maximum length a string value may reach before it
+            is truncated. The limit covers both tag values and the string
+            attribute values of span events, which are written into the
+            annotations of the encoded span. ``None`` disables truncation, which
+            is the default for this exporter and differs from the encoder
+            default of 128 characters.
         timeout: Maximum number of seconds to wait for each batch export. When
             ``None`` or zero, the value of the
             :envvar:`OTEL_EXPORTER_ZIPKIN_TIMEOUT` environment variable is used,
