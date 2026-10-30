@@ -304,15 +304,21 @@ class SpanShim(Span):
 
         Deprecated by the OpenTracing API in favour of :meth:`log_kv`, and
         kept here only so that already instrumented code keeps working. The
-        OpenTracing base class implementation collects the ``event``,
-        ``payload`` and ``timestamp`` keyword arguments into a dictionary and
-        calls :meth:`log_kv` with it, so an event reaches the OpenTelemetry
-        span through the same path as a direct call to :meth:`log_kv`. Any
-        other keyword argument is discarded without warning.
+        OpenTracing base class implementation puts the ``event`` and
+        ``payload`` keyword arguments into a dictionary, and passes that
+        dictionary and the ``timestamp`` keyword argument as the two arguments
+        of :meth:`log_kv`, so an event reaches the OpenTelemetry span through
+        the same path as a direct call to :meth:`log_kv`. Any other keyword
+        argument is discarded without warning.
+
+        Unlike :meth:`opentracing.Span.log`, this override discards what
+        :meth:`log_kv` returns and returns `None`, so a call to it cannot be
+        chained the way a call to :meth:`log_kv` can.
 
         Args:
             kwargs: The keyword arguments accepted by
-                :meth:`opentracing.Span.log`.
+                :meth:`opentracing.Span.log`, which are ``event``,
+                ``payload`` and ``timestamp``.
         """
         super().log(**kwargs)
 
@@ -326,15 +332,20 @@ class SpanShim(Span):
         arguments and calls :meth:`log_kv` with it, which records an
         OpenTelemetry event named after *event*.
 
+        Unlike :meth:`opentracing.Span.log_event`, this override discards what
+        :meth:`log_kv` returns and returns `None`, so a call to it cannot be
+        chained the way a call to :meth:`log_kv` can.
+
         Args:
             event: The name of the event, stored under the ``event`` key of
                 the dictionary passed to :meth:`log_kv`.
             payload: An arbitrary value stored under the ``payload`` key of
                 the same dictionary. When it is `None` the key is left out
-                altogether. The OpenTelemetry API only accepts the attribute
-                value types listed in ``opentelemetry.util.types.Attributes``,
-                so a payload of any other type is dropped by the OpenTelemetry
-                span rather than by this method.
+                altogether. A value whose type is not one of those listed in
+                ``opentelemetry.util.types.AnyValue`` is replaced by the
+                OpenTelemetry span, with its ``str()`` when the type defines
+                ``__str__`` or ``__repr__`` and with ``None`` otherwise. The
+                ``payload`` key itself is kept either way.
         """
         super().log_event(event, payload=payload)
 
@@ -410,13 +421,24 @@ class ScopeShim(Scope):
     """
 
     def __init__(self, manager: ScopeManagerShim, span: SpanShim, span_cm=None):
-        """Initializes a :class:`ScopeShim` and makes its span the active one.
+        """Initializes a :class:`ScopeShim` and records it as the active one.
 
         The parameters are documented on the class. Creating a
-        :class:`ScopeShim` attaches an OpenTelemetry context holding it, so
-        the object has to be closed, by :meth:`close` or by leaving the
-        ``with`` block that produced it, for the previously active
-        :class:`ScopeShim` to become active again.
+        :class:`ScopeShim` attaches an OpenTelemetry context that holds this
+        object under a private key, which is what
+        :attr:`ScopeManagerShim.active` reads. The object has to be closed, by
+        :meth:`close` or by leaving the ``with`` block that produced it, for
+        the previously recorded :class:`ScopeShim` to be the active one again.
+
+        This does not make the OpenTelemetry span current. Starting the span
+        and making it current is done by
+        :meth:`opentelemetry.trace.use_span` on the
+        :meth:`from_context_manager` path, before this method runs. A
+        :class:`ScopeShim` built directly from a :class:`SpanShim` whose
+        OpenTelemetry span was never made current leaves
+        :func:`opentelemetry.trace.get_current_span` returning the invalid
+        span, and :attr:`ScopeManagerShim.active` then returns `None` rather
+        than this object.
         """
         super().__init__(manager, span)
         self._span_cm = span_cm
@@ -483,9 +505,14 @@ class ScopeShim(Scope):
 
         The OpenTracing base class implementation would set the OpenTracing
         ``error`` tag and record the exception as OpenTracing log fields. This
-        override hands the exception to the OpenTelemetry side instead, where
-        it becomes an exception event on the OpenTelemetry span and sets that
-        span's status to ``ERROR``.
+        override hands the exception to the OpenTelemetry side instead,
+        through ``_end_span_scope``. It reaches the OpenTelemetry span,
+        as an exception event and a span status of ``ERROR``, only when this
+        :class:`ScopeShim` holds the context manager returned by
+        :meth:`opentelemetry.trace.use_span`, which is the case for one built
+        by :meth:`from_context_manager`. For a :class:`ScopeShim` built
+        directly from a :class:`SpanShim` the three arguments are discarded
+        and the exception is not recorded anywhere.
 
         Args:
             exc_type: The class of the exception that left the ``with`` block,
