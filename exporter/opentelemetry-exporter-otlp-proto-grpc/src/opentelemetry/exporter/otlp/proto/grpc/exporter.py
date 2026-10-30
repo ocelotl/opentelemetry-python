@@ -371,10 +371,13 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
             members are what ``_export`` returns.
         endpoint: OTLP-compatible receiver endpoint. Falls back to
             :envvar:`OTEL_EXPORTER_OTLP_ENDPOINT` and then to
-            ``http://localhost:4317``. Only the host and port are kept,
-            because the gRPC exporter addresses a service rather than a URL
-            path, and a path that holds more than slashes is dropped with a
-            warning naming the HTTP exporter instead.
+            ``http://localhost:4317``. When the endpoint is written with a
+            scheme, only the host and port are kept, because the gRPC exporter
+            addresses a service rather than a URL path, and a path that holds
+            more than slashes is dropped with a warning naming the HTTP
+            exporter instead. An endpoint written without a scheme is passed
+            to gRPC unchanged, so a path in it is neither dropped nor
+            reported.
         insecure: Connection type. ``True`` sends plain HTTP/2 with no TLS.
             ``None`` means the value is taken from
             :envvar:`OTEL_EXPORTER_OTLP_INSECURE`, or from the endpoint scheme
@@ -599,8 +602,9 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
         Up to six attempts are made within the configured timeout. The backoff
         doubles after each attempt and is jittered by up to 20 percent either
         way, unless the receiver sent a ``RetryInfo`` trailer, whose delay is
-        used instead. The first ``UNAVAILABLE`` failure also closes and
-        recreates the channel. Retrying stops early when the next backoff
+        used instead. An ``UNAVAILABLE`` failure on the first attempt also
+        closes and recreates the channel, and an ``UNAVAILABLE`` failure on
+        any later attempt does not. Retrying stops early when the next backoff
         would pass the deadline, when the status code is not in the retryable
         set, or when shutdown starts during a backoff.
 

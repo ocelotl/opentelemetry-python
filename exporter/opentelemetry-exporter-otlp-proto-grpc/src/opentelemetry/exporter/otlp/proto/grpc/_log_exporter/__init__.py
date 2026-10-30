@@ -61,10 +61,13 @@ class OTLPLogExporter(
 ):
     """OTLP log record exporter
 
-    Sends log records to an OTLP receiver over gRPC. Each argument that is
-    left as ``None`` is read from the logs-specific environment variable first
-    and from the generic OTLP variable second, so a deployment can configure
-    logs apart from the other signals.
+    Sends log records to an OTLP receiver over gRPC. The ``endpoint``,
+    ``insecure``, ``credentials``, ``headers``, ``timeout`` and ``compression``
+    arguments, when left as ``None``, are read from the logs-specific
+    environment variable first and from the generic OTLP variable second, so a
+    deployment can configure logs apart from the other signals. The remaining
+    arguments have no logs-specific variable, and each entry below says what it
+    does read.
 
     Args:
         endpoint: OTLP-compatible receiver endpoint. Falls back to
@@ -75,12 +78,18 @@ class OTLPLogExporter(
             ``None`` means the value is taken from
             :envvar:`OTEL_EXPORTER_OTLP_LOGS_INSECURE`, then from
             :envvar:`OTEL_EXPORTER_OTLP_INSECURE`, and finally from the scheme
-            of the endpoint.
+            of the endpoint. An ``https`` scheme forces ``False`` whatever the
+            argument and the two variables say.
         credentials: Credentials object for server authentication. ``None``
             means credentials are built from
             :envvar:`OTEL_EXPORTER_OTLP_LOGS_CERTIFICATE` and its client key
-            and client certificate companions when that variable is set, and
-            resolved from the generic OTLP variables otherwise.
+            and client certificate companions when that variable is set and
+            neither the ``insecure`` argument nor
+            :envvar:`OTEL_EXPORTER_OTLP_LOGS_INSECURE` says the connection is
+            insecure, and resolved from the generic OTLP variables otherwise.
+            An ``https`` endpoint combined with an insecure setting therefore
+            makes a TLS connection that ignores the logs-specific certificate
+            variables.
         headers: Headers to send when exporting, as a mapping, as a sequence
             of pairs, or as the comma-separated string form used by
             :envvar:`OTEL_EXPORTER_OTLP_LOGS_HEADERS`. ``None`` means that
@@ -94,12 +103,18 @@ class OTLPLogExporter(
             from :envvar:`OTEL_EXPORTER_OTLP_COMPRESSION`, and no compression
             is used when neither is set.
         channel_options: gRPC channel options, as a sequence of name and value
-            pairs, merged over this package's own options.
+            pairs, merged over this package's own options. No environment
+            variable is read for this.
         retryable_error_codes: gRPC status codes that cause an export to be
-            retried, overriding the default set.
+            retried. ``None`` means the set is read from
+            ``OTEL_PYTHON_EXPORTER_OTLP_GRPC_RETRYABLE_ERROR_CODES``, which
+            applies to all three signals and has no logs-specific form, and
+            otherwise falls back to the default set.
         meter_provider: Meter provider used to record the exporter's own
             self-observability metrics. ``None`` means the globally configured
-            meter provider is used.
+            meter provider is used. Those metrics are recorded at all only
+            when :envvar:`OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED` is set to
+            ``true``.
     """
 
     def __init__(
