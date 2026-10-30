@@ -432,9 +432,11 @@ class ScopeShim(Scope):
 
         This does not make the OpenTelemetry span current, and does not
         change what :func:`opentelemetry.trace.get_current_span` returns.
-        Starting the span and making it current is done by
+        Making the span current is done by
         :meth:`opentelemetry.trace.use_span` on the
-        :meth:`from_context_manager` path, before this method runs. So for a
+        :meth:`from_context_manager` path, before this method runs. The
+        OpenTelemetry span was already started earlier than that, by the
+        OpenTelemetry tracer in :meth:`TracerShim.start_span`. So for a
         :class:`ScopeShim` built directly from a :class:`SpanShim`,
         :attr:`ScopeManagerShim.active` hands back this object while some
         OpenTelemetry span is current, whichever span that is, and returns
@@ -454,7 +456,10 @@ class ScopeShim(Scope):
 
         The method extracts a `opentelemetry.trace.Span` object from the
         context manager by calling the context manager's ``__enter__()``
-        method. This causes the span to start in the OpenTelemetry tracer.
+        method. This makes the span current in the OpenTelemetry tracer. The
+        span was started earlier, by the call to
+        :meth:`opentelemetry.trace.Tracer.start_span` that produced it, and
+        :meth:`opentelemetry.trace.use_span` does not start anything.
 
         Example usage::
 
@@ -542,9 +547,13 @@ class ScopeShim(Scope):
         manager returned by :meth:`opentelemetry.trace.use_span`, and the
         three arguments are passed to that context manager's ``__exit__()``
         method. An exception is then recorded on the OpenTelemetry span, as an
-        exception event and a span status of ``ERROR``, with no condition
-        attached. The ending of the span is the conditional part: it happens
-        only if *finish_on_close* was `True` when
+        exception event and a span status of ``ERROR``, as long as the span is
+        recording and the exception derives from :class:`Exception`.
+        :meth:`opentelemetry.trace.use_span` ignores one that derives from
+        :class:`BaseException` alone, and records nothing on a span that is
+        not recording, such as the one a sampler declined to sample. None of
+        that depends on *finish_on_close*. The ending of the span is the part
+        that does: it happens only if *finish_on_close* was `True` when
         :meth:`ScopeManagerShim.activate` created this :class:`ScopeShim`,
         because that is the value handed to the ``end_on_exit`` parameter of
         :meth:`opentelemetry.trace.use_span`.

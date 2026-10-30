@@ -10,10 +10,10 @@ number of seconds since the epoch, while the OpenTelemetry Python API passes an
 a log entry through a field whose key is ``event`` inside the log fields, while
 the OpenTelemetry Python API takes the event name as a separate argument.
 
-The functions here hold both conversions in one place, so that every call site
-in ``opentelemetry.shim.opentracing_shim`` performs them the same way. This
-module is internal to the shim: it is part of neither the OpenTracing API nor
-the OpenTelemetry API, and nothing outside the shim should import it.
+The functions here hold both conversions in one place, so that every caller
+performs them the same way. This module is internal to the shim: it is part of
+neither the OpenTracing API nor the OpenTelemetry API, and nothing outside the
+shim should import it.
 """
 
 # A default event name to be used for logging events when a better event name
@@ -46,8 +46,12 @@ def time_seconds_to_ns(time_seconds):
 def time_seconds_from_ns(time_nanoseconds):
     """Converts a time value in nanoseconds to a time value in seconds.
 
-    This is the direction used when a timestamp read from the OpenTelemetry
-    API has to be handed back through the OpenTracing API.
+    This is the reverse direction, for a timestamp read from the OpenTelemetry
+    API that has to be handed back through the OpenTracing API. Nothing under
+    ``opentelemetry.shim.opentracing_shim`` calls it today. Its callers are
+    the tests of the shim, which use it to read a timestamp back off an
+    OpenTelemetry span and compare it against the value given to the
+    OpenTracing API.
 
     Args:
         time_nanoseconds: An ``int`` representing the number of nanoseconds
