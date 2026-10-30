@@ -152,11 +152,40 @@ _ENVIRON_TO_COMPRESSION = {
 
 
 class InvalidCompressionValueException(Exception):
+    """Raised when a compression environment variable holds a value gRPC cannot use.
+
+    The only value this package accepts is ``gzip``. The exception message
+    repeats both the variable name and the offending value, so the operator
+    can find the misconfigured variable without reading the traceback.
+
+    Args:
+        environ_key: Name of the environment variable that was read.
+        environ_value: Value found in that variable, already lowercased and
+            stripped.
+    """
+
     def __init__(self, environ_key: str, environ_value: str):
+        """Build the exception message. The arguments are documented on the class."""
         super().__init__(f'Invalid value "{environ_value}" for compression envvar {environ_key}')
 
 
 def environ_to_compression(environ_key: str) -> Compression | None:
+    """Translate the value of a compression environment variable into a gRPC compression method.
+
+    Args:
+        environ_key: Name of the environment variable to read, for example
+            ``OTEL_EXPORTER_OTLP_COMPRESSION``. The value is lowercased and
+            stripped before it is compared.
+
+    Returns:
+        ``grpc.Compression.Gzip`` when the variable holds ``gzip``, and
+        ``None`` when the variable is unset. ``None`` leaves the choice to the
+        caller, which falls back to ``grpc.Compression.NoCompression``.
+
+    Raises:
+        InvalidCompressionValueException: When the variable is set to anything
+            other than ``gzip``.
+    """
     environ_value = environ[environ_key].lower().strip() if environ_key in environ else None
     if environ_value not in _ENVIRON_TO_COMPRESSION and environ_value is not None:
         raise InvalidCompressionValueException(environ_key, environ_value)
@@ -171,10 +200,43 @@ def get_resource_data(
     resource_class: Callable[..., TypingResourceT],
     name: str,
 ) -> list[TypingResourceT]:
+    """Group SDK data by resource and wrap each group in a protobuf resource message.
+
+    This is a thin forwarding wrapper kept for backwards compatibility. New
+    code calls one of the encoders in
+    ``opentelemetry-exporter-otlp-proto-common`` instead.
+
+    Args:
+        sdk_resource_scope_data: Mapping from an SDK resource to a mapping of
+            already encoded scope data collected under that resource. Only the
+            values of the inner mapping reach the protobuf message; its keys
+            are the instrumentation scopes and are dropped here.
+        resource_class: Protobuf message class to instantiate once per
+            resource, for example ``ResourceSpans``. It is called with the
+            encoded resource under the keyword ``resource`` and the scope data
+            under the keyword built from ``name``.
+        name: Signal part of the scope keyword, for example ``spans``, which
+            is passed to ``resource_class`` as ``scope_spans``.
+
+    Returns:
+        One instance of ``resource_class`` per entry in
+        ``sdk_resource_scope_data``, in iteration order of that mapping.
+    """
     return _get_resource_data(sdk_resource_scope_data, resource_class, name)
 
 
 def _read_file(file_path: str) -> bytes | None:
+    """Read a certificate or key file from disk.
+
+    Args:
+        file_path: Path of the file to read.
+
+    Returns:
+        The bytes of the file, or ``None`` when the file does not exist. A
+        missing file is logged with its name rather than raised, so a
+        misconfigured path degrades to the default TLS credentials instead of
+        stopping the process.
+    """
     try:
         with open(file_path, "rb") as file:
             return file.read()
@@ -191,6 +253,23 @@ def _load_credentials(
     client_key_file: str | None,
     client_certificate_file: str | None,
 ) -> ChannelCredentials:
+    """Build TLS channel credentials from certificate and key files on disk.
+
+    Args:
+        certificate_file: Path of the PEM file holding the root certificates
+            used to verify the receiver. ``None`` falls back to the root
+            certificates gRPC finds for itself.
+        client_key_file: Path of the PEM file holding the client private key
+            used for mutual TLS. ``None`` means no client key is sent.
+        client_certificate_file: Path of the PEM file holding the client
+            certificate chain used for mutual TLS. ``None`` means no client
+            certificate is sent.
+
+    Returns:
+        Channel credentials built from whichever of the three files was read.
+        A path that does not exist is logged and treated as if it had not been
+        given, so the result can be weaker than the caller asked for.
+    """
     root_certificates = _read_file(certificate_file) if certificate_file else None
     private_key = _read_file(client_key_file) if client_key_file else None
     certificate_chain = _read_file(client_certificate_file) if client_certificate_file else None
@@ -209,6 +288,35 @@ def _get_credentials(
     client_key_file_env_key: str,
     client_certificate_file_env_key: str,
 ) -> ChannelCredentials:
+    """Resolve the TLS channel credentials an exporter should use.
+
+    Three sources are consulted in order: the credentials the caller passed,
+    a credential provider named by an environment variable and loaded through
+    the ``opentelemetry_otlp_credential_provider`` entry point group, and a
+    set of certificate file paths read from environment variables.
+
+    Args:
+        creds: Credentials the caller built itself. When this is not ``None``
+            it is returned unchanged and no environment variable is read.
+        credential_entry_point_env_key: Name of the environment variable
+            holding the name of a credential provider entry point.
+        certificate_file_env_key: Name of the environment variable holding the
+            path of the root certificate file. When this variable is unset,
+            the two client file variables below are not read at all.
+        client_key_file_env_key: Name of the environment variable holding the
+            path of the client private key file, for mutual TLS.
+        client_certificate_file_env_key: Name of the environment variable
+            holding the path of the client certificate file, for mutual TLS.
+
+    Returns:
+        The credentials from the first source that yields any, and otherwise
+        credentials built from the root certificates gRPC finds for itself.
+
+    Raises:
+        RuntimeError: When the credential provider environment variable names
+            an entry point that is not installed, or names one whose return
+            value is not a ``grpc.ChannelCredentials``.
+    """
     if creds is not None:
         return creds
     _credential_env = environ.get(credential_entry_point_env_key)
@@ -255,13 +363,53 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
     receiver outages.
 
     Args:
-        endpoint: OTLP-compatible receiver endpoint
-        insecure: Connection type
-        credentials: ChannelCredentials object for server authentication
-        headers: Headers to send when exporting
-        timeout: Backend request timeout in seconds
-        compression: gRPC compression method to use
-        channel_options: gRPC channel options
+        stub: gRPC service stub class for the signal being exported, for
+            example ``TraceServiceStub``. It is instantiated with the channel
+            every time the channel is created or recreated.
+        result: Export result enumeration for the signal being exported, for
+            example ``SpanExportResult``. Its ``SUCCESS`` and ``FAILURE``
+            members are what ``_export`` returns.
+        endpoint: OTLP-compatible receiver endpoint. Falls back to
+            :envvar:`OTEL_EXPORTER_OTLP_ENDPOINT` and then to
+            ``http://localhost:4317``. Any path in the endpoint is dropped
+            with a warning, because the gRPC exporter addresses a service
+            rather than a URL path.
+        insecure: Connection type. ``True`` sends plain HTTP/2 with no TLS.
+            ``None`` means the value is taken from
+            :envvar:`OTEL_EXPORTER_OTLP_INSECURE`, or from the endpoint scheme
+            when that variable is unset. An ``https`` scheme forces ``False``
+            whatever the argument says.
+        credentials: ChannelCredentials object for server authentication. Used
+            only when the connection is not insecure. ``None`` means the
+            credentials are resolved from the environment instead.
+        headers: Headers to send when exporting, as a mapping, as a sequence
+            of pairs, or as the comma-separated string form used by
+            :envvar:`OTEL_EXPORTER_OTLP_HEADERS`. ``None`` means that
+            environment variable is read, and no headers are sent when it is
+            unset too.
+        timeout: Backend request timeout in seconds. This is the deadline for
+            the whole export including retries, not for one attempt. ``None``
+            means the value is taken from
+            :envvar:`OTEL_EXPORTER_OTLP_TIMEOUT`, defaulting to 10 seconds.
+        compression: gRPC compression method to use. ``None`` means the value
+            is taken from :envvar:`OTEL_EXPORTER_OTLP_COMPRESSION`, and no
+            compression is used when that variable is unset too.
+        channel_options: gRPC channel options, as a sequence of name and value
+            pairs. They are merged over this package's own options, so an
+            option given here overrides the default of the same name.
+        retryable_error_codes: gRPC status codes that cause an export to be
+            retried. ``None`` means the value is taken from
+            ``OTEL_PYTHON_EXPORTER_OTLP_GRPC_RETRYABLE_ERROR_CODES``, parsed as
+            a comma-separated list of status code names, and otherwise falls
+            back to this module's own set.
+        component_type: Semantic conventions component type recorded on the
+            exporter's own self-observability metrics. ``None`` turns those
+            metrics off.
+        signal: Signal name recorded on the exporter's own self-observability
+            metrics.
+        meter_provider: Meter provider used to record the exporter's own
+            self-observability metrics. ``None`` means the globally configured
+            meter provider is used.
     """
 
     def __init__(
@@ -281,6 +429,10 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
         signal: Literal["traces", "metrics", "logs"] = "traces",
         meter_provider: MeterProvider | None = None,
     ):
+        """Resolve the configuration and open the gRPC channel.
+
+        The parameters are documented on the class.
+        """
         super().__init__()
         self._result = result
         self._stub = stub
@@ -404,19 +556,59 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
         self,
         data: SDKDataT,
     ) -> ExportServiceRequestT:
-        pass
+        """Encode a batch of SDK data as the protobuf request for one signal.
+
+        Implemented by each signal's exporter, because the encoder differs per
+        signal. It is called once per export attempt, so a retry re-encodes
+        the same batch.
+
+        Args:
+            data: Batch handed to the exporter by the SDK.
+
+        Returns:
+            The export service request to send over the gRPC channel.
+        """
 
     @abstractmethod
     def _count_data(
         self,
         data: SDKDataT,
     ) -> int:
-        pass
+        """Count the individual items in a batch of SDK data.
+
+        The count is recorded on the exporter's own self-observability
+        metrics, and it is not the number of gRPC calls.
+
+        Args:
+            data: Batch handed to the exporter by the SDK.
+
+        Returns:
+            Number of spans, log records or metric data points in the batch.
+        """
 
     def _export(
         self,
         data: SDKDataT,
     ) -> ExportResultT:
+        """Send one batch over the gRPC channel, retrying transient failures.
+
+        Up to six attempts are made within the configured timeout. The backoff
+        doubles after each attempt and is jittered by up to 20 percent either
+        way, unless the receiver sent a ``RetryInfo`` trailer, whose delay is
+        used instead. The first ``UNAVAILABLE`` failure also closes and
+        recreates the channel. Retrying stops early when the next backoff
+        would pass the deadline, when the status code is not in the retryable
+        set, or when shutdown starts during a backoff.
+
+        Args:
+            data: Batch handed to the exporter by the SDK.
+
+        Returns:
+            The ``SUCCESS`` member of the signal's export result enumeration
+            when the receiver accepted the batch, and the ``FAILURE`` member
+            otherwise. Exporting after shutdown logs a warning and returns
+            ``FAILURE`` without contacting the receiver.
+        """
         if self._shutdown:
             logger.warning("Exporter already shutdown, ignoring batch")
             return self._result.FAILURE  # type: ignore [reportReturnType]
@@ -502,8 +694,16 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
         """
         Shut down the exporter.
 
+        Closing the channel also releases an export that is waiting between
+        retries, which then gives up rather than making a further attempt. A
+        second call logs a warning and does nothing.
+
         Args:
             timeout_millis: Timeout in milliseconds for shutting down the exporter.
+                It is accepted for interface compatibility and is not used:
+                closing a gRPC channel does not block.
+            kwargs: Accepted and ignored, so that signal-specific subclasses
+                can pass their own keyword arguments through.
         """
         if self._shutdown:
             logger.warning("Exporter already shutdown, ignoring call")
@@ -519,9 +719,23 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
         """
         Returns a string that describes the overall exporter, to be used in
         warning messages.
+
+        Returns:
+            The plural signal name, for example ``traces``, as it appears in
+            the retry and failure log messages of ``_export``.
         """
 
     def _set_meter_provider(self, meter_provider: MeterProvider) -> None:
+        """Rebuild the exporter's own self-observability metrics against another meter provider.
+
+        The SDK calls this when the exporter is installed under a meter
+        provider that was not known when the exporter was constructed. The
+        previous instruments are discarded.
+
+        Args:
+            meter_provider: Meter provider to record the exporter's own
+                metrics with.
+        """
         self._metrics = create_exporter_metrics(
             self._component_type,
             self._signal,
