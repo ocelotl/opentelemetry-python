@@ -4,9 +4,12 @@
 """Log record exporter that writes OTLP JSON to a file, to a stream or to standard output.
 
 The logger of this module carries ``opentelemetry.sdk._shared_internal.DuplicateFilter``, which
-drops a warning or an export failure that repeats the one before it within the same twenty second
-window. An application that routes its own logging through OpenTelemetry would otherwise turn each
-failed export into another log record to export, and the failures would then feed themselves.
+compares a record against the one before it on the logging module, the level and the message
+template rather than on the formatted text, and drops the record when all three match inside the
+same twenty second window. A second failure from the same call site is therefore dropped even
+when its exception type and message differ from the first. An application that routes its own
+logging through OpenTelemetry would otherwise turn each failed export into another log record to
+export, and the failures would then feed themselves.
 """
 
 import logging
