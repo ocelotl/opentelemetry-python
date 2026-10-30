@@ -123,10 +123,10 @@ class OTLPLogExporter(
         compression: gRPC compression method to use. ``None`` means the value
             is taken from :envvar:`OTEL_EXPORTER_OTLP_LOGS_COMPRESSION`, then
             from :envvar:`OTEL_EXPORTER_OTLP_COMPRESSION`, and no compression
-            is used when neither is set. Only one of the two is ever read: a
-            value of ``gzip`` in
+            is used when neither is set. The generic variable is read only
+            when the signal-specific one is unset: a value of ``gzip`` in
             :envvar:`OTEL_EXPORTER_OTLP_LOGS_COMPRESSION` settles the choice
-            and :envvar:`OTEL_EXPORTER_OTLP_COMPRESSION` is then left unread,
+            and leaves :envvar:`OTEL_EXPORTER_OTLP_COMPRESSION` unread,
             whatever it holds. A value other than ``gzip`` in whichever
             variable is read makes the constructor raise
             ``InvalidCompressionValueException``.
