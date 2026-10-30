@@ -83,6 +83,62 @@ logger = logging.getLogger(__name__)
 
 
 class ZipkinExporter(SpanExporter):
+    """Exports spans to a Zipkin collector as version 2 protobuf over HTTP.
+
+    Each batch is serialized by ``ProtobufEncoder`` and sent as the body of a
+    single HTTP POST to the collector. The session used for that POST carries a
+    ``Content-Type`` of ``application/x-protobuf``, set when the exporter is
+    constructed.
+
+    The three ``local_node_`` arguments together describe the network context of
+    the node that produced the spans, which Zipkin records as the local endpoint
+    of every span in the batch. The service name of that local endpoint is not
+    taken from an argument: it is read from the ``service.name`` resource
+    attribute of the first span of each batch, and a batch whose first span
+    carries none keeps the name the exporter last resolved. That is the name
+    read when the exporter was constructed, from the resource of the global
+    tracer provider when that provider has one and from ``Resource.create()``
+    otherwise, until the first batch supplies one of its own.
+
+    Args:
+        endpoint: Full URL of the Zipkin collector endpoint that receives the
+            spans. When ``None``, the value of the
+            :envvar:`OTEL_EXPORTER_ZIPKIN_ENDPOINT` environment variable is used,
+            and when that variable is unset or empty the endpoint falls back to
+            ``http://localhost:9411/api/v2/spans``.
+        local_node_ipv4: Primary IPv4 address associated with this connection,
+            given either as a dotted-quad string or as the integer form of the
+            address. ``None`` omits the IPv4 address from the local endpoint. A
+            value that does not parse as an IPv4 address raises ``ValueError``.
+        local_node_ipv6: Primary IPv6 address associated with this connection,
+            given as a string. ``None`` omits the IPv6 address from the local
+            endpoint. A value that does not parse as an IPv6 address raises
+            ``ValueError``, which includes any integer below 2 ** 32, since
+            ``ipaddress.ip_address`` reads those as IPv4 addresses.
+        local_node_port: Depending on context, this could be a listen port or the
+            client-side of a socket. ``None`` omits the port from the local
+            endpoint.
+        max_tag_value_length: Maximum length a string value may reach before it
+            is truncated. The limit covers both tag values and the string
+            attribute values of span events, which are written into the
+            annotations of the encoded span. ``None`` disables truncation, which
+            is the default for this exporter and differs from the encoder
+            default of 128 characters.
+        timeout: Maximum number of seconds to wait for each batch export. When
+            ``None`` or zero, the value of the
+            :envvar:`OTEL_EXPORTER_ZIPKIN_TIMEOUT` environment variable is used,
+            and when that is unset the timeout is 10 seconds. A value of that
+            variable that is not a decimal integer, an empty one included,
+            raises ``ValueError`` out of the constructor.
+        session: Connection session used to reach the Zipkin collector endpoint.
+            Pass one to control connection pooling, retries or authentication.
+            When ``None``, this exporter creates one. Either way the exporter
+            takes the session over: it sets ``Content-Type`` on the session
+            headers, and :meth:`shutdown` closes the session even when the
+            caller supplied it. Do not pass a session the application also uses
+            for its own requests.
+    """
+
     def __init__(
         self,
         endpoint: str | None = None,
@@ -93,22 +149,9 @@ class ZipkinExporter(SpanExporter):
         timeout: int | None = None,
         session: requests.Session | None = None,
     ):
-        """Zipkin exporter.
+        """Build a Zipkin protobuf exporter.
 
-        Args:
-            version: The protocol version to be used.
-            endpoint: The endpoint of the Zipkin collector.
-            local_node_ipv4: Primary IPv4 address associated with this connection.
-            local_node_ipv6: Primary IPv6 address associated with this connection.
-            local_node_port: Depending on context, this could be a listen port or the
-                client-side of a socket.
-            max_tag_value_length: Max length string attribute values can have.
-            timeout: Maximum time the Zipkin exporter will wait for each batch export.
-                The default value is 10s.
-            session: Connection session to the Zipkin collector endpoint.
-
-            The tuple (local_node_ipv4, local_node_ipv6, local_node_port) is used to represent
-            the network context of a node in the service graph.
+        The parameters are documented on the class.
         """
         self.local_node = NodeEndpoint(local_node_ipv4, local_node_ipv6, local_node_port)
 
@@ -124,6 +167,28 @@ class ZipkinExporter(SpanExporter):
         self.timeout = timeout or int(environ.get(OTEL_EXPORTER_ZIPKIN_TIMEOUT, 10))
 
     def export(self, spans: Sequence[Span]) -> SpanExportResult:
+        """Serialize one batch of spans and POST it to the Zipkin collector.
+
+        The ``service.name`` resource attribute of the first span of the batch
+        becomes the service name of the local endpoint for every span in it. All
+        spans of a batch come from one tracer provider, so they share a resource
+        and therefore a service name. A batch whose first span carries no
+        ``service.name`` leaves the previously resolved service name in place.
+
+        A collector response whose status code is neither 200 nor 202 is logged
+        at error level together with the response body, and counts as a failed
+        export. Network and timeout failures are not caught here: they surface
+        to the caller as the exception raised by the underlying session.
+
+        Args:
+            spans: The batch of ended spans to export. An empty batch is still
+                serialized and posted.
+
+        Returns:
+            ``SpanExportResult.SUCCESS`` when the collector accepted the batch,
+            and ``SpanExportResult.FAILURE`` when it rejected it or when this
+            exporter has already been shut down.
+        """
         # After the call to Shutdown subsequent calls to Export are
         # not allowed and should return a Failure result
         if self._closed:
@@ -154,6 +219,14 @@ class ZipkinExporter(SpanExporter):
         return SpanExportResult.SUCCESS
 
     def shutdown(self) -> None:
+        """Close the session and refuse any further export.
+
+        Closing the session releases its connection pool, including a session
+        that was passed to the constructor rather than created here. Every later
+        call to :meth:`export` logs a warning and returns
+        ``SpanExportResult.FAILURE``. A second call to this method logs a
+        warning and does nothing else, so shutting down twice is safe.
+        """
         if self._closed:
             logger.warning("Exporter already shutdown, ignoring call")
             return
@@ -161,4 +234,21 @@ class ZipkinExporter(SpanExporter):
         self._closed = True
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
+        """Report that there is nothing left to flush.
+
+        This exporter holds no queue of its own: :meth:`export` posts each batch
+        before it returns, so by the time this method runs every batch handed to
+        the exporter has already been sent. Buffering belongs to the span
+        processor in front of the exporter, and the span processors of the SDK
+        drain their own queue through :meth:`export` rather than through this
+        method, which none of them calls. It exists to satisfy the
+        :class:`~opentelemetry.sdk.trace.export.SpanExporter` interface.
+
+        Args:
+            timeout_millis: Budget in milliseconds for the flush. Ignored,
+                because nothing is waited on.
+
+        Returns:
+            ``True`` always.
+        """
         return True
