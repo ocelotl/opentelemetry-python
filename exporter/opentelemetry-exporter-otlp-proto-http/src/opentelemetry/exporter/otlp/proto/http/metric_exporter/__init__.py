@@ -10,9 +10,11 @@ which decides how often a collection happens and calls
 :meth:`OTLPMetricExporter.export` with the result.
 
 Unlike the span and log exporters, this one can split a single collection
-across several requests: setting ``max_export_batch_size`` caps the number of
-data points in one request, and the remaining data points go into further
-requests sent one after another.
+across several requests: setting ``max_export_batch_size`` to a positive number
+caps the number of data points in one request, and the remaining data points go
+into further requests sent one after another. A value of 0 or a negative value
+is not a disabled limit, and the ``max_export_batch_size`` entry on
+:class:`OTLPMetricExporter` records what each of those does instead.
 
 ``DEFAULT_METRICS_EXPORT_PATH`` is the path appended to a base endpoint that
 carries no signal path of its own. The other module-level ``DEFAULT_`` names
