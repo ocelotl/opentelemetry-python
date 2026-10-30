@@ -71,8 +71,10 @@ class JsonMessage(abc.ABC):
 
         Returns:
             A dictionary keyed by the lowerCamelCase JSON names of the fields, holding only the
-            fields that are set. A field left at its proto3 default is omitted, as is every
-            member of a oneof group other than the one that is set.
+            fields that are set. A field left at its proto3 default is omitted. The members of a
+            oneof group are tested in reverse declaration order, and the first one that is not
+            ``None`` is the only one written, so a caller that has set several of them loses the
+            rest without an error.
         """
 
     @classmethod
