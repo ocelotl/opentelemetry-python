@@ -82,18 +82,28 @@ class OTLPLogExporter(
             argument and the two variables say, and an endpoint written
             without a scheme matches neither ``http`` nor ``https``, so it
             too resolves to ``False`` and opens a TLS channel.
-        credentials: Credentials object for server authentication. Credentials
-            are resolved only when the connection ends up secure, so an
-            insecure connection reads no certificate variable at all. For a
-            secure connection, ``None`` means credentials are built from
-            :envvar:`OTEL_EXPORTER_OTLP_LOGS_CERTIFICATE` and its client key
-            and client certificate companions when that variable is set and
-            neither the ``insecure`` argument nor
+        credentials: Credentials object for server authentication. ``None``
+            means they are resolved from the environment. The logs-specific
+            sources are consulted when
+            :envvar:`OTEL_EXPORTER_OTLP_LOGS_CERTIFICATE` is set and neither
+            the ``insecure`` argument nor
             :envvar:`OTEL_EXPORTER_OTLP_LOGS_INSECURE` says the connection is
-            insecure, and from the generic OTLP certificate variables in every
-            other case. An ``https`` endpoint combined with an insecure
-            setting therefore makes a TLS connection that ignores the
-            logs-specific certificate variables.
+            insecure: the entry point named by
+            ``OTEL_PYTHON_EXPORTER_OTLP_GRPC_LOGS_CREDENTIAL_PROVIDER`` takes
+            precedence, and the logs-specific certificate, client key and
+            client certificate files are read when that variable is unset. The
+            generic sources are consulted when nothing has been resolved yet
+            and the connection ends up secure:
+            ``OTEL_PYTHON_EXPORTER_OTLP_GRPC_CREDENTIAL_PROVIDER``, then
+            :envvar:`OTEL_EXPORTER_OTLP_CERTIFICATE` with its own companions,
+            then the root certificates gRPC finds for itself. An ``http``
+            endpoint and :envvar:`OTEL_EXPORTER_OTLP_INSECURE` do not stop the
+            logs-specific variables from being read and their files from being
+            opened, because the first condition tests only the argument and
+            the logs-specific insecure variable, and the credentials built
+            that way are then never used. An ``https`` endpoint combined with
+            an insecure setting makes a TLS connection that skips the
+            logs-specific variables and uses the generic ones.
         headers: Headers to send when exporting, as a mapping, as a sequence
             of pairs, or as the comma-separated string form used by
             :envvar:`OTEL_EXPORTER_OTLP_LOGS_HEADERS`. ``None`` means that
@@ -102,12 +112,17 @@ class OTLPLogExporter(
             including retries. ``None`` means the value is taken from
             :envvar:`OTEL_EXPORTER_OTLP_LOGS_TIMEOUT`, then from
             :envvar:`OTEL_EXPORTER_OTLP_TIMEOUT`, defaulting to 10 seconds. A
-            value of ``0``, from the argument or from either variable, is
-            treated the same way as ``None`` and the next source is used.
+            ``0`` in the argument or in
+            :envvar:`OTEL_EXPORTER_OTLP_LOGS_TIMEOUT` is treated the same way
+            as ``None`` and the next source is used, while a ``0`` in
+            :envvar:`OTEL_EXPORTER_OTLP_TIMEOUT` is kept and makes every
+            export fail on its first attempt.
         compression: gRPC compression method to use. ``None`` means the value
             is taken from :envvar:`OTEL_EXPORTER_OTLP_LOGS_COMPRESSION`, then
             from :envvar:`OTEL_EXPORTER_OTLP_COMPRESSION`, and no compression
-            is used when neither is set.
+            is used when neither is set. Any value of either variable other
+            than ``gzip`` makes the constructor raise
+            ``InvalidCompressionValueException``.
         channel_options: gRPC channel options, as a sequence of name and value
             pairs, merged over this package's own options. No environment
             variable is read for this.
@@ -121,6 +136,12 @@ class OTLPLogExporter(
             meter provider is used. Those metrics are recorded at all only
             when :envvar:`OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED` is set to
             ``true``.
+
+    Raises:
+        RuntimeError: When either credential provider environment variable
+            names an entry point that is not installed, or one whose return
+            value is not a ``grpc.ChannelCredentials``. The constructor is
+            where this surfaces.
     """
 
     def __init__(

@@ -375,9 +375,12 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
             scheme, only the host and port are kept, because the gRPC exporter
             addresses a service rather than a URL path, and a path that holds
             more than slashes is dropped with a warning naming the HTTP
-            exporter instead. An endpoint written without a scheme is passed
-            to gRPC unchanged, so a path in it is neither dropped nor
-            reported.
+            exporter instead. The same happens for an endpoint that starts
+            with ``//`` and no scheme, because the host and port are taken
+            from the network location that ``urlparse`` reports rather than
+            from the scheme. An endpoint that has neither a scheme nor a
+            leading ``//`` has no network location, and is passed to gRPC
+            unchanged, so a path in it is neither dropped nor reported.
         insecure: Connection type. ``True`` sends plain HTTP/2 with no TLS.
             ``None`` means the value is taken from
             :envvar:`OTEL_EXPORTER_OTLP_INSECURE`, or from the endpoint scheme
@@ -400,7 +403,9 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
             timeout of ``0`` is treated the same way as ``None``.
         compression: gRPC compression method to use. ``None`` means the value
             is taken from :envvar:`OTEL_EXPORTER_OTLP_COMPRESSION`, and no
-            compression is used when that variable is unset too.
+            compression is used when that variable is unset too. Any value of
+            that variable other than ``gzip`` makes the constructor raise
+            ``InvalidCompressionValueException``.
         channel_options: gRPC channel options, as a sequence of name and value
             pairs. They are merged over this package's own options, so an
             option given here overrides the default of the same name.
@@ -420,6 +425,12 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
             meter provider is used. Those metrics are recorded at all only
             when :envvar:`OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED` is set to
             ``true``.
+
+    Raises:
+        RuntimeError: When ``OTEL_PYTHON_EXPORTER_OTLP_GRPC_CREDENTIAL_PROVIDER``
+            names an entry point that is not installed, or one whose return
+            value is not a ``grpc.ChannelCredentials``. The constructor is
+            where this surfaces.
     """
 
     def __init__(
