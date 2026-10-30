@@ -493,11 +493,13 @@ class PrometheusMetricReader(MetricReader):
 
         ``MetricReader.collect`` calls this from inside the scrape that the
         collector started, so the batch is queued and then drained by that same
-        scrape. A batch of ``None`` is discarded.
+        scrape.
 
         Args:
-            metrics_data: The metrics the SDK collected, or ``None`` when it
-                collected nothing.
+            metrics_data: The metrics the SDK collected. The SDK path never
+                delivers ``None``, because ``MetricReader.collect`` drops that
+                case before calling here, so the guard below only matters to a
+                caller invoking this method directly.
             timeout_millis: Accepted for the signature of
                 :class:`~opentelemetry.sdk.metrics.export.MetricReader` and
                 ignored, because queueing the batch does no blocking work.
@@ -566,9 +568,9 @@ class _CustomCollector:
     ):
         """Build a collector with an empty queue and no callback.
 
-        The parameters are documented on the class. The callback is supplied
-        afterwards by :class:`PrometheusMetricReader`, which cannot pass it
-        here because it needs the collector to exist first.
+        The parameters are documented on the class. The callback is not one of
+        them: :class:`PrometheusMetricReader` assigns it to ``_callback`` after
+        constructing the collector.
         """
         self._callback = None
         self._metrics_datas: deque[MetricsData] = deque()
@@ -672,9 +674,13 @@ class _CustomCollector:
 
         A ``Sum`` becomes a Prometheus counter unless it is cumulative and
         non-monotonic, in which case it becomes a gauge. A ``Gauge`` becomes a
-        gauge and a ``Histogram`` becomes a histogram. Any other data type,
-        ``ExponentialHistogram`` among them, is logged at warning level and
-        dropped, because Prometheus text format has nothing to map it onto.
+        gauge and a ``Histogram`` becomes a histogram. Any other data type is
+        logged at warning level and dropped, because Prometheus text format
+        has nothing to map it onto, but only when it carries no data point:
+        ``_collect_data_points`` runs before the choice is made and raises
+        ``AttributeError`` on a data point that is neither a
+        ``NumberDataPoint`` nor a ``HistogramDataPoint``, which is what an
+        ``ExponentialHistogram`` holds.
 
         Args:
             metric: The metric to translate. Its name is prefixed and
@@ -823,6 +829,12 @@ class _CustomCollector:
             Resource, scope and data point attributes are merged in that order,
             so a later one wins when two of them sanitize to the same label
             name.
+
+        Raises:
+            AttributeError: If a data point is of neither of those two kinds,
+                since the value is then read from a field the point does not
+                have. An ``ExponentialHistogramDataPoint`` is the case that
+                reaches this.
         """
         keys: set[str] = set()
         rows: list[dict[str, str]] = []

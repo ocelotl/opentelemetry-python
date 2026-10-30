@@ -8,8 +8,10 @@ its units in words rather than in UCUM symbols. The functions here perform the
 rewrites the OpenTelemetry to Prometheus compatibility specification requires,
 at
 https://github.com/open-telemetry/opentelemetry-specification/blob/v1.33.0/specification/compatibility/prometheus_and_openmetrics.md.
-They are called by ``_CustomCollector`` once per exported metric, so they
-operate on single strings and hold no state.
+``_CustomCollector`` calls ``sanitize_full_name`` and ``map_unit`` once per
+exported metric, and ``sanitize_attribute`` once per attribute of every data
+point as well as once per resource attribute carried by ``target_info``. All
+of them operate on single strings and hold no state.
 """
 
 from re import UNICODE, compile
