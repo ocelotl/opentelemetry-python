@@ -9,10 +9,14 @@ Register it with a log record processor such as ``BatchLogRecordProcessor``
 instead of calling it directly.
 
 The logger this module reports its own failures through carries a
-``DuplicateFilter``, which drops a message identical to the previous one within
-the same twenty second window. Without it, a logging setup that exports its own
-log records through this exporter would turn one export failure into an endless
-stream of records describing that failure.
+``DuplicateFilter``. It compares a record against the previous one by module,
+level and format string, the format string being the template before the
+arguments are substituted, and drops the record when all three match within the
+same twenty second window. Without it, a logging setup that exports its own log
+records through this exporter would turn one export failure into an endless
+stream of records describing that failure. The cost is that two different
+failures reported through one template, a 400 response followed by a 500, are
+collapsed into a single record.
 """
 
 import logging
@@ -61,12 +65,14 @@ class OTLPLogExporter(LogRecordExporter):
 
     Each call to :meth:`export` encodes the batch it is handed as one JSON
     document and posts it to a single endpoint. A transient failure is retried
-    with exponential backoff until the timeout runs out. A permanent failure is
-    logged and reported to the caller, which drops the batch.
+    with exponential backoff, over at most six attempts and for no longer than
+    the timeout. A permanent failure is logged and reported to the caller, which
+    drops the batch.
 
-    Every argument may be left as ``None``. The value is then taken from the
+    Every argument may be left as ``None``. Each one is then taken from the
     per-signal ``OTEL_EXPORTER_OTLP_LOGS_*`` environment variable, then from
-    the generic ``OTEL_EXPORTER_OTLP_*`` variable, then from a default. All
+    the generic ``OTEL_EXPORTER_OTLP_*`` variable, then from a default, with the
+    exception of ``_transport``, which has no environment variable at all. All
     settings are resolved once, when the exporter is constructed; changing the
     environment afterwards has no effect.
 

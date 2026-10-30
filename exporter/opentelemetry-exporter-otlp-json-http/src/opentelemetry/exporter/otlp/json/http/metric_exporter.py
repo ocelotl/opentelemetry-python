@@ -67,15 +67,21 @@ class OTLPMetricExporter(MetricExporter):
 
     Each call to :meth:`export` encodes the collection it is handed and posts
     it, as one request or as several when ``max_export_batch_size`` is set. A
-    transient failure is retried with exponential backoff until the timeout
-    runs out. A permanent failure is logged and reported to the caller, which
-    drops the collection.
+    transient failure is retried with exponential backoff, over at most six
+    attempts and for no longer than the timeout. A permanent failure is logged
+    and reported to the caller, which drops the collection.
 
-    Every argument may be left as ``None``. The value is then taken from the
-    per-signal ``OTEL_EXPORTER_OTLP_METRICS_*`` environment variable, then from
-    the generic ``OTEL_EXPORTER_OTLP_*`` variable, then from a default. All
-    settings are resolved once, when the exporter is constructed; changing the
-    environment afterwards has no effect.
+    Every argument may be left as ``None``, but the fallback that follows is
+    not the same for all of them. ``endpoint``, ``certificate_file``,
+    ``client_key_file``, ``client_certificate_file``, ``headers``, ``timeout``
+    and ``compression`` are taken from the per-signal
+    ``OTEL_EXPORTER_OTLP_METRICS_*`` environment variable, then from the generic
+    ``OTEL_EXPORTER_OTLP_*`` variable, then from a default.
+    ``preferred_temporality`` and ``preferred_aggregation`` have a per-signal
+    environment variable and no generic one. ``max_export_batch_size`` and
+    ``_transport`` have no environment variable at all. All settings are
+    resolved once, when the exporter is constructed; changing the environment
+    afterwards has no effect.
 
     Args:
         endpoint: Full URL of the OTLP/HTTP signal endpoint, including the signal
@@ -94,8 +100,11 @@ class OTLPMetricExporter(MetricExporter):
             so that a name already present is replaced rather than sent twice.
             The ``content-type`` and ``user-agent`` headers this exporter sets
             can be overridden this way.
-        timeout: Seconds one export may take in total, retries included. The
-            default is 10 seconds.
+        timeout: Seconds one request may take, the retries of that request
+            included. When ``max_export_batch_size`` splits a collection into
+            several requests, each of them is given this budget afresh, so a
+            whole export can take this long multiplied by the number of
+            requests. The default is 10 seconds.
         compression: Compression applied to the request body. The default is
             ``Compression.NONE``, which sends the JSON uncompressed.
         preferred_temporality: Aggregation temporality per instrument class,
@@ -215,7 +224,7 @@ class OTLPMetricExporter(MetricExporter):
         ``max_export_batch_size`` data points each. The requests are sent one
         after another, and the first one that fails ends the call, leaving the
         data points after it unsent. The call blocks until every request has
-        been answered or the timeout has run out.
+        been answered or has exhausted its own timeout.
 
         A collection that cannot be encoded fails as a whole: the error is
         logged and nothing is sent. The same applies after :meth:`shutdown`

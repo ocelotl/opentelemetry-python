@@ -51,12 +51,14 @@ class OTLPSpanExporter(SpanExporter):
 
     Each call to :meth:`export` encodes the batch it is handed as one JSON
     document and posts it to a single endpoint. A transient failure is retried
-    with exponential backoff until the timeout runs out. A permanent failure is
-    logged and reported to the caller, which drops the batch.
+    with exponential backoff, over at most six attempts and for no longer than
+    the timeout. A permanent failure is logged and reported to the caller, which
+    drops the batch.
 
-    Every argument may be left as ``None``. The value is then taken from the
+    Every argument may be left as ``None``. Each one is then taken from the
     per-signal ``OTEL_EXPORTER_OTLP_TRACES_*`` environment variable, then from
-    the generic ``OTEL_EXPORTER_OTLP_*`` variable, then from a default. All
+    the generic ``OTEL_EXPORTER_OTLP_*`` variable, then from a default, with the
+    exception of ``_transport``, which has no environment variable at all. All
     settings are resolved once, when the exporter is constructed; changing the
     environment afterwards has no effect.
 
