@@ -99,8 +99,11 @@ class RequestsHTTPResult(BaseHTTPResult):
         names none of those types. On ``requests`` 2.25.0, which
         ``pyproject.toml`` still admits because it requires only
         ``requests ~= 2.25``, ``application/json`` without a ``charset`` takes
-        the charset detection path instead. Bytes that do not decode become
-        replacement characters rather than an exception.
+        the charset detection path instead. A ``charset`` naming an encoding
+        that Python's codec registry does not know is an exception to the
+        first step: ``requests`` catches the ``LookupError`` and decodes as
+        UTF-8 instead. Bytes that do not decode become replacement characters
+        rather than an exception.
 
         Returns:
             The decoded body, or ``""`` when the request failed or the
