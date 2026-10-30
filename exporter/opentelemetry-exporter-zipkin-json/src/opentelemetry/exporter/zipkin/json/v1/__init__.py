@@ -29,10 +29,11 @@ class V1Encoder(Encoder):
         of the local endpoint, since v1 attaches the endpoint per annotation
         rather than once per span.
 
-        String values are truncated to ``max_tag_value_length``. The tags that
-        came from the attributes of the span and of its resource were already
-        truncated when they were extracted, so truncating them again changes
-        nothing. The scope, status and dropped count tags bypass that earlier
+        String values are truncated to ``max_tag_value_length`` when that
+        limit is set to a positive number. The tags that came from the
+        attributes of the span and of its resource were already truncated
+        when they were extracted, so truncating them again changes nothing.
+        The scope, status and dropped count tags bypass that earlier
         truncation, so this is the only one they get, and the v1 payload can
         therefore carry a shorter value than the v2 payload for the same span.
 

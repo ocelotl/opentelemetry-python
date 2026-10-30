@@ -85,7 +85,7 @@ class Encoder(abc.ABC):
             local_endpoint: The network context to attach to the encoded
                 spans. Where it ends up in the payload depends on the Zipkin
                 API version: v2 writes it once per span, v1 repeats it inside
-                every annotation.
+                every annotation and every binary annotation.
 
         Returns:
             The request body to send to the Zipkin collector.
@@ -184,10 +184,10 @@ class Encoder(abc.ABC):
                 ``SpanContext`` is treated as absent.
 
         Returns:
-            The parent span id, or ``None`` when the argument is a
-            ``SpanContext`` of a root span or is neither a ``Span`` nor a
-            ``SpanContext``. The encoders omit the ``parentId`` field when
-            this is ``None``.
+            The parent span id, or ``None`` when the argument is neither a
+            ``Span`` nor a ``SpanContext``, which is what ``span.parent``
+            holds for a root span. The encoders omit the ``parentId`` field
+            when this is ``None``.
 
         Raises:
             AttributeError: If the argument is a ``Span`` whose ``parent`` is
