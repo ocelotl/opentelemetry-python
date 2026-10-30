@@ -297,15 +297,27 @@ class Urllib3HTTPTransport(BaseHTTPTransport):
     ) -> BaseHTTPResult:
         """Send an HTTP request through the right pool manager and return the result.
 
-        A failed request is not retried. On ``urllib3`` 2.5.0 and later a
-        redirect is not followed either, so a ``3xx`` status reaches the caller
-        as the status of the request. On an earlier ``urllib3``, which
-        ``pyproject.toml`` still admits because it requires only
-        ``urllib3 >= 1.26``, ``PoolManager.urlopen`` runs its own redirect
-        handling and never sees the ``redirect=False`` that was put in the
-        pool settings, so it follows up to three redirects, re-sending the body
-        and the headers to each target, and the caller gets the status of the
-        final hop.
+        The hop this method issues is never retried, and on ``urllib3`` 2.5.0
+        and later a redirect is never followed, so a ``3xx`` status reaches the
+        caller as the status of the request.
+
+        An earlier ``urllib3``, which ``pyproject.toml`` still admits because
+        it requires only ``urllib3 >= 1.26``, behaves differently in several
+        ways that matter to an exporter. ``PoolManager.urlopen`` runs its own
+        redirect handling and never sees the ``redirect=False`` that was put in
+        the pool settings, so it follows up to three redirects and the caller
+        gets the status of the last hop reached. A 301, 302, 307 or 308 to the
+        same host re-sends the method, the body and the headers. A 303 turns
+        the request into a bodiless ``GET``, so a ``303`` from a misconfigured
+        endpoint gives the caller a ``200`` for an export whose payload was
+        never delivered. A redirect to a different host drops the
+        ``Authorization``, ``Cookie`` and ``Proxy-Authorization`` headers. A
+        chain longer than three redirects comes back as a result whose
+        ``error`` is a ``MaxRetryError``, which :meth:`is_connection_error`
+        reports as retryable, so the exporter sends the batch again. The
+        redirect target also gets a retry budget of its own, drawn from what
+        is left of the ``urllib3`` default, in place of the zero this
+        transport asked for.
 
         Every exception raised by ``urllib3`` is caught and placed in the
         result, including ones that are not connection errors, so this method

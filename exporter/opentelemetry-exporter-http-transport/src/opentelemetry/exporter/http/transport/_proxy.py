@@ -5,12 +5,23 @@
 
 ``urllib3`` reads no proxy configuration of its own, while ``requests`` does,
 so the ``urllib3`` transport of this package calls ``_get_environ_proxy`` for
-every request URL to reach the decision ``requests`` reaches. The two agree on
-``requests`` 2.34 and later. On an earlier ``requests`` they differ over a
-``NO_PROXY`` entry that a hostname ends with on no ``.`` boundary: this module
-leaves ``notexample.com`` proxied under ``NO_PROXY=example.com``, while
-``requests`` sends it directly. The ``requests`` transport does not use this
-module.
+every request URL to reach the decision ``requests`` reaches. The agreement is
+close rather than exact, and two divergences are known.
+
+A ``NO_PROXY`` entry that a hostname ends with on no ``.`` boundary is matched
+by ``requests`` below 2.34 and by this module never: under
+``NO_PROXY=example.com``, ``requests`` 2.33 sends ``notexample.com`` directly
+while this module proxies it. From ``requests`` 2.34 the two agree on host
+names.
+
+An IPv4 ``NO_PROXY`` entry is parsed by this module with
+:mod:`ipaddress` and by ``requests`` with ``socket.inet_aton`` plus a
+prefix-length check, and the two accept different strings at every version.
+``0.0.0.0/0`` matches every address here and nothing in ``requests``, which
+rejects a prefix length below 1. ``10.0/16`` matches ``10.0.0.1`` in
+``requests``, which accepts the shorthand, and nothing here.
+
+The ``requests`` transport does not use this module.
 
 The decision is made in two steps. ``_should_bypass_proxies`` answers whether
 the URL is exempt, by the ``NO_PROXY`` environment variable and then by the
@@ -105,9 +116,11 @@ def _should_bypass_proxies(url: str) -> bool:
     are consulted via :func:`urllib.request.proxy_bypass`.
 
     An empty element, which two adjacent commas produce, is dropped when the
-    list is split. An entry made only of dots survives that and is skipped
-    separately, so a stray ``.`` does not exempt a hostname written with a
-    trailing dot such as ``example.com.``.
+    list is split. An entry made only of dots survives that and is skipped by
+    the matching loop instead. Skipping it does not settle the answer:
+    :func:`urllib.request.proxy_bypass` reads the same ``NO_PROXY`` value
+    afterwards and has its own rules, and under ``NO_PROXY=.`` it exempts a
+    hostname written with a trailing dot such as ``example.com.``.
 
     Args:
         url: The absolute URL the request is about to be sent to.
