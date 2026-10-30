@@ -197,9 +197,6 @@ class OTLPMetricExporter(
             names an entry point that is not installed, or one whose return
             value is not a ``grpc.ChannelCredentials``. The constructor is
             where this surfaces.
-        InvalidCompressionValueException: When ``compression`` is ``None`` and
-            the compression variable that is read holds anything other than
-            ``gzip``.
         KeyError: When ``retryable_error_codes`` is ``None`` and
             ``OTEL_PYTHON_EXPORTER_OTLP_GRPC_RETRYABLE_ERROR_CODES`` holds a
             name that is not a ``grpc.StatusCode`` member. The key is that
