@@ -96,6 +96,14 @@ def configure_sdk(config: OpenTelemetryConfiguration) -> None:
             built, for example an exporter whose package is not installed
             or a sampler type the schema does not define. Instrumentation
             is the exception: a failure there is logged and skipped.
+        Exception: Whatever an SDK constructor or a plugin reached through
+            the configuration raises, since nothing here translates those.
+            A resource attribute whose value does not fit its declared type
+            raises ``ValueError``, a dataclass handed an unknown key raises
+            ``TypeError``, a view with an empty selector raises a bare
+            ``Exception``, and a Prometheus reader on a bound port raises
+            ``OSError``. Catching ``ConfigurationError`` alone therefore
+            does not survive every bad configuration file.
 
     Example:
         >>> from opentelemetry.configuration.file import (

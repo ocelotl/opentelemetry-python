@@ -551,11 +551,15 @@ def _create_sampler(config: SamplerConfig) -> Sampler:
         rather than passed to it.
 
     Raises:
-        ConfigurationError: If the block selects nothing, in which case the
-            message carries the repr of the block, or if a plugin sampler
-            name is not registered in the entry point group, in which case
-            ``load_entry_point`` raises and the message names the plugin
-            and the group instead.
+        ConfigurationError: If the block selects no sampler type this
+            function implements, in which case the message carries the repr
+            of the block. The schema declares two sampler fields that are
+            not implemented here, ``probability/development`` and
+            ``jaeger_remote/development``, so a block that sets either one
+            reaches that same error. It is raised as well when a plugin
+            sampler name is not registered in the entry point group, in
+            which case ``load_entry_point`` raises and the message names the
+            plugin and the group instead.
     """
     if config.always_on is not None:
         return ALWAYS_ON
