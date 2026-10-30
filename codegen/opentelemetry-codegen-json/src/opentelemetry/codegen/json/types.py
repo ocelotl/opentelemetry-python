@@ -180,8 +180,10 @@ def to_json_field_name(snake_name: str) -> str:
     This is the fallback for a descriptor that carries no ``json_name``. ``protoc`` normally fills
     that field in, and the generator prefers it when present.
 
-    The conversion uses ``str.title`` on each component after the first, which lowercases the rest
-    of a component as well as uppercasing its first character, so ``trace_ID`` gives ``traceId``.
+    The conversion uses ``str.title`` on each component after the first. ``str.title`` uppercases
+    the first letter after every character that is not a letter and lowercases every other letter,
+    so ``trace_ID`` gives ``traceId`` and a digit inside a component starts a second uppercase
+    letter: ``foo_bar1baz`` gives ``fooBar1Baz``.
     A leading underscore produces an empty first component, so the result begins with whatever
     ``str.title`` makes of the second one: ``_foo`` gives ``Foo``, and ``_1abc`` gives ``1Abc``.
 
