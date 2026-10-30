@@ -14,7 +14,7 @@ OTEL_LOGS_EXPORTER = "OTEL_LOGS_EXPORTER"
 .. envvar:: OTEL_LOGS_EXPORTER
 
 Specifies which exporter is used for logs. See `General SDK Configuration
-<https://opentelemetry.io/docs/concepts/sdk-configuration/general-sdk-configuration/#otel_logs_exporter>`_.
+<https://opentelemetry.io/docs/concepts/sdk-configuration/general-sdk-configuration/#otel_logs_exporter>`__.
 
 **Default value:** ``"otlp"``
 
