@@ -770,9 +770,8 @@ def _create_pull_metric_exporter(
         config: The ``exporter`` block of a pull metric reader
             configuration.
         cardinality_limits: Per-instrument limits from the reader. They
-            reach the Prometheus reader; for a plugin they are ignored with
-            a warning, because the plugin constructor takes only the keys
-            its own configuration mapping holds.
+            reach the Prometheus reader. For a plugin they are ignored, and
+            a warning is logged only when they are not ``None``.
 
     Returns:
         The reader the block selects.
