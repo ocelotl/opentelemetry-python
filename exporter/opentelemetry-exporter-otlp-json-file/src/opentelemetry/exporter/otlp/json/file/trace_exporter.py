@@ -50,6 +50,9 @@ class FileSpanExporter(SpanExporter):
     Raises:
         ValueError: Both ``path`` and ``stream`` were given. Leaving both out selects
             ``sys.stdout``.
+        OSError: ``path`` could not be opened for appending, because its directory does not
+            exist, because the process may not write there, or for any other reason ``open``
+            reports.
     """
 
     @overload

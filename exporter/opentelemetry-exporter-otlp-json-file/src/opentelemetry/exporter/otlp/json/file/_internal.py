@@ -53,6 +53,9 @@ class _FileExporter(Generic[T]):
 
     Raises:
         ValueError: Both ``path`` and ``stream`` were given, which names two destinations at once.
+        OSError: ``path`` could not be opened for appending, because its directory does not
+            exist, because the process may not write there, or for any other reason ``open``
+            reports.
     """
 
     def __init__(
