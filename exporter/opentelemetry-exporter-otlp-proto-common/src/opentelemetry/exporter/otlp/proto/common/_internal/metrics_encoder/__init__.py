@@ -1,5 +1,18 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
+"""Conversion of SDK metrics into the protobuf metrics export request.
+
+``encode_metrics`` is the only name the OTLP exporters import from here by way of
+``opentelemetry.exporter.otlp.proto.common.metrics_encoder``. The gRPC and HTTP
+metric exporters additionally import ``OTLPMetricExporterMixin`` from this module
+directly, to share the reading of the two environment variables that decide
+aggregation temporality and the default histogram aggregation.
+
+The SDK has already grouped metrics by resource and by instrumentation scope
+before they reach this module, so the encoding copies that structure rather than
+rebuilding it, which is where it differs from the span and log record encoders.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -54,11 +67,39 @@ _logger = logging.getLogger(__name__)
 
 
 class OTLPMetricExporterMixin:
+    """Shared configuration for the gRPC and HTTP OTLP metric exporters.
+
+    Both exporters subclass this mixin together with
+    :class:`opentelemetry.sdk.metrics.export.MetricExporter`, and call
+    ``_common_configuration`` from their own constructors. The mixin reads the
+    two OTLP environment variables that select a temporality and a default
+    histogram aggregation per instrument class, so that the two exporters cannot
+    disagree about what those variables mean.
+
+    The mixin defines no state of its own and takes no constructor arguments.
+    """
+
     def _common_configuration(
         self,
         preferred_temporality: dict[type, AggregationTemporality] | None = None,
         preferred_aggregation: dict[type, Aggregation] | None = None,
     ) -> None:
+        """Initialise the ``MetricExporter`` half of the exporter.
+
+        Calls ``MetricExporter.__init__`` explicitly rather than through
+        ``super()``, so the exporter gets the temporality and aggregation
+        mappings that the environment and the arguments produce together.
+
+        Args:
+            preferred_temporality: Per instrument class, the aggregation
+                temporality the caller wants, overriding what the environment
+                selects. ``None`` and an empty mapping both leave the environment
+                in charge. An instrument class absent from the mapping keeps the
+                environment's choice.
+            preferred_aggregation: Per instrument class, the aggregation the
+                caller wants. Same ``None`` and absence handling as
+                ``preferred_temporality``.
+        """
         MetricExporter.__init__(
             self,
             preferred_temporality=self._get_temporality(preferred_temporality),
@@ -68,6 +109,26 @@ class OTLPMetricExporterMixin:
     def _get_temporality(
         self, preferred_temporality: dict[type, AggregationTemporality]
     ) -> dict[type, AggregationTemporality]:
+        """Decide the aggregation temporality of each instrument class.
+
+        Reads ``OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE``, upper-cased
+        and stripped of surrounding whitespace, so ``delta`` and ``" DELTA "``
+        are both accepted. ``CUMULATIVE`` is the default and makes every
+        instrument class cumulative. ``DELTA`` makes counters, histograms and
+        observable counters delta. ``LOWMEMORY`` differs from ``DELTA`` only in
+        keeping observable counters cumulative, which lets the SDK avoid storing
+        the previous value for them. Any other value is logged at ``WARNING`` and
+        treated as ``CUMULATIVE``.
+
+        Args:
+            preferred_temporality: Per instrument class, the temporality that
+                overrides the environment's choice. ``None`` leaves the
+                environment's choice untouched. The mapping is not mutated.
+
+        Returns:
+            One entry per instrument class the exporter supports, suitable for
+            the ``preferred_temporality`` argument of ``MetricExporter``.
+        """
         otel_exporter_otlp_metrics_temporality_preference = (
             environ.get(
                 OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE,
@@ -120,6 +181,31 @@ class OTLPMetricExporterMixin:
         self,
         preferred_aggregation: dict[type, Aggregation],
     ) -> dict[type, Aggregation]:
+        """Decide the default aggregation of each instrument class.
+
+        Reads ``OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION``, which
+        only ever affects :class:`opentelemetry.sdk.metrics.Histogram`.
+        ``explicit_bucket_histogram`` is the default and selects
+        :class:`opentelemetry.sdk.metrics.view.ExplicitBucketHistogramAggregation`;
+        ``base2_exponential_bucket_histogram`` selects
+        :class:`opentelemetry.sdk.metrics.view.ExponentialBucketHistogramAggregation`.
+        The comparison is exact, with no case folding and no stripping, so
+        ``Explicit_Bucket_Histogram`` is logged at ``WARNING`` and falls back to
+        explicit buckets. Every instrument class other than ``Histogram`` is left
+        out of the result, which leaves the SDK's own default in place for it.
+
+        Args:
+            preferred_aggregation: Per instrument class, the aggregation that
+                overrides the environment's choice, and the only way to set an
+                aggregation for an instrument class that is not ``Histogram``.
+                ``None`` leaves the environment's choice untouched. The mapping is
+                not mutated.
+
+        Returns:
+            The aggregation for ``Histogram`` plus every entry of
+            ``preferred_aggregation``, suitable for the
+            ``preferred_aggregation`` argument of ``MetricExporter``.
+        """
         otel_exporter_otlp_metrics_default_histogram_aggregation = environ.get(
             OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION,
             "explicit_bucket_histogram",
@@ -151,18 +237,62 @@ class EncodingException(Exception):
     """
     Raised by encode_metrics() when an exception is caught during encoding. Contains the problematic metric so
     the misbehaving metric name and details can be logged during exception handling.
+
+    It is raised with ``from None``, so the traceback does not show the original
+    exception as the cause. The original exception is kept as an attribute
+    instead, and is included in the string form.
+
+    Args:
+        original_exception: The exception raised while encoding ``metric``.
+            Available afterwards as the ``original_exception`` attribute.
+        metric: The SDK metric that failed to encode, carrying its name,
+            description, unit and data points. Available afterwards as the
+            ``metric`` attribute. A caller that logs it should keep in mind that
+            the data points include attribute values, which may be sensitive.
     """
 
     def __init__(self, original_exception, metric):
+        """Store the failing metric and the exception it caused.
+
+        The arguments are documented on the class.
+        """
         super().__init__()
         self.original_exception = original_exception
         self.metric = metric
 
     def __str__(self):
+        """Render the failing metric and the original exception.
+
+        Returns:
+            The metric on its own line, then the original exception on the next.
+            ``Exception.__init__`` was called with no arguments, so this is the
+            only place the two values appear in the formatted traceback.
+        """
         return f"{self.metric}\n{self.original_exception}"
 
 
 def encode_metrics(data: MetricsData) -> ExportMetricsServiceRequest:
+    """Encode collected metrics as the protobuf request body of an OTLP metrics export.
+
+    Unlike the span and log record encoders, this one does not regroup anything:
+    the SDK hands over one ``ResourceMetrics`` per resource already, each holding
+    its scopes, and the encoding mirrors that structure. A metric whose data type
+    the protocol has no message for is logged at ``WARNING`` and encoded as a
+    ``Metric`` with a name, a description and a unit but no data points.
+
+    Args:
+        data: The metrics the SDK's reader collected.
+
+    Returns:
+        The ``ExportMetricsServiceRequest`` to send over gRPC or, serialized, as
+        the body of an HTTP request.
+
+    Raises:
+        EncodingException: If encoding a single metric fails. The exception
+            carries that metric and the exception it caused, so the caller can
+            name the offending instrument. Nothing is exported in that case: the
+            whole batch is lost, not only the one metric.
+    """
     resource_metrics_dict = {}
 
     for resource_metrics in data.resource_metrics:
@@ -184,6 +314,27 @@ def encode_metrics(data: MetricsData) -> ExportMetricsServiceRequest:
 
 
 def _encode_resource_metrics(resource_metrics, resource_metrics_dict):
+    """Encode every scope and metric under one resource into an accumulator.
+
+    Nothing is returned: the encoded messages are added to
+    ``resource_metrics_dict``, which ``encode_metrics`` then turns into
+    ``ResourceMetrics`` messages. The entry for the resource is assigned rather
+    than merged, so calling this twice with the same resource discards what the
+    first call produced.
+
+    Args:
+        resource_metrics: One ``ResourceMetrics`` as the SDK's reader produced
+            it, holding the resource and its scope metrics.
+        resource_metrics_dict: The accumulator, mapping each SDK resource to a
+            mapping from instrumentation scope to the protobuf ``ScopeMetrics``
+            being filled. Mutated in place.
+
+    Raises:
+        EncodingException: If encoding one metric fails, wrapping the original
+            exception and naming the metric. The scope metrics encoded before it
+            stay in the accumulator, but ``encode_metrics`` does not return, so
+            they are never exported.
+    """
     resource = resource_metrics.resource
     # It is safe to assume that each entry in data.resource_metrics is
     # associated with an unique resource.
@@ -219,6 +370,27 @@ def _encode_resource_metrics(resource_metrics, resource_metrics_dict):
 
 
 def _encode_metric(metric, pb2_metric):
+    """Fill in the data points of a protobuf ``Metric`` from an SDK metric.
+
+    Nothing is returned: ``pb2_metric`` is mutated, and which of its ``gauge``,
+    ``histogram``, ``sum`` and ``exponential_histogram`` fields gets set is
+    decided by the runtime type of ``metric.data``. A numeric data point is
+    written to ``as_int`` when its value is an ``int`` and to ``as_double``
+    otherwise.
+
+    An exponential histogram data point whose positive or negative bucket counts
+    are empty leaves that side of the point unset rather than writing an empty
+    ``Buckets`` message.
+
+    Args:
+        metric: The SDK metric, whose ``data`` attribute holds the data points.
+            A ``data`` of a type this function does not recognise is logged at
+            ``WARNING`` by class name and leaves ``pb2_metric`` without data
+            points, so the metric is exported as an empty one rather than
+            dropped.
+        pb2_metric: The protobuf ``Metric`` to fill in. Its name, description and
+            unit are expected to be set already, and are not touched here.
+    """
     if isinstance(metric.data, Gauge):
         for data_point in metric.data.data_points:
             pt = pb2.NumberDataPoint(
