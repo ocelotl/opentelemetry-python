@@ -6,7 +6,10 @@
 A Zipkin span carries the network context of the node that recorded it. This
 module holds the representation of that context, ``NodeEndpoint``, which the
 encoders in ``opentelemetry.exporter.zipkin.encoder`` serialize into the
-``localEndpoint`` field of the Zipkin payload.
+payload. Where it lands depends on the Zipkin API version: the v2 encoder
+writes it once per span as ``localEndpoint``, and the v1 encoder repeats it
+under the key ``endpoint`` inside every annotation and binary annotation,
+because v1 has no per-span endpoint field.
 """
 
 import ipaddress
@@ -28,9 +31,10 @@ class NodeEndpoint:
     The service name is not a parameter. It is read once, at construction
     time, from the resource of the globally registered tracer provider, or
     from a freshly created ``Resource`` when that provider carries none. The
-    exporter overwrites it later with the service name of the first span of
-    each exported batch, so the value sampled here only survives for batches
-    that are empty or whose spans carry no ``service.name``.
+    exporter then replaces it, permanently, with the service name of the first
+    span of the first exported batch that carries one, so the value sampled
+    here is used only until that batch and the replacement is used for every
+    batch after it.
 
     Args:
         ipv4: Primary IPv4 address associated with this connection.

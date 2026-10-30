@@ -242,7 +242,7 @@ class Encoder(abc.ABC):
     def _extract_tag_value_string_from_sequence(self, sequence: Sequence):
         """Render a sequence attribute as a compact JSON array string.
 
-        The length limit is honoured at the element boundary rather than by
+        The length limit is honored at the element boundary rather than by
         cutting the finished string, so the result stays valid JSON. Elements
         are appended while the running length of the rendered array, counting
         the brackets, the quotes and the separating commas, stays within

@@ -108,7 +108,9 @@ class ZipkinExporter(SpanExporter):
         local_node_port: Depending on context, this could be a listen port or the
             client-side of a socket.
         max_tag_value_length: Max length string attribute values can have.
-            ``None`` leaves tag values untruncated.
+            Under ``Protocol.V2``, ``None`` leaves tag values untruncated.
+            Under ``Protocol.V1``, ``None`` makes ``export`` raise
+            ``TypeError``, so a length has to be given to use that version.
         timeout: Maximum time the Zipkin exporter will wait for each batch export.
             The default value is 10s. When ``None`` or zero, the value of the
             :envvar:`OTEL_EXPORTER_ZIPKIN_TIMEOUT` environment variable is
@@ -176,6 +178,13 @@ class ZipkinExporter(SpanExporter):
             ``SpanExportResult.SUCCESS`` when the collector answered 200 or
             202, and ``SpanExportResult.FAILURE`` for any other status code or
             when the exporter has already been shut down.
+
+        Raises:
+            TypeError: If the exporter was built with ``Protocol.V1`` and
+                ``max_tag_value_length`` left unset, and the batch holds a
+                span that contributes at least one tag, which in practice is
+                every span. Give ``max_tag_value_length`` a length to use
+                ``Protocol.V1``.
         """
         # After the call to Shutdown subsequent calls to Export are
         # not allowed and should return a Failure result

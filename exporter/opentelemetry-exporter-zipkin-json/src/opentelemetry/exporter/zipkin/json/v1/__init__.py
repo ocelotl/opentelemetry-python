@@ -29,9 +29,12 @@ class V1Encoder(Encoder):
         of the local endpoint, since v1 attaches the endpoint per annotation
         rather than once per span.
 
-        String values are truncated to ``max_tag_value_length``. The tags have
-        already been truncated once when they were extracted, so this second
-        truncation changes nothing in practice.
+        String values are truncated to ``max_tag_value_length``. The tags that
+        came from the attributes of the span and of its resource were already
+        truncated when they were extracted, so truncating them again changes
+        nothing. The scope, status and dropped count tags bypass that earlier
+        truncation, so this is the only one they get, and the v1 payload can
+        therefore carry a shorter value than the v2 payload for the same span.
 
         Args:
             span: The span whose tags to convert.
@@ -66,6 +69,11 @@ class JsonV1Encoder(JsonEncoder, V1Encoder):
     """Zipkin Export Encoder for JSON v1 API
 
     API spec: https://github.com/openzipkin/zipkin-api/blob/master/zipkin-api.yaml
+
+    Args:
+        max_tag_value_length: maximum length of an exported tag value. Values
+          will be truncated to conform. Since values are serialized to a JSON
+          list string, max_tag_value_length is honored at the element boundary.
     """
 
     def _encode_span(self, span: Span, encoded_local_endpoint: dict) -> dict:
