@@ -56,9 +56,8 @@ class LogRecord(ABC):
         timestamp: When the event occurred, as nanoseconds since the Unix
             epoch.
         observed_timestamp: When the event was observed by the collection
-            system, as nanoseconds since the Unix epoch. Defaults to
-            ``timestamp`` when that is given, and to the current time
-            otherwise.
+            system, as nanoseconds since the Unix epoch. Defaults to the time
+            the record is built, whether or not ``timestamp`` was given.
         context: The context the record belongs to. Defaults to the current
             context, from which the trace id, span id and trace flags are
             taken.
@@ -249,10 +248,11 @@ class Logger(ABC):
                 given, every keyword argument below is ignored. When it is
                 ``None``, a record is built from the keyword arguments.
             timestamp: When the event occurred, as nanoseconds since the Unix
-                epoch. Defaults to the time the record is created.
+                epoch. Left unset when omitted, so the record carries ``None``
+                rather than a time the API invented.
             observed_timestamp: When the event was observed by the collection
                 system, as nanoseconds since the Unix epoch. Defaults to the
-                time the record is created.
+                time the record is built.
             context: The context the record belongs to, used to associate it
                 with the active span. Defaults to the current context.
             severity_number: The severity of the event on the OpenTelemetry
@@ -345,10 +345,11 @@ class NoOpLogger(Logger):
                 given, every keyword argument below is ignored. When it is
                 ``None``, a record is built from the keyword arguments.
             timestamp: When the event occurred, as nanoseconds since the Unix
-                epoch. Defaults to the time the record is created.
+                epoch. Left unset when omitted, so the record carries ``None``
+                rather than a time the API invented.
             observed_timestamp: When the event was observed by the collection
                 system, as nanoseconds since the Unix epoch. Defaults to the
-                time the record is created.
+                time the record is built.
             context: The context the record belongs to, used to associate it
                 with the active span. Defaults to the current context.
             severity_number: The severity of the event on the OpenTelemetry
@@ -486,10 +487,11 @@ class ProxyLogger(Logger):
                 given, every keyword argument below is ignored. When it is
                 ``None``, a record is built from the keyword arguments.
             timestamp: When the event occurred, as nanoseconds since the Unix
-                epoch. Defaults to the time the record is created.
+                epoch. Left unset when omitted, so the record carries ``None``
+                rather than a time the API invented.
             observed_timestamp: When the event was observed by the collection
                 system, as nanoseconds since the Unix epoch. Defaults to the
-                time the record is created.
+                time the record is built.
             context: The context the record belongs to, used to associate it
                 with the active span. Defaults to the current context.
             severity_number: The severity of the event on the OpenTelemetry

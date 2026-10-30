@@ -12,10 +12,13 @@ rules: ``_clean_attribute_value``, which coerces or drops an invalid
 value, and :class:`BoundedAttributes`, the mapping that spans, log records and
 metric measurements store their attributes in.
 
-A value that cannot be represented is never allowed to raise through to the
-caller. It is coerced to :class:`str` when the object defines ``__str__`` or
-``__repr__``, dropped otherwise, and a warning is logged either way, so that
-faulty instrumentation degrades the telemetry rather than the application.
+A value that cannot be represented is coerced to :class:`str` when the object
+defines ``__str__`` or ``__repr__``, and is replaced with ``None`` otherwise.
+The pair stays in the mapping either way and ``dropped`` is not incremented. A
+key is treated differently: a key of a nested mapping that cannot be converted
+is dropped along with its value. A warning is logged in every case. Note that
+coercion calls ``__str__`` on the object, so a ``__str__`` that raises does
+propagate to the caller.
 """
 
 import copy

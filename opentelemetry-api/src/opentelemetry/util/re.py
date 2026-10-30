@@ -71,7 +71,10 @@ def parse_env_headers(s: str, liberal: bool = False) -> Mapping[str, str]:
     ``s`` holds comma separated ``name=value`` pairs in the W3C Baggage HTTP
     header format at https://www.w3.org/TR/baggage/#baggage-http-header-format,
     except that the additional semi-colon delimited metadata is not supported.
-    Names are lowercased and both halves are URL-decoded.
+    Names are lowercased. Both halves are URL-decoded only for a pair that
+    matches the strict pattern above; a pair accepted only because ``liberal``
+    is set is taken verbatim, so a percent escape in it survives into the
+    result.
 
     A pair that does not match the expected format is skipped and a warning is
     logged, so a single malformed entry does not discard the rest.

@@ -614,10 +614,13 @@ class Meter(ABC):
             unit: The unit for observations this instrument reports. For
                 example, ``By`` for bytes. UCUM units are recommended.
             description: A description for this instrument and what it measures.
+
         Returns:
-            A :class:`~opentelemetry.metrics.Gauge`. Which implementation is
-            returned depends on the meter: a recording one when an SDK is
-            installed, a no-op one otherwise.
+            A :class:`~opentelemetry.metrics.Gauge` from a meter that
+            overrides this method. This method is not abstract and its own
+            body only emits a warning, so a meter that inherits it returns
+            ``None`` and a caller that goes on to record a measurement raises
+            :exc:`AttributeError`.
         """
         warnings.warn("create_gauge() is not implemented and will be a no-op")
 

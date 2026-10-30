@@ -420,7 +420,9 @@ class TraceState(Mapping[str, str]):
         """Iterate over the keys.
 
         Returns:
-            An iterator over the keys, most recently added first.
+            An iterator over the keys. The order is the one the pairs
+            were supplied to the constructor or parsed from the header in.
+            :meth:`add` and :meth:`update` put their new pair first.
         """
         return iter(self._dict)
 
@@ -592,7 +594,9 @@ class TraceState(Mapping[str, str]):
         """Return a view of the keys.
 
         Returns:
-            A view of the keys, most recently added first.
+            A view of the keys. The order is the one the pairs
+            were supplied to the constructor or parsed from the header in.
+            :meth:`add` and :meth:`update` put their new pair first.
         """
         return self._dict.keys()
 
@@ -600,7 +604,9 @@ class TraceState(Mapping[str, str]):
         """Return a view of the pairs.
 
         Returns:
-            A view of the key/value pairs, most recently added first.
+            A view of the key/value pairs. The order is the one the pairs
+            were supplied to the constructor or parsed from the header in.
+            :meth:`add` and :meth:`update` put their new pair first.
         """
         return self._dict.items()
 
@@ -608,7 +614,9 @@ class TraceState(Mapping[str, str]):
         """Return a view of the values.
 
         Returns:
-            A view of the values, most recently added first.
+            A view of the values. The order is the one the pairs
+            were supplied to the constructor or parsed from the header in.
+            :meth:`add` and :meth:`update` put their new pair first.
         """
         return self._dict.values()
 
@@ -691,7 +699,10 @@ class SpanContext(tuple[int, int, bool, "TraceFlags", "TraceState", bool]):
         """The id of the trace this span belongs to.
 
         Returns:
-            A 128-bit integer, zero when the context is invalid.
+            A 128-bit integer. It is zero in ``INVALID_SPAN_CONTEXT``,
+            but a context can be invalid while this id is non-zero, because
+            :attr:`is_valid` requires both ids to be in range. Test
+            :attr:`is_valid` rather than comparing this against zero.
         """
         return self[0]  # pylint: disable=unsubscriptable-object
 
@@ -700,7 +711,10 @@ class SpanContext(tuple[int, int, bool, "TraceFlags", "TraceState", bool]):
         """The id of this span.
 
         Returns:
-            A 64-bit integer, zero when the context is invalid.
+            A 64-bit integer. It is zero in ``INVALID_SPAN_CONTEXT``, but
+            a context can be invalid while this id is non-zero, because
+            :attr:`is_valid` requires both ids to be in range. Test
+            :attr:`is_valid` rather than comparing this against zero.
         """
         return self[1]  # pylint: disable=unsubscriptable-object
 

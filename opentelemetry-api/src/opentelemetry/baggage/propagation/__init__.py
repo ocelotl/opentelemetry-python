@@ -122,9 +122,12 @@ class W3CBaggagePropagator(textmap.TextMapPropagator):
         See
         `opentelemetry.propagators.textmap.TextMapPropagator.extract`
 
-        A list-member that does not parse, that fails validation or that
-        breaks a size limit is skipped with a warning, so a single bad entry
-        does not discard the rest of the header.
+        A list-member that does not parse, that fails validation, that
+        holds a non-ASCII character or that is longer than the per-entry
+        limit is skipped on its own, so the rest of the header still
+        extracts. Exceeding the entry count or the total header length is
+        different: extraction stops there and every remaining entry is
+        discarded, including entries that would have fitted.
 
         Args:
             carrier: The object holding the incoming headers, for example the
