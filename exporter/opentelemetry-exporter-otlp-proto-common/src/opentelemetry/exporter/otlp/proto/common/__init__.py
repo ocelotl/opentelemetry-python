@@ -14,7 +14,10 @@ The encoders live in ``opentelemetry.exporter.otlp.proto.common.trace_encoder``,
 sits under the private ``_internal`` subpackage. Those three modules are the
 whole surface an outside caller should rely on; the OTLP exporter packages of
 this repository additionally import ``_get_resource_data`` and
-``OTLPMetricExporterMixin`` out of ``_internal`` directly, so moving a name
+``OTLPMetricExporterMixin`` out of ``_internal`` directly, and the test suites
+of the gRPC exporter and of ``opentelemetry-exporter-otlp-json-common`` import
+``_encode_attributes``, ``_encode_key_value``, ``_encode_span_id``,
+``_encode_trace_id`` and ``_encode_value`` out of it as well, so moving a name
 within that subpackage breaks them.
 """
 
