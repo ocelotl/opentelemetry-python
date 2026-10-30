@@ -39,8 +39,9 @@ def _generate_metric(name, data, attributes=None, description=None, unit=None) -
             ``_generate_unsupported_metric`` relies on.
         attributes: Ignored. Attributes belong to the individual data points
             inside ``data``, so there is nothing for this function to do with
-            them. The parameter is kept because the other builders in this
-            module accept one and forward their arguments here positionally.
+            them. The parameter only keeps the signature uniform with the other
+            builders in this module, none of which pass their own ``attributes``
+            on to this function.
         description: The metric description. ``None`` means ``"foo"``, so a
             test that does not care about the description gets a non-empty one.
         unit: The metric unit. ``None`` means ``"s"``.

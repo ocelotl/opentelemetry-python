@@ -251,10 +251,12 @@ class TestBase(unittest.TestCase):
                    yields an empty list rather than an error.
 
         Returns:
-            The metrics collected since the last collection, sorted by name.
-            Reading them performs a collection, so calling this twice in a row
-            does not return the same data: the second call sees only what was
-            recorded in between.
+            The metrics the reader holds after a fresh collection, sorted by
+            name. Reading them performs that collection. ``create_meter_provider``
+            builds the reader with the default cumulative temporality, so a
+            measurement already reported is reported again on every later call
+            and the values accumulate rather than reset. Calling this twice with
+            nothing recorded in between returns the same values twice.
         """
         metrics_data = self.memory_metrics_reader.get_metrics_data()
         resource_metrics = metrics_data.resource_metrics if metrics_data else []
@@ -329,9 +331,12 @@ class TestBase(unittest.TestCase):
         Returns:
             ``True`` when the two are of the same concrete type, that type is
             ``NumberDataPoint`` or ``HistogramDataPoint``, their values agree
-            within ``est_value_delta``, and their attributes are equal. A data
-            point of any other type returns ``False`` rather than raising, so an
-            unsupported type is reported as a mismatch.
+            within ``est_value_delta``, and their attributes are equal. Two
+            ``HistogramDataPoint`` objects additionally have to carry the same
+            ``count`` and the same ``explicit_bounds``, and the same ``min`` and
+            ``max`` when ``est_value_delta`` is ``0``. A data point of any other
+            type returns ``False`` rather than raising, so an unsupported type
+            is reported as a mismatch.
         """
         if type(expected_data_point) != type(data_point) or not isinstance(  # noqa: E721
             expected_data_point, (HistogramDataPoint, NumberDataPoint)

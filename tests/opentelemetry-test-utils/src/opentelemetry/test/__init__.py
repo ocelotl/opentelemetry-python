@@ -46,9 +46,10 @@ class _AssertNotRaisesMixin:
         An instance is bound to ``self.assertNotRaises`` on the test case. It is
         both the callable and the context manager: calling it records the
         exception types to watch for and returns the same instance, which is
-        then entered. Entering it without calling it first raises
-        ``AttributeError``, because the exception types are set only by
-        ``__call__``.
+        then entered. Entering it without calling it first succeeds, because
+        ``__enter__`` does not read the exception types; the omission surfaces
+        as an ``AttributeError`` out of ``__exit__``, and only when the block
+        raised something.
 
         The instance is shared across every use within one test case, so nesting
         two ``assertNotRaises`` blocks does not work: the inner call overwrites

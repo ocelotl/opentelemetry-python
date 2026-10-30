@@ -42,9 +42,10 @@ class MockFunc:
     def __call__(self, *args, **kwargs):
         """Count this call and return the shared ``Mock``.
 
-        Only the count is thread safe. The returned ``Mock`` records its own
-        calls without a lock, so assert on ``call_count`` rather than on
-        ``mock.call_count``.
+        ``self.mock`` is returned but never called here, so its own
+        ``call_count`` counts what callers did with the returned object and not
+        calls to this ``MockFunc``. Assert on ``call_count``, which is the only
+        count of the latter and the only one taken under the lock.
 
         Args:
             *args: Accepted and discarded, so any call signature works.
