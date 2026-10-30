@@ -6,15 +6,27 @@
 The span, metric and log exporters in this package take the same connection
 settings, and each one resolves them the same way: the value passed to the
 exporter constructor wins, then the per-signal environment variable, then the
-generic ``OTEL_EXPORTER_OTLP_*`` variable, then a built-in default. The helpers
-here implement the last three steps. Every helper takes the name of the
-per-signal environment variable as an argument, because the name is the only
-part that differs between the three exporters.
+generic ``OTEL_EXPORTER_OTLP_*`` variable, then a built-in default.
 
-A malformed environment value is reported through the module logger and
-replaced by the default. None of these helpers raises on bad input, so a typo
-in the environment degrades the configuration instead of preventing the
-exporter from being constructed.
+``_resolve_endpoint``, ``_resolve_timeout`` and ``_resolve_compression`` cover
+the environment and default steps only; the exporter applies its own
+constructor argument before it calls them. ``_resolve_headers`` and
+``_build_transport`` take the constructor values as arguments and apply the
+whole precedence themselves, because each of the several values they resolve
+falls back independently of the others.
+
+Every helper takes the names of the environment variables it reads as
+arguments, since those names are what differs between the three exporters.
+``_resolve_endpoint`` takes the signal path to append as well, and
+``_build_transport`` takes three variable names rather than one.
+
+None of these helpers raises on bad input, so a typo in the environment
+degrades the configuration instead of preventing the exporter from being
+constructed. ``_resolve_timeout`` and ``_resolve_compression`` report the bad
+value through this module's logger and fall back to the default. A malformed
+entry in a headers variable is dropped by
+``opentelemetry.util.re.parse_env_headers``, which reports it through its own
+logger, so raising the level of this module's logger alone does not surface it.
 """
 
 from __future__ import annotations
@@ -59,7 +71,9 @@ def _resolve_endpoint(
     naming the signal. When it is unset or empty, ``default_path`` is appended
     to ``OTEL_EXPORTER_OTLP_ENDPOINT``, or to ``http://localhost:4318`` when
     that variable is unset or empty as well. One trailing slash is removed from
-    the base before the path is appended, so the result does not contain ``//``.
+    the base before the path is appended, so a base written as
+    ``http://collector:4318/`` does not produce a doubled slash in front of the
+    signal path. A base ending in more than one slash keeps the rest of them.
 
     Args:
         endpoint_env_var: Name of the per-signal endpoint environment variable,
