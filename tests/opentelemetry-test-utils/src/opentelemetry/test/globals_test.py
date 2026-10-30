@@ -13,9 +13,10 @@ keep the one installed by the first.
 The ``reset_*_globals`` functions here reach into those private globals and put
 them back to their unset state, and the ``*GlobalsTest`` classes call them from
 ``setUp`` and ``tearDown`` so a test does not have to. Reaching into private
-names is why every function in this module carries a warning against use outside
-a test suite: nothing here is part of the public API of the packages it mutates,
-and a release may move or rename the globals it assigns to.
+names is why each of the three functions that assign to those globals carries a
+warning against use outside a test suite: nothing here is part of the public API
+of the packages it mutates, and a release may move or rename the globals it
+assigns to.
 """
 
 import unittest
@@ -32,10 +33,14 @@ def reset_trace_globals() -> None:
     """Put the trace API globals back to their unset state.
 
     Clears the configured tracer provider, replaces the proxy tracer provider
-    with a fresh one so that tracers handed out by an earlier test stop
-    forwarding to the provider that test installed, and resets the ``Once`` guard that
+    with a fresh one so that a tracer requested after this call is not bound to
+    the provider the previous test installed, and resets the ``Once`` guard that
     makes ``opentelemetry.trace.set_tracer_provider`` effective only once.
     After this call, ``set_tracer_provider`` installs a provider again.
+
+    A tracer obtained before this call is not detached by it: a proxy tracer
+    caches the real tracer the first time it resolves one, so it keeps sending
+    spans to the earlier provider. Request the tracer again after the reset.
 
     WARNING: only use this for tests. It assigns to private module globals of
     ``opentelemetry.trace``.
@@ -50,9 +55,13 @@ def reset_metrics_globals() -> None:
     """Put the metrics API globals back to their unset state.
 
     Clears the configured meter provider, replaces the proxy meter provider with
-    a fresh one so that meters and instruments created by an earlier test stop
-    forwarding to the provider that test installed, and resets the ``Once`` guard that
+    a fresh one so that a meter requested after this call is not bound to the
+    provider the previous test installed, and resets the ``Once`` guard that
     makes ``opentelemetry.metrics.set_meter_provider`` effective only once.
+
+    A meter or instrument obtained before this call is not detached by it: the
+    proxy caches the real one the first time it resolves it, so measurements
+    keep reaching the earlier provider. Create them again after the reset.
 
     WARNING: only use this for tests. It assigns to private module globals of
     ``opentelemetry.metrics._internal``.
@@ -67,9 +76,13 @@ def reset_logging_globals() -> None:
     """Put the logs API globals back to their unset state.
 
     Clears the configured logger provider, replaces the proxy logger provider
-    with a fresh one so that loggers obtained by an earlier test stop forwarding
-    to the provider that test installed, and resets the ``Once`` guard that makes
-    ``opentelemetry._logs.set_logger_provider`` effective only once.
+    with a fresh one so that a logger requested after this call is not bound to
+    the provider the previous test installed, and resets the ``Once`` guard that
+    makes ``opentelemetry._logs.set_logger_provider`` effective only once.
+
+    A logger obtained before this call is not detached by it: a proxy logger
+    caches the real logger the first time it resolves one. Request the logger
+    again after the reset.
 
     WARNING: only use this for tests. It assigns to private module globals of
     ``opentelemetry._logs._internal``.

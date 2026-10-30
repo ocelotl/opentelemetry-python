@@ -291,7 +291,10 @@ class LiveCheckReport:
             is computed once and cached on the instance, and it is the cached
             list itself rather than a copy, so editing it changes what later
             reads return. A report with no violation gives an empty list, which
-            is the condition :meth:`end_and_check` would have passed on.
+            is not the same as :meth:`end_and_check` passing: that method
+            decides on weaver's exit status, so weaver can exit non-zero for a
+            reason that produces no violation entry and raise
+            :class:`LiveCheckError` with an empty list in the message.
         """
         return _extract_violations(self._report)
 

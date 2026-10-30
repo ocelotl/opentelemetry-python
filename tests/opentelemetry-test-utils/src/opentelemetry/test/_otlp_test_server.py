@@ -382,8 +382,10 @@ class OtlpProtoTestServer:
         """Stop serving, join the thread and close the socket.
 
         Does nothing when the server was never started. Queued telemetry is
-        kept, so a test may read it after stopping. The server cannot be
-        started again afterwards, because its socket is closed.
+        kept, so a test may read it after stopping. Calling ``start`` again
+        builds a new ``HTTPServer`` and works, and it rebinds the port assigned
+        to the previous run rather than asking for a new one, because that port
+        was written over the ``0`` requested at construction.
         """
         if self._server is not None:
             self._server.shutdown()
@@ -483,9 +485,10 @@ class OtlpProtoTestServer:
 
         Raises:
             TimeoutError: When fewer than ``count`` spans arrive in time. The
-                spans collected before the timeout have already been removed
-                from the queue and are reported only as a count in the message,
-                so they are lost.
+                spans already taken off the queue are discarded with the
+                exception. The message names how many were collected only when
+                the deadline passes between two successful reads; the usual
+                case is the timeout of the read itself, which names no count.
         """
         deadline = time.monotonic() + timeout
         spans = []
@@ -571,8 +574,9 @@ class OtlpProtoTestServer:
 
         Raises:
             TimeoutError: When fewer than ``count`` metrics arrive in time. The
-                metrics collected before the timeout are lost with the
-                exception.
+                metrics already taken off the queue are discarded with the
+                exception. The message names how many were collected only when
+                the deadline passes between two successful reads.
         """
         deadline = time.monotonic() + timeout
         metrics = []
@@ -656,8 +660,9 @@ class OtlpProtoTestServer:
 
         Raises:
             TimeoutError: When fewer than ``count`` log records arrive in time.
-                The records collected before the timeout are lost with the
-                exception.
+                The records already taken off the queue are discarded with the
+                exception. The message names how many were collected only when
+                the deadline passes between two successful reads.
         """
         deadline = time.monotonic() + timeout
         log_records = []

@@ -113,7 +113,12 @@ class CapturingSampler(Sampler):
         )
 
     def get_description(self) -> str:
-        """Return the sampler name recorded on exported spans.
+        """Return the human-readable description of this sampler.
+
+        The SDK uses a sampler description only when a composite sampler such
+        as ``ParentBased`` builds its own description out of the samplers it
+        wraps. Nothing attaches it to a span, so a test cannot assert on it
+        through exported telemetry.
 
         Returns:
             The constant ``"CapturingSampler"``. It does not vary with

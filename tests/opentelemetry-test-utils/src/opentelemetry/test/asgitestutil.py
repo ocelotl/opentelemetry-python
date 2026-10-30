@@ -165,11 +165,11 @@ class AsyncAsgiTestBase(TestBase, IsolatedAsyncioTestCase):
     coroutines that a test method awaits, and ``IsolatedAsyncioTestCase`` runs
     each test method on its own event loop. Prefer this class in new code.
 
-    ``tearDown`` has the same two limits as in :class:`AsgiTestBase`: it does
-    not call ``TestBase.tearDown``, so the trace and metrics globals are not
-    reset, and it drives its own loop rather than the one
-    ``IsolatedAsyncioTestCase`` provides. Override ``asyncTearDown`` instead
-    when a test needs cleanup that awaits.
+    ``tearDown`` has the same limit as in :class:`AsgiTestBase`: it does not
+    call ``TestBase.tearDown``, so the trace and metrics globals are not reset.
+    It is also synchronous, and drives the loop with ``run_until_complete``
+    rather than awaiting, so a subclass that needs cleanup it can await has to
+    override ``asyncTearDown`` instead.
     """
 
     def setUp(self):

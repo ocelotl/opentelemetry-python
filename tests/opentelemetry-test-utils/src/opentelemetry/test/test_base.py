@@ -208,7 +208,7 @@ class TestBase(unittest.TestCase):
 
         Returns:
             A tuple with the meter provider in the first element and the
-            in-memory metrics exporter in the second.
+            in-memory metric reader in the second.
         """
         memory_reader = InMemoryMetricReader()
         metric_readers = kwargs.get("metric_readers", [])
