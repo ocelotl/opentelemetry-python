@@ -58,8 +58,10 @@ def _opencensus_time_to_nanos(timestamp: str) -> int:
             The fractional second part and the trailing ``Z`` are both required.
 
     Returns:
-        The same instant as a whole number of nanoseconds since the unix epoch, rounded, which is
-        what the OpenTelemetry API takes for an event timestamp.
+        The parsed time as a whole number of nanoseconds since the unix epoch, rounded, which is
+        what the OpenTelemetry API takes for an event timestamp. It is displaced by the local UTC
+        offset, as described above, so it names the intended instant only in a process whose local
+        timezone is UTC.
 
     Raises:
         ValueError: When ``timestamp`` does not have that exact format.
@@ -138,9 +140,12 @@ class ShimSpan(wrapt.ObjectProxy):
 
         Args:
             attribute_key: The name of the attribute.
-            attribute_value: The value of the attribute. It reaches the OpenTelemetry span
-                unchanged, so a value of a type OpenTelemetry does not accept is dropped there
-                with a warning rather than converted here.
+            attribute_value: The value of the attribute. Nothing is converted here, so the
+                OpenTelemetry API is what cleans it. A value that is not a ``bool``, ``str``,
+                ``None``, ``bytes``, ``int``, ``float``, or a mapping or sequence of those, is
+                logged as a warning and then passed through ``str``, or replaced by ``None`` when
+                its type defines neither ``__str__`` nor ``__repr__``. The attribute key survives
+                either way, so a bad value shows up on the span rather than disappearing from it.
         """
         self._self_otel_span.set_attribute(attribute_key, attribute_value)
 
@@ -206,7 +211,9 @@ class ShimSpan(wrapt.ObjectProxy):
 
     @property
     def span_kind(self):
-        """Setting span_kind does not work with the shim because the OpenCensus Tracer does not
+        """Report the OpenCensus span kind of this span, which is always ``UNSPECIFIED``.
+
+        Setting span_kind does not work with the shim because the OpenCensus Tracer does not
         accept the param in start_span() and there's no way to set OTel span kind after
         start_span().
 
@@ -251,8 +258,8 @@ class ShimSpan(wrapt.ObjectProxy):
         )
 
     def finish(self):
-        """Note this method does not pop the span from current context. Use Tracer.end_span()
-        or a `with span: ...` statement (contextmanager) to do that.
+        """Note this method does not pop the span from current context. Use the OpenCensus
+        Tracer.end_span() or a `with span: ...` statement (contextmanager) to do that.
         """
         self._self_otel_span.end()
 

@@ -57,9 +57,12 @@ def get_shim_span_in_context() -> ShimSpan:
     Returns:
         The shim span that the most recent ``ShimTracer.start_span`` attached to the context, or
         ``None`` when no shim span is current. ``None`` is what a caller sees before the shim has
-        started any span and after the last one has been ended. Starting a span straight through
-        the OpenTelemetry API does not produce ``None``: it leaves the key of the shim in place, so
-        a shim span that encloses it is still the one reported.
+        started any span, and after the last one has been ended by ``ShimTracer.end_span`` or by
+        leaving its ``with`` block, those being the two ways that restore the context. Ending a
+        shim span with ``ShimSpan.finish`` alone leaves it under the key of the shim, so it keeps
+        being reported after it has ended. Starting a span straight through the OpenTelemetry API
+        does not produce ``None`` either: it leaves the key of the shim in place, so a shim span
+        that encloses it is still the one reported.
     """
     return context.get_value(_SHIM_SPAN_KEY)
 
@@ -269,9 +272,12 @@ class ShimTracer(wrapt.ObjectProxy):
 
         Args:
             attribute_key: The name of the attribute.
-            attribute_value: The value of the attribute. It reaches the OpenTelemetry span
-                unchanged, so a value of a type OpenTelemetry does not accept is dropped there
-                with a warning rather than converted here.
+            attribute_value: The value of the attribute. Nothing is converted here, so the
+                OpenTelemetry API is what cleans it. A value that is not a ``bool``, ``str``,
+                ``None``, ``bytes``, ``int``, ``float``, or a mapping or sequence of those, is
+                logged as a warning and then passed through ``str``, or replaced by ``None`` when
+                its type defines neither ``__str__`` nor ``__repr__``. The attribute key survives
+                either way, so a bad value shows up on the span rather than disappearing from it.
 
         Raises:
             AttributeError: When no shim span is current in the OpenTelemetry context, since
