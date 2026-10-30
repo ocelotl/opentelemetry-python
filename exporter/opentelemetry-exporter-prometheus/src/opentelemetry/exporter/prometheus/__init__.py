@@ -517,7 +517,9 @@ class PrometheusMetricReader(MetricReader):
     def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
         """Unregister the collector, so later scrapes no longer report these metrics.
 
-        Any batch still queued on the collector is dropped with it. No HTTP
+        A batch still queued on the collector is never exported, because the
+        collector is no longer scraped, but it is not released: the queue
+        keeps it, and registering the same collector again serves it. No HTTP
         server is stopped, including the one ``_AutoPrometheusMetricReader``
         starts, because serving is not this reader's responsibility.
 
@@ -529,9 +531,11 @@ class PrometheusMetricReader(MetricReader):
 
         Raises:
             KeyError: If the collector is no longer on the registry, which
-                happens when this method is called a second time directly.
-                Shutting the meter provider down instead is guarded against
-                that and calls this once.
+                happens the second time this method runs for the same
+                collector, whichever caller invokes it.
+                ``MeterProvider.shutdown`` is guarded by ``_shutdown_once``,
+                so it calls this once, and it still raises when a direct call
+                unregistered the collector first.
         """
         self._registry.unregister(self._collector)
 
