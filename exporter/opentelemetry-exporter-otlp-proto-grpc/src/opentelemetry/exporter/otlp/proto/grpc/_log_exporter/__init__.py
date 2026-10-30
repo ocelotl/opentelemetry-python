@@ -79,17 +79,21 @@ class OTLPLogExporter(
             :envvar:`OTEL_EXPORTER_OTLP_LOGS_INSECURE`, then from
             :envvar:`OTEL_EXPORTER_OTLP_INSECURE`, and finally from the scheme
             of the endpoint. An ``https`` scheme forces ``False`` whatever the
-            argument and the two variables say.
-        credentials: Credentials object for server authentication. ``None``
-            means credentials are built from
+            argument and the two variables say, and an endpoint written
+            without a scheme matches neither ``http`` nor ``https``, so it
+            too resolves to ``False`` and opens a TLS channel.
+        credentials: Credentials object for server authentication. Credentials
+            are resolved only when the connection ends up secure, so an
+            insecure connection reads no certificate variable at all. For a
+            secure connection, ``None`` means credentials are built from
             :envvar:`OTEL_EXPORTER_OTLP_LOGS_CERTIFICATE` and its client key
             and client certificate companions when that variable is set and
             neither the ``insecure`` argument nor
             :envvar:`OTEL_EXPORTER_OTLP_LOGS_INSECURE` says the connection is
-            insecure, and resolved from the generic OTLP variables otherwise.
-            An ``https`` endpoint combined with an insecure setting therefore
-            makes a TLS connection that ignores the logs-specific certificate
-            variables.
+            insecure, and from the generic OTLP certificate variables in every
+            other case. An ``https`` endpoint combined with an insecure
+            setting therefore makes a TLS connection that ignores the
+            logs-specific certificate variables.
         headers: Headers to send when exporting, as a mapping, as a sequence
             of pairs, or as the comma-separated string form used by
             :envvar:`OTEL_EXPORTER_OTLP_LOGS_HEADERS`. ``None`` means that
@@ -97,7 +101,9 @@ class OTLPLogExporter(
         timeout: Backend request timeout in seconds, covering the whole export
             including retries. ``None`` means the value is taken from
             :envvar:`OTEL_EXPORTER_OTLP_LOGS_TIMEOUT`, then from
-            :envvar:`OTEL_EXPORTER_OTLP_TIMEOUT`, defaulting to 10 seconds.
+            :envvar:`OTEL_EXPORTER_OTLP_TIMEOUT`, defaulting to 10 seconds. A
+            value of ``0``, from the argument or from either variable, is
+            treated the same way as ``None`` and the next source is used.
         compression: gRPC compression method to use. ``None`` means the value
             is taken from :envvar:`OTEL_EXPORTER_OTLP_LOGS_COMPRESSION`, then
             from :envvar:`OTEL_EXPORTER_OTLP_COMPRESSION`, and no compression

@@ -85,8 +85,7 @@ def _timeout_from_env(*environ_keys: str, default: None = None) -> float | None:
 def _timeout_from_env(*environ_keys: str, default: float | None = None) -> float | None:
     """Read an export timeout in seconds from the first usable environment variable.
 
-    The variables are examined in the order they are given, so a caller passes
-    the signal-specific variable first and the generic one second.
+    The variables are examined left to right and the first usable one wins.
 
     Args:
         environ_keys: Names of the environment variables to examine, in order

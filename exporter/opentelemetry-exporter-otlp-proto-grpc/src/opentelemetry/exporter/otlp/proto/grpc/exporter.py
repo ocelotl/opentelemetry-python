@@ -381,8 +381,10 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
         insecure: Connection type. ``True`` sends plain HTTP/2 with no TLS.
             ``None`` means the value is taken from
             :envvar:`OTEL_EXPORTER_OTLP_INSECURE`, or from the endpoint scheme
-            when that variable is unset. An ``https`` scheme forces ``False``
-            whatever the argument says.
+            when that variable is unset. Only an ``http`` scheme gives
+            ``True`` that way, so an endpoint written without a scheme
+            resolves to ``False`` and opens a TLS channel. An ``https`` scheme
+            forces ``False`` whatever the argument says.
         credentials: ChannelCredentials object for server authentication. Used
             only when the connection is not insecure. ``None`` means the
             credentials are resolved from the environment instead.
@@ -394,7 +396,8 @@ class OTLPExporterMixin(ABC, Generic[SDKDataT, ExportServiceRequestT, ExportResu
         timeout: Backend request timeout in seconds. This is the deadline for
             the whole export including retries, not for one attempt. ``None``
             means the value is taken from
-            :envvar:`OTEL_EXPORTER_OTLP_TIMEOUT`, defaulting to 10 seconds.
+            :envvar:`OTEL_EXPORTER_OTLP_TIMEOUT`, defaulting to 10 seconds. A
+            timeout of ``0`` is treated the same way as ``None``.
         compression: gRPC compression method to use. ``None`` means the value
             is taken from :envvar:`OTEL_EXPORTER_OTLP_COMPRESSION`, and no
             compression is used when that variable is unset too.
