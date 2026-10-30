@@ -9,5 +9,6 @@ hand the Python source they build back to ``protoc``, which is the program that 
 Those files are then committed to the repository and shipped as ordinary modules.
 
 ``opentelemetry.codegen.json`` is the only generator that currently lives here. It produces the
-contents of the ``opentelemetry-proto-json`` distribution.
+generated Python modules of the ``opentelemetry-proto-json`` distribution, under its ``src``
+directory. The packaging files and the tests of that distribution are hand-written.
 """
