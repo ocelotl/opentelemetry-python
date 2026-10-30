@@ -129,8 +129,8 @@ class CodeWriter:
         Writes a docstring. If content is a string, it writes a single-line docstring. If content is an iterable of strings, it writes a multi-line docstring.
 
         Nothing in the content is escaped, so a triple quote inside it closes the docstring early
-        and breaks the generated file. The content the generator passes comes from protobuf
-        message and enum names, which cannot contain one.
+        and breaks the generated file. The content the generator passes is fixed literal text and
+        protobuf message and enum names, neither of which can contain one.
 
         Args:
             content: A string for a single-line docstring or an iterable of strings for a multi line docstring
@@ -585,7 +585,7 @@ class CodeWriter:
         The lines are joined rather than terminated, so the result has no trailing newline unless
         the last line written was blank. ``_generate_file`` in
         ``opentelemetry.codegen.json.generator`` relies on that for the per-proto message modules,
-        ending each one with ``blank_line``. The other files that generator produces end another
+        ending each one with ``blank_line``. The other files the generator produces end another
         way: ``version/__init__.py`` through ``writemany``, and ``_json_codec.py`` and the empty
         ``__init__.py`` files without a ``CodeWriter`` at all.
 
