@@ -328,7 +328,12 @@ class OTLPMetricExporter(
 
         Returns:
             ``MetricExportResult.SUCCESS`` when every request was accepted,
-            and ``MetricExportResult.FAILURE`` when any of them was not.
+            and ``MetricExportResult.FAILURE`` when any of them was not. An
+            exporter that has already been shut down fails every request it
+            would have sent, so it returns ``MetricExportResult.FAILURE``
+            unless there was no request to send: a collection holding no data
+            points, with ``max_export_batch_size`` set, is split into nothing
+            and returns ``MetricExportResult.SUCCESS`` even after shutdown.
         """
         # TODO(#2663): OTLPExporterMixin should pass timeout to gRPC
         if self._max_export_batch_size is None:
