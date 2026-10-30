@@ -231,9 +231,12 @@ class OTLPMetricExporter(MetricExporter):
         been answered or has exhausted its own timeout.
 
         A collection that cannot be encoded fails as a whole: the error is
-        logged and nothing is sent. The same applies after :meth:`shutdown`
-        has been called, when the collection is dropped with a warning instead
-        of being exported.
+        logged, nothing is sent, and the call reports failure. That guard
+        covers the encoding step alone. An error raised afterwards, while the
+        encoded collection is split and each request serialized to JSON, is
+        not caught here: it propagates to the caller, and the requests already
+        sent are not retracted. After :meth:`shutdown` has been called the
+        collection is dropped with a warning instead of being exported.
 
         Args:
             metrics_data: The metrics collected by the metric reader that owns
