@@ -1,6 +1,23 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+"""Instrumentor activation from declarative configuration.
+
+This is the one part of declarative configuration that runs third party
+code rather than building SDK objects, so it is also the one part that
+swallows failures. An instrumentor that cannot be found, cannot be
+built, or raises while instrumenting is logged and skipped, and the
+instrumentors after it still run. A configuration file that names a
+package the user forgot to install therefore starts the application with
+less instrumentation rather than not at all.
+
+The module name has no leading underscore, unlike every other
+implementation module here, but ``configure_instrumentation`` is not
+re-exported from ``opentelemetry.configuration`` or from
+``opentelemetry.configuration.file`` either, so ``configure_sdk`` is the
+only caller inside the package.
+"""
+
 from __future__ import annotations
 
 from dataclasses import fields, is_dataclass
@@ -34,6 +51,20 @@ def configure_instrumentation(
     Absent or unknown entry points are logged as warnings; runtime errors from
     an instrumentor are logged as exceptions.  Neither stops the remaining
     instrumentors from being applied.
+
+    When the instrumentor declares a ``configuration`` dataclass, only the
+    fields of that dataclass whose resolved value is not ``None`` are
+    forwarded. An option the instrumentor's dataclass does not declare is
+    therefore dropped, and an option set explicitly to null is dropped too,
+    so the instrumentor applies its own default instead.
+
+    Args:
+        configuration: The ``instrumentation/development`` section of the
+            parsed configuration. ``None``, and a section whose ``python``
+            field is absent, both return without doing anything. Each key of
+            ``python`` is an entry point name in the
+            ``opentelemetry_instrumentor`` group, and each value is the
+            option mapping for it.
     """
     if configuration is None or configuration.python is None:
         return
