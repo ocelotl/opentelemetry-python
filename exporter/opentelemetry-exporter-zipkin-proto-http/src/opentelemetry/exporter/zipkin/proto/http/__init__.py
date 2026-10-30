@@ -94,8 +94,10 @@ class ZipkinExporter(SpanExporter):
     the node that produced the spans, which Zipkin records as the local endpoint
     of every span in the batch. The service name of that local endpoint is not
     taken from an argument: it is read from the ``service.name`` resource
-    attribute of the first span of each batch, falling back to the service name
-    resolved when the exporter was constructed.
+    attribute of the first span of each batch, and a batch whose first span
+    carries none keeps the name the exporter last resolved. That is the name
+    read from the global tracer provider when the exporter was constructed,
+    until the first batch supplies one of its own.
 
     Args:
         endpoint: Full URL of the Zipkin collector endpoint that receives the
@@ -124,7 +126,9 @@ class ZipkinExporter(SpanExporter):
         timeout: Maximum number of seconds to wait for each batch export. When
             ``None`` or zero, the value of the
             :envvar:`OTEL_EXPORTER_ZIPKIN_TIMEOUT` environment variable is used,
-            and when that is unset the timeout is 10 seconds.
+            and when that is unset the timeout is 10 seconds. A value of that
+            variable that is not a decimal integer, an empty one included,
+            raises ``ValueError`` out of the constructor.
         session: Connection session used to reach the Zipkin collector endpoint.
             Pass one to control connection pooling, retries or authentication.
             When ``None``, this exporter creates one. Either way the exporter
