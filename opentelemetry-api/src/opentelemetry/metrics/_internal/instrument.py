@@ -304,12 +304,13 @@ class NoOpCounter(Counter):
     ) -> None:
         """Discard the measurement.
 
+        The call reaches the abstract method of the base class, whose body is
+        empty, so no argument is read and nothing is recorded anywhere.
+
         Args:
-            amount: The value to record.
-            attributes: Optional set of attributes to associate with the
-                measurement.
-            context: Optional context to associate with the measurement. If
-                not provided, the current context is used.
+            amount: Ignored.
+            attributes: Ignored.
+            context: Ignored.
         """
         return super().add(amount, attributes=attributes, context=context)
 
@@ -412,12 +413,13 @@ class NoOpUpDownCounter(UpDownCounter):
     ) -> None:
         """Discard the measurement.
 
+        The call reaches the abstract method of the base class, whose body is
+        empty, so no argument is read and nothing is recorded anywhere.
+
         Args:
-            amount: The value to record.
-            attributes: Optional set of attributes to associate with the
-                measurement.
-            context: Optional context to associate with the measurement. If
-                not provided, the current context is used.
+            amount: Ignored.
+            attributes: Ignored.
+            context: Ignored.
         """
         return super().add(amount, attributes=attributes, context=context)
 
@@ -691,12 +693,13 @@ class NoOpHistogram(Histogram):
     ) -> None:
         """Discard the measurement.
 
+        The call reaches the abstract method of the base class, whose body is
+        empty, so no argument is read and nothing is recorded anywhere.
+
         Args:
-            amount: The value to record.
-            attributes: Optional set of attributes to associate with the
-                measurement.
-            context: Optional context to associate with the measurement. If
-                not provided, the current context is used.
+            amount: Ignored.
+            attributes: Ignored.
+            context: Ignored.
         """
         return super().record(amount, attributes=attributes, context=context)
 
@@ -892,12 +895,13 @@ class NoOpGauge(Gauge):
     ) -> None:
         """Discard the measurement.
 
+        The call reaches the abstract method of the base class, whose body is
+        empty, so no argument is read and nothing is recorded anywhere.
+
         Args:
-            amount: The value to record.
-            attributes: Optional set of attributes to associate with the
-                measurement.
-            context: Optional context to associate with the measurement. If
-                not provided, the current context is used.
+            amount: Ignored.
+            attributes: Ignored.
+            context: Ignored.
         """
         return super().set(amount, attributes=attributes, context=context)
 
