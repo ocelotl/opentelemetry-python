@@ -14,7 +14,8 @@ class for each.
 ``x-b3-spanid`` and ``x-b3-sampled``. ``B3SingleFormat`` writes the one header
 named ``b3``, holding the same fields joined by ``-``.
 
-Only injection differs between the two. ``B3SingleFormat`` inherits
+What differs between the two is injection, and with it the set of header names
+each one reports through ``fields``. ``B3SingleFormat`` inherits
 ``B3MultiFormat.extract`` unchanged, so either class reads a carrier written in
 either encoding, and the single ``b3`` header wins when a carrier holds both.
 
@@ -52,7 +53,8 @@ class B3MultiFormat(TextMapPropagator):
     and ``x-b3-sampled``. Extraction reads those headers but also reads the
     single ``b3`` header of the other B3 encoding, and prefers it when both are
     present, so this class accepts a carrier written either way.
-    ``B3SingleFormat`` inherits that extraction and overrides only injection.
+    ``B3SingleFormat`` inherits that extraction and overrides injection, along
+    with the ``fields`` property that reports what injection writes.
 
     This class is registered as the ``opentelemetry_propagator`` entry point
     named ``b3multi``.
@@ -196,8 +198,8 @@ class B3MultiFormat(TextMapPropagator):
         ``x-b3-spanid`` as 16 hexadecimal characters, and ``x-b3-sampled`` as
         ``1`` or ``0``. ``x-b3-flags`` is never written, so a debug flag that
         ``extract`` read from an incoming request reaches the next hop only as
-        the sampled bit it set, and the fourth B3 field, the parent span id, is
-        never written either.
+        the sampled bit it set. ``x-b3-parentspanid``, the header this encoding
+        gives the parent span id, is never written either.
 
         Nothing at all is written when the context holds no span, or when the
         span's span context is invalid, which is the case whenever either id is
