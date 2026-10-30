@@ -1,7 +1,13 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Zipkin Exporter Endpoints"""
+"""Zipkin Exporter Endpoints
+
+A Zipkin span carries the network context of the node that recorded it. This
+module holds the representation of that context, ``NodeEndpoint``, which the
+encoders in ``opentelemetry.exporter.zipkin.encoder`` serialize into the
+``localEndpoint`` field of the Zipkin payload.
+"""
 
 import ipaddress
 
@@ -9,16 +15,32 @@ from opentelemetry import trace
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 
 IpInput = str | int | None
+"""Accepted spellings of an IP address passed to ``NodeEndpoint``.
+
+An address may be given as a string such as ``"192.168.0.1"``, as the integer
+the address packs into, or as ``None`` when the address is unknown.
+"""
 
 
 class NodeEndpoint:
     """The network context of a node in the service graph.
+
+    The service name is not a parameter. It is read once, at construction
+    time, from the resource of the globally registered tracer provider, or
+    from a freshly created ``Resource`` when that provider carries none. The
+    exporter overwrites it later with the service name of the first span of
+    each exported batch, so the value sampled here only survives for batches
+    that are empty or whose spans carry no ``service.name``.
 
     Args:
         ipv4: Primary IPv4 address associated with this connection.
         ipv6: Primary IPv6 address associated with this connection.
         port: Depending on context, this could be a listen port or the
           client-side of a socket. None if unknown.
+
+    Raises:
+        ValueError: If ``ipv4`` does not parse as an IPv4 address, or if
+            ``ipv6`` does not parse as an IPv6 address.
     """
 
     def __init__(
@@ -27,6 +49,10 @@ class NodeEndpoint:
         ipv6: IpInput = None,
         port: int | None = None,
     ):
+        """Initialize the endpoint.
+
+        The parameters are documented on the class.
+        """
         self.ipv4 = ipv4
         self.ipv6 = ipv6
         self.port = port
@@ -42,10 +68,31 @@ class NodeEndpoint:
 
     @property
     def ipv4(self) -> ipaddress.IPv4Address | None:
+        """The parsed form of the ``ipv4`` argument given to the constructor.
+
+        Returns:
+            The address as an ``ipaddress.IPv4Address``, whatever spelling it
+            was assigned in, or ``None`` when no IPv4 address was given. The
+            encoders omit the ``ipv4`` field of the Zipkin endpoint when this
+            is ``None``.
+        """
         return self._ipv4
 
     @ipv4.setter
     def ipv4(self, address: IpInput) -> None:
+        """Parse and store an IPv4 address.
+
+        Args:
+            address: The address, as a string, as the integer it packs into,
+                or ``None`` to record that no IPv4 address is known.
+
+        Raises:
+            ValueError: If ``address`` parses as an IP address of a family
+                other than IPv4, which in practice means an IPv6 address was
+                assigned to the IPv4 attribute. ``ipaddress.ip_address``
+                raises its own ``ValueError`` first when ``address`` is not an
+                IP address at all.
+        """
         if address is None:
             self._ipv4 = None
         else:
@@ -56,10 +103,31 @@ class NodeEndpoint:
 
     @property
     def ipv6(self) -> ipaddress.IPv6Address | None:
+        """The parsed form of the ``ipv6`` argument given to the constructor.
+
+        Returns:
+            The address as an ``ipaddress.IPv6Address``, whatever spelling it
+            was assigned in, or ``None`` when no IPv6 address was given. The
+            encoders omit the ``ipv6`` field of the Zipkin endpoint when this
+            is ``None``.
+        """
         return self._ipv6
 
     @ipv6.setter
     def ipv6(self, address: IpInput) -> None:
+        """Parse and store an IPv6 address.
+
+        Args:
+            address: The address, as a string, as the integer it packs into,
+                or ``None`` to record that no IPv6 address is known.
+
+        Raises:
+            ValueError: If ``address`` parses as an IP address of a family
+                other than IPv6, which in practice means an IPv4 address was
+                assigned to the IPv6 attribute. ``ipaddress.ip_address``
+                raises its own ``ValueError`` first when ``address`` is not an
+                IP address at all.
+        """
         if address is None:
             self._ipv6 = None
         else:
