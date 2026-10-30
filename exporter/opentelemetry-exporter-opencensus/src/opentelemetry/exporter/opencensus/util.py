@@ -1,6 +1,19 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+"""Conversions from OpenTelemetry values to OpenCensus protobuf messages.
+
+Two tracing models meet in this package. OpenTelemetry is the model the
+calling application uses, and its names come from ``opentelemetry.trace`` and
+``opentelemetry.sdk.trace``. OpenCensus is the model the collector expects on
+the wire, and its names come from the generated ``opencensus.proto`` modules.
+Every function here reads a value of the first model and produces a message of
+the second, so none of them is a general purpose helper.
+
+Inside this distribution the functions are called from
+``opentelemetry.exporter.opencensus.trace_exporter`` and from its tests.
+"""
+
 from os import getpid
 from socket import gethostname
 from time import time
@@ -26,13 +39,14 @@ def proto_timestamp_from_time_ns(time_ns):
 
     OpenTelemetry records span and event times as an integer number of
     nanoseconds since the Unix epoch, while OpenCensus carries them in the
-    protobuf ``Timestamp`` message used by its span fields ``start_time``,
-    ``end_time`` and ``time_events``.
+    protobuf ``Timestamp`` message used by the span fields ``start_time`` and
+    ``end_time`` and by the ``time`` field of a time event.
 
     Args:
         time_ns: Time in nanoseconds since the Unix epoch, or ``None``.
-            ``None`` is not reported as a missing time: it leaves the message
-            at its default value, which reads back as the epoch itself.
+            ``None`` leaves the message at its default value, so a reader of
+            the message sees the Unix epoch and cannot tell that no time was
+            given.
 
     Returns:
         A ``google.protobuf.timestamp_pb2.Timestamp``.
@@ -46,6 +60,20 @@ def proto_timestamp_from_time_ns(time_ns):
 
 # pylint: disable=no-member
 def get_collector_span_kind(kind: SpanKind):
+    """Translate an OpenTelemetry span kind to an OpenCensus span kind.
+
+    OpenCensus names only the server and the client role, so of the five
+    OpenTelemetry kinds only ``SERVER`` and ``CLIENT`` survive the
+    translation. ``INTERNAL``, ``PRODUCER`` and ``CONSUMER`` all become
+    ``SPAN_KIND_UNSPECIFIED`` and the collector cannot tell them apart from
+    each other afterwards.
+
+    Args:
+        kind: The kind of the OpenTelemetry span being exported.
+
+    Returns:
+        A member of the OpenCensus ``trace_pb2.Span.SpanKind`` enumeration.
+    """
     if kind is SpanKind.SERVER:
         return trace_pb2.Span.SpanKind.SERVER
     if kind is SpanKind.CLIENT:
@@ -54,13 +82,29 @@ def get_collector_span_kind(kind: SpanKind):
 
 
 def add_proto_attribute_value(pb_attributes, key, value):
-    """Sets string, int, boolean or float value on protobuf
-        span, link or annotation attributes.
+    """Store one OpenTelemetry attribute in an OpenCensus attribute map.
+
+    The OpenCensus ``AttributeValue`` message is a union of a string, an
+    integer, a boolean and a double, so the Python type of the OpenTelemetry
+    attribute value decides which field is written. ``bool`` is tested before
+    ``int`` on purpose, since ``bool`` is a subclass of ``int`` in Python and
+    would otherwise be exported as 0 or 1.
+
+    An OpenTelemetry attribute value may also be a sequence, and OpenCensus
+    has no field for one. Such a value, and any other type that does not match
+    the four cases, is written as the result of ``str()`` on it, so a tuple
+    reaches the collector as its Python text form rather than as a list.
+
+    The message is modified in place. The string case writes the nested
+    ``value`` field of a ``TruncatableString`` and sets no truncation count,
+    so no value is shortened here.
 
     Args:
-        pb_attributes: protobuf Span's attributes property.
-        key: attribute key to set.
-        value: attribute value
+        pb_attributes: The OpenCensus ``Attributes`` message to write into.
+            A span, a link and an annotation each carry one.
+        key: The OpenTelemetry attribute key, used unchanged as the key of
+            the OpenCensus attribute map.
+        value: The OpenTelemetry attribute value.
     """
 
     if isinstance(value, bool):
@@ -77,11 +121,29 @@ def add_proto_attribute_value(pb_attributes, key, value):
 
 # pylint: disable=no-member
 def get_node(service_name, host_name):
-    """Generates Node message from params and system information.
+    """Build the OpenCensus ``Node`` message that identifies this process.
+
+    OpenCensus has no equivalent of an OpenTelemetry resource. The collector
+    instead expects a ``Node`` on every export request, describing the process
+    the spans came from, so this function fills that message from the service
+    name taken from the resource plus values read from the running process.
+
+    ``start_timestamp`` is the moment this function runs, which is when the
+    exporter was constructed or when a later batch replaced the node, and not
+    the moment the process started.
 
     Args:
-       service_name: Name of Collector service.
-       host_name: Host name.
+        service_name: The value of the ``service.name`` resource attribute of
+            the spans being exported. ``None`` leaves the service name empty
+            in the message.
+        host_name: The host name to report. ``None`` means the exporter was
+            not told one, in which case the host name of the machine is read
+            with ``socket.gethostname()``.
+
+    Returns:
+        An OpenCensus ``common_pb2.Node`` carrying the process identifier,
+        the version of this exporter, the version of ``opentelemetry-api``
+        and the service name.
     """
     return common_pb2.Node(
         identifier=common_pb2.ProcessIdentifier(
