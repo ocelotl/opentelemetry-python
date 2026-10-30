@@ -92,7 +92,10 @@ def sanitize_full_name(name: str) -> str:
         The name with every run of characters outside ``a-zA-Z0-9:`` collapsed
         into a single underscore. A leading digit is replaced by an underscore
         rather than prefixed with one, so ``5xx_responses`` becomes
-        ``_xx_responses`` and the digit is lost.
+        ``_xx_responses`` and the digit is lost. Two distinct instrument names
+        can sanitize to the same Prometheus name, ``a.b`` and ``a-b`` both
+        giving ``a_b``, and such metrics are merged into one family when their
+        description and unit match as well.
     """
     # Leading number special case
     if name and name[0].isdigit():
