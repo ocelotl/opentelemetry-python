@@ -408,6 +408,8 @@ def _create_log_record_processor(
     Raises:
         ConfigurationError: If neither field is set, or if the processor
             cannot be built.
+        MissingDependencyError: If the selected exporter's distribution is
+            not installed.
     """
     if config.batch is not None:
         return _create_batch_log_record_processor(config.batch)

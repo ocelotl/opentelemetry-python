@@ -398,6 +398,8 @@ def _create_span_processor(
     Raises:
         ConfigurationError: If neither ``batch`` nor ``simple`` is set, or
             if the exporter cannot be built.
+        MissingDependencyError: If the selected exporter's distribution is
+            not installed.
     """
     if config.batch is not None:
         exporter = _create_span_exporter(config.batch.exporter)

@@ -841,6 +841,8 @@ def _create_pull_metric_reader(
     Raises:
         ConfigurationError: If the exporter block selects nothing or cannot
             be built.
+        MissingDependencyError: If the Prometheus exporter distribution is
+            not installed.
         OSError: If the exporter block is ``prometheus/development`` and
             its listener cannot bind the configured port.
     """
@@ -866,6 +868,8 @@ def _create_metric_reader(config: MetricReaderConfig) -> MetricReader:
     Raises:
         ConfigurationError: If neither field is set, or if the reader
             cannot be built.
+        MissingDependencyError: If the selected exporter's distribution is
+            not installed.
         OSError: If the reader is a ``pull`` reader on
             ``prometheus/development`` and its listener cannot bind the
             configured port.
