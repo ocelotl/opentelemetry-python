@@ -8,13 +8,19 @@ meant to be called from outside this module. The rest build one piece: a
 log record processor, its exporter, the record limits, or the
 experimental per-logger configurator.
 
-No function here reads an environment variable. Every value the
-configuration file leaves out is replaced by the constant the
-specification gives and passed to the SDK explicitly, so the
-``OTEL_BLRP_*`` and ``OTEL_LOGRECORD_ATTRIBUTE_*`` variables have no
-effect once a configuration file is in use. That is the difference from
-the span processor on the tracer path, which passes an absent field
-through as ``None`` and does let the SDK read its environment variable.
+No function here reads an environment variable. The record limits and
+the batch processor tuning values are passed to the SDK explicitly, with
+the constant the specification gives standing in for an absent
+configuration field, so ``OTEL_BLRP_*`` and
+``OTEL_LOGRECORD_ATTRIBUTE_*`` have no effect once a configuration file
+is in use. That is the difference from the span processor on the tracer
+path, which passes an absent batch field through as ``None`` and does
+let the SDK read ``OTEL_BSP_*``.
+
+The exporter fields are the other way round on both paths. An absent
+endpoint, header set, timeout or compression is passed through as
+``None``, so the exporter still reads the ``OTEL_EXPORTER_OTLP_*``
+family for whatever the configuration file leaves out.
 
 The logger configurator block accepts two fields the Python SDK's
 ``_LoggerConfig`` has no place for, ``minimum_severity`` and

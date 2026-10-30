@@ -8,13 +8,22 @@ restricted wildcard syntax the configuration schema uses, which is not
 ``fnmatch`` and not a regular expression. ``load_entry_point`` and
 ``_resolve_component`` turn a component name from the configuration file
 into a class, either a built-in one or a plugin registered through an
-entry point group. The remaining functions translate one configuration
+entry point group, though only the first of those two is called from
+anywhere in the package. The remaining functions translate one configuration
 field into the shape an SDK exporter constructor expects: a headers
 dict, a ``Compression`` enum member, or a file path.
 
-Everything here raises ``ConfigurationError`` on bad input rather than
-falling back to a default, because a value that reached these functions
-came from a configuration file the user wrote on purpose.
+The component resolvers and the value translators raise
+``ConfigurationError`` on bad input rather than falling back to a
+default, because a value that reached them came from a configuration
+file the user wrote on purpose. ``_parse_headers`` is the exception: a
+malformed pair is dropped with a warning so that one typo does not
+discard the rest of the header set.
+
+``_resolve_component`` has no caller in the package. Each signal factory
+open-codes the same dispatch with a ``match`` statement instead, so a
+reader following a component name from the configuration file should
+read one of those rather than this.
 """
 
 from __future__ import annotations
@@ -222,6 +231,10 @@ def _resolve_component(
     (``minProperties: 1, maxProperties: 1``). If multiple typed fields or
     ``additional_properties`` entries are set (e.g. when schema validation
     is bypassed), the first registry match wins.
+
+    Nothing in the package calls this. Each signal factory open-codes the
+    same dispatch with a ``match`` statement, so the only callers today are
+    in ``opentelemetry-configuration/tests/test_common.py``.
 
     Args:
         config: A dataclass with ``additional_properties`` (from the

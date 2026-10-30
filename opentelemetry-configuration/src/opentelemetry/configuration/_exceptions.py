@@ -16,7 +16,11 @@ configuration file has to catch more than ``ConfigurationError``.
 ``MissingDependencyError`` is the subclass raised when the configuration
 selects a component whose package is not installed. It also inherits
 ``ImportError``, so code written before this package existed, which
-caught ``ImportError`` around an optional exporter, keeps working.
+caught ``ImportError`` around an optional exporter, keeps working. The
+three ``otlp_file/development`` exporters are the exception: they report
+a missing ``opentelemetry-exporter-otlp-json-file`` as a plain
+``ConfigurationError``, so an ``except MissingDependencyError`` branch
+does not catch that one.
 """
 
 
