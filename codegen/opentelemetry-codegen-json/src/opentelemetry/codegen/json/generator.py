@@ -3,6 +3,31 @@
 
 # pylint: disable=no-member,invalid-name,too-many-lines
 
+"""Turns protobuf descriptors into OTLP/JSON dataclass modules.
+
+This module is hand-written and runs at build time. Everything it produces is a string of Python
+source destined for the ``opentelemetry-proto-json`` distribution, where it is committed and must
+not be edited by hand. Only the per-message modules say so in an ``AUTO-GENERATED`` header; the
+copied ``_json_codec.py``, the generated ``version/__init__.py`` and the empty ``__init__.py``
+files carry no header and are overwritten by a regeneration just the same. Changing the shape of
+the generated code means changing the code here and regenerating, which
+``scripts/proto_codegen_json.sh`` does.
+
+``OtlpJsonGenerator`` holds the whole translation. ``generate_plugin_response`` is what
+``opentelemetry.codegen.json.plugin`` calls, and it turns the generator's output into the
+``CodeGeneratorResponse`` that ``protoc`` reads back. ``generate_code`` is the inner form it is
+built from, returning a plain mapping from output path to source text.
+
+The output layout mirrors the input layout. A ``package_transform`` callable rewrites each
+``.proto`` path, by default replacing the substring ``opentelemetry/proto/`` with
+``opentelemetry/proto_json/``, and the longest directory prefix shared by every transformed path
+becomes the common root. Two things are written at that common root rather than per proto file:
+``_json_codec.py``, copied verbatim from
+``opentelemetry.codegen.json.runtime.json_codec``, and ``version/__init__.py``, holding
+``__version__``. An empty ``__init__.py`` is then added to every ancestor directory of a
+generated file, apart from the ``opentelemetry`` namespace directory itself.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -34,6 +59,24 @@ class OtlpJsonGenerator:
     """
     Generates Python dataclasses and JSON serialization/deserialization code
     from protobuf descriptors.
+
+    Construction indexes every message and enum in every descriptor of ``request``, including the
+    descriptors that are only dependencies and are not themselves being generated, because a field
+    in a generated file may name a type defined in one of those. Generation itself happens in
+    ``generate_all``.
+
+    An instance produces source text only, and nothing here touches the filesystem except to read
+    the codec module. ``protoc`` is what writes the files, from the response that
+    ``opentelemetry.codegen.json.plugin`` hands back to it.
+
+    Args:
+        request: The ``CodeGeneratorRequest`` that ``protoc`` wrote to the plugin's standard input.
+            Its ``proto_file`` field carries every descriptor, and its ``file_to_generate`` field
+            names the subset to emit modules for.
+        package_transform: Rewrites a ``.proto`` path into the path of the Python file to generate
+            from it. The ``.proto`` suffix is replaced with ``.py`` afterwards, so this callable
+            only has to deal with the directory part.
+        version: The value written as ``__version__`` into the generated ``version/__init__.py``.
     """
 
     def __init__(
@@ -43,12 +86,7 @@ class OtlpJsonGenerator:
         version: str,
     ) -> None:
         """
-        Initialize the generator.
-
-        Args:
-            request: Protobuf compiler plugin request
-            package_transform: A callable that transforms the proto file path.
-            version: Version string for the generated code.
+        Initialize the generator. The parameters are documented on the class.
         """
         self._request = request
         self._package_transform = package_transform
@@ -616,9 +654,25 @@ class OtlpJsonGenerator:
         """
         Get the Python expression to serialize a value of a given type for JSON output.
 
+        The expression is a fragment of generated source, so ``var_name`` is spliced into it as
+        written rather than evaluated here. For a repeated field the caller passes the loop
+        variable of a lambda, and for a singular field it passes an attribute access on ``self``.
+
+        A field named ``trace_id``, ``span_id`` or ``parent_span_id`` is hex encoded in preference
+        to the base64 encoding that Proto3 JSON gives bytes, which is the OTLP deviation. The type
+        is consulted first: a message-typed or enum-typed field is handled by its type whatever it
+        is called. Among the remaining types the name alone decides, so a field with one of those
+        three names is hex encoded even when it is declared as something other than ``bytes``.
+
         Args:
             field_desc: Field descriptor for the value being serialized
             var_name: Variable name representing the value to serialize
+
+        Returns:
+            A Python expression that evaluates to the JSON form of the value. For a type that
+            needs no conversion, such as a string or a 32-bit integer, this is ``var_name``
+            unchanged. On the repeated branch the caller compares the result against ``var_name``
+            to decide whether the list needs a mapping call at all.
         """
         codec = self._get_codec_module_path()
         if field_desc.type == descriptor.FieldDescriptorProto.TYPE_MESSAGE:
@@ -858,8 +912,15 @@ def _load_codec_source() -> str:
     """
     Load the source code for the codec module from its source file.
 
+    The text is copied into the generated package unchanged, as ``_json_codec.py``, so that the
+    generated code carries its own runtime helpers and does not import this distribution.
+
     Returns:
         Source code as a string
+
+    Raises:
+        RuntimeError: If ``runtime/json_codec.py`` cannot be read. Generation cannot continue,
+            because every generated module imports the codec module by name.
     """
     codec_src_path = Path(__file__).parent / "runtime" / "json_codec.py"
     try:
@@ -908,12 +969,22 @@ def generate_code(
     """
     Main entry point for code generation.
 
+    ``generate_plugin_response`` is the only caller. This form exists because a mapping from path
+    to source is easier to read and to assert against than a protobuf response message.
+
     Args:
         request: Protobuf compiler plugin request
-        package_transform: Package transformation string or callable
+        package_transform: Rewrites a ``.proto`` path into the path of the Python file to generate
+            from it. The default substitutes ``opentelemetry/proto_json/`` for
+            ``opentelemetry/proto/`` wherever that substring occurs, and leaves a path that does
+            not contain it alone.
 
     Returns:
-        Dictionary mapping output file paths to generated code
+        Dictionary mapping output file paths to generated code. Besides one entry per file in
+        ``request.file_to_generate``, it holds ``_json_codec.py`` and ``version/__init__.py`` at
+        the common root, and an ``__init__.py`` for every ancestor directory of a generated file
+        apart from the ``opentelemetry`` namespace directory. It is empty when
+        ``file_to_generate`` is.
     """
     generator = OtlpJsonGenerator(request, package_transform, version="0.0.0")
     return generator.generate_all()
@@ -926,12 +997,20 @@ def generate_plugin_response(
     """
     Generate plugin response with all generated files.
 
+    Besides the files, the response declares which ``protoc`` features this plugin understands.
+    Without ``FEATURE_PROTO3_OPTIONAL`` declared, ``protoc`` refuses to pass a descriptor
+    containing an ``optional`` proto3 field, and the edition range states which editions of the
+    language the plugin accepts.
+
     Args:
         request: Protobuf compiler plugin request
-        package_transform: Package transformation string
+        package_transform: Rewrites a ``.proto`` path into the path of the Python file to generate
+            from it. The default substitutes ``opentelemetry/proto_json/`` for
+            ``opentelemetry/proto/`` wherever that substring occurs, and leaves a path that does
+            not contain it alone.
 
     Returns:
-        Plugin response with generated files
+        Plugin response with generated files, ready for ``protoc`` to write to disk.
     """
     response = plugin.CodeGeneratorResponse()
 

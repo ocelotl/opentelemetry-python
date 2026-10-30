@@ -1,6 +1,23 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+"""Accumulates lines of Python source and tracks indentation.
+
+``CodeWriter`` is the only thing in this module.
+``opentelemetry.codegen.json.generator`` uses it to assemble every file it emits.
+
+The writer has no model of the code it is building. It appends strings to a list and prefixes each
+non-empty one with the current indentation, and the methods named after Python constructs only
+save the caller from writing the keyword, the punctuation and the indentation bookkeeping by hand.
+Nothing here parses or validates what it is given, so a syntactically invalid fragment passed in
+comes out unchanged.
+
+A method named after a block construct, such as ``if_`` or ``class_``, is a context manager that
+writes the header line and indents the body for the duration of the ``with`` statement. A method
+named after a statement writes one line and returns the writer, so calls can be chained. Names
+that would collide with a Python keyword or a builtin carry a trailing underscore.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Generator, Iterable
@@ -10,12 +27,25 @@ from typing import Any
 
 # pylint: disable-next=too-many-public-methods
 class CodeWriter:
+    """
+    Builds a Python source file line by line, keeping track of the current indentation level.
+
+    A new instance holds no lines and sits at indentation level zero. ``writeln`` appends one
+    line, prefixed with the current level's worth of spaces unless the line is empty, and the
+    methods built on it append one or more such lines. The block context managers raise the level
+    for the duration of a ``with`` statement and lower it again on exit, including when the body
+    raises. ``to_string`` and ``to_lines`` read the result
+    out; neither clears the instance, and no method removes or rewrites a line once it has been
+    appended.
+
+    Args:
+        indent_size: Number of spaces that one indentation level is worth. Four matches the
+            formatting the repository applies to the generated files.
+    """
+
     def __init__(self, indent_size: int = 4) -> None:
         """
-        Initializes a new CodeWriter instance.
-
-        Args:
-            indent_size: Number of spaces for each indentation level (default: 4)
+        Initializes a new CodeWriter instance. The parameters are documented on the class.
         """
         self._lines: list[str] = []
         self._indent_level: int = 0
@@ -25,6 +55,14 @@ class CodeWriter:
     def indent(self) -> Generator[CodeWriter, None, None]:
         """
         Context manager to increase indentation level for a block of code.
+
+        Use this for a block whose header has already been written, or for one that no other
+        method covers. The level is lowered again in a ``finally`` clause, so an exception raised
+        inside the ``with`` statement leaves the writer at the level it started from.
+
+        Returns:
+            A context manager yielding this ``CodeWriter``, so the body can be written through the
+            name bound by ``as``.
         """
         self._indent_level += 1
         try:
@@ -35,6 +73,11 @@ class CodeWriter:
     def writeln(self, line: str = "") -> CodeWriter:
         """
         Writes a line of code with proper indentation. If the line is empty, it writes a blank line.
+
+        A blank line is written as the empty string rather than as the current indentation's worth
+        of spaces, which keeps trailing whitespace out of the generated file. Every other method
+        that writes a single line goes through this one, except ``blank_line``, which appends
+        directly.
 
         Args:
             line: The line of code to write (default: empty string for a blank line)
@@ -65,6 +108,10 @@ class CodeWriter:
         """
         Writes a comment line or block. If content is a string, it writes a single comment line.
 
+        An empty string, whether passed on its own or found in the iterable, becomes a bare ``#``
+        rather than ``#`` followed by a space, so the generated file carries no trailing
+        whitespace.
+
         Args:
             content: A string for a single comment line or an iterable of strings for multiple comment lines
         Returns:
@@ -80,6 +127,10 @@ class CodeWriter:
     def docstring(self, content: str | Iterable[str]) -> CodeWriter:
         """
         Writes a docstring. If content is a string, it writes a single-line docstring. If content is an iterable of strings, it writes a multi-line docstring.
+
+        Nothing in the content is escaped, so a triple quote inside it closes the docstring early
+        and breaks the generated file. The content the generator passes is fixed literal text and
+        protobuf message and enum names, neither of which can contain one.
 
         Args:
             content: A string for a single-line docstring or an iterable of strings for a multi line docstring
@@ -100,6 +151,10 @@ class CodeWriter:
         Writes an import statement. If items are provided, it writes a from-import statement.
         Otherwise, it writes a regular import statement.
 
+        The import is written wherever the writer currently is, with no sorting and no grouping,
+        so the caller decides the order. The generator sorts its own import lists before calling
+        this.
+
         Args:
             module: The module to import
             *items: Optional items to import from the module (if empty, imports the whole module)
@@ -117,8 +172,15 @@ class CodeWriter:
         """
         Create a generic code block with a header (e.g. if, for, while, try, etc.)
 
+        The header is written exactly as given, trailing colon included, so this is the escape
+        hatch for a construct that has no method of its own, such as ``try`` or ``with``.
+
         Args:
             header: The header line for the code block
+
+        Returns:
+            A context manager yielding this ``CodeWriter``, with the indentation raised for the
+            body of the block.
         """
         self.writeln(header)
         with self.indent():
@@ -134,10 +196,21 @@ class CodeWriter:
         """
         Generate a class definition with optional base classes and decorators.
 
+        The body is not given a ``pass`` statement when nothing is written inside the ``with``
+        statement, so an empty body produces a syntax error in the generated file. The caller is
+        responsible for writing at least one statement.
+
         Args:
             name: The name of the class
-            bases: Optional iterable of base class names
-            decorators: Optional iterable of decorator names
+            bases: Optional iterable of base class names. ``None`` and an empty list or tuple
+                both produce a class statement with no parenthesized base list at all, since the
+                test is on the truthiness of ``bases`` rather than on what it yields.
+            decorators: Optional iterable of decorator names, written in the order given, each
+                already without its leading ``@``
+
+        Returns:
+            A context manager yielding this ``CodeWriter``, with the indentation raised for the
+            class body.
         """
         if decorators is not None:
             for dec in decorators:
@@ -162,13 +235,23 @@ class CodeWriter:
         """
         Generate a dataclass definition with optional base classes, decorators and dataclass parameters.
 
+        The dataclass decorator is written last, immediately above the class statement, so any
+        decorator passed in ``decorators`` wraps it. With neither ``frozen`` nor ``slots`` set the
+        decorator is written bare, without parentheses.
+
         Args:
             name: The name of the dataclass
             bases: Optional iterable of base class names
-            decorators: Optional iterable of additional decorator names
+            decorators: Optional iterable of additional decorator names, written above the
+                dataclass decorator
             frozen: Whether to set frozen=True in the dataclass decorator
             slots: Whether to set slots=True in the dataclass decorator
-            decorator_name: The full name of the dataclass decorator to use
+            decorator_name: The full name of the dataclass decorator to use. The default assumes
+                the generated module imports ``dataclasses`` rather than ``dataclass`` itself.
+
+        Returns:
+            A context manager yielding this ``CodeWriter``, with the indentation raised for the
+            class body.
         """
         dc_params = []
         if frozen:
@@ -203,11 +286,20 @@ class CodeWriter:
         """
         Generate an enum definition with optional base classes and decorators.
 
+        ``enum_type`` is written as the first base and anything in ``bases`` follows it. Python
+        requires the enum class to come last, so a non-empty ``bases`` produces a class statement
+        that raises ``TypeError`` when the generated module is imported. The generated OTLP enums
+        pass ``enum.IntEnum`` and nothing else, so the case does not arise there.
+
         Args:
             name: The name of the enum
             enum_type: The base enum type to inherit from (default: "enum.Enum")
             bases: Optional iterable of additional base class names
             decorators: Optional iterable of decorator names
+
+        Returns:
+            A context manager yielding this ``CodeWriter``, with the indentation raised for the
+            enum body.
         """
         if decorators is not None:
             for dec in decorators:
@@ -233,11 +325,20 @@ class CodeWriter:
         """
         Write a dataclass field with optional default value or default factory.
 
+        ``default`` is interpolated into the line as it is, so a string passed there is written
+        without quotes and has to arrive already in Python source form: ``'""'`` for an empty
+        string default, not ``""``. A ``default`` of ``None`` means no default at all rather than
+        a default of ``None``, so to write ``= None`` pass the string ``"None"``.
+
         Args:
             name: The name of the field
             type_hint: The type hint for the field
-            default: Optional default value for the field
-            default_factory: Optional default factory for the field
+            default: Optional default value for the field, already written as Python source
+            default_factory: Optional default factory for the field, which takes precedence over
+                ``default`` when both are given
+
+        Returns:
+            The CodeWriter instance
         """
         if default_factory:
             self.writeln(f"{name}: {type_hint} = dataclasses.field(default_factory={default_factory})")
@@ -251,9 +352,15 @@ class CodeWriter:
         """
         Write an enum member with a specific value.
 
+        ``value`` is interpolated with ``str``, so an integer comes out as a numeric literal and a
+        string comes out unquoted. Pass a string member value already quoted.
+
         Args:
             name: The name of the enum member
-            value: The value of the enum member
+            value: The value of the enum member, already written as Python source
+
+        Returns:
+            The CodeWriter instance
         """
         self.writeln(f"{name} = {value}")
         return self
@@ -269,11 +376,22 @@ class CodeWriter:
         """
         Create a function definition with optional decorators and return type.
 
+        As with ``class_``, an empty body produces a syntax error, so write at least a ``pass``
+        statement inside the ``with`` statement.
+
         Args:
             name: The name of the function
-            params: An iterable of parameter strings or a single string for the parameter list
+            params: An iterable of parameter strings or a single string for the parameter list.
+                An iterable is joined with ``", "``; a string is written as it stands, which is
+                the way to pass a parameter list that is already assembled, with the caller
+                responsible for the separators.
             decorators: Optional iterable of decorator names
-            return_type: Optional return type hint for the function
+            return_type: Optional return type hint for the function. ``None`` and the empty string
+                both leave the arrow off entirely.
+
+        Returns:
+            A context manager yielding this ``CodeWriter``, with the indentation raised for the
+            function body.
         """
         if decorators is not None:
             for dec in decorators:
@@ -297,11 +415,20 @@ class CodeWriter:
         """
         Create a method definition within a class with optional decorators and return type.
 
+        This delegates to ``function`` and adds nothing. It exists so that generator code reads as
+        what it is building, and it does not supply ``self``: the caller lists it in ``params``
+        like any other parameter, or omits it for a ``staticmethod``.
+
         Args:
             name: The name of the method
-            params: An iterable of parameter strings or a single string for the parameter list
+            params: An iterable of parameter strings or a single string for the parameter list,
+                including the receiver when there is one
             decorators: Optional iterable of decorator names
             return_type: Optional return type hint for the method
+
+        Returns:
+            A context manager yielding this ``CodeWriter``, with the indentation raised for the
+            method body.
         """
         with self.function(name, params, decorators=decorators, return_type=return_type):
             yield self
@@ -312,7 +439,12 @@ class CodeWriter:
         Create an if block
 
         Args:
-            condition: The condition for the if statement
+            condition: The condition for the if statement, written as Python source without the
+                ``if`` keyword and without the trailing colon
+
+        Returns:
+            A context manager yielding this ``CodeWriter``, with the indentation raised for the
+            body of the branch.
         """
         self.writeln(f"if {condition}:")
         with self.indent():
@@ -323,8 +455,17 @@ class CodeWriter:
         """
         Create an elif block
 
+        Nothing checks that an ``if`` block precedes this one at the same indentation level. The
+        caller has to get that ordering right, which is why the generator decides between ``if_``
+        and ``elif_`` from the position of a field within its oneof group.
+
         Args:
-            condition: The condition for the elif statement
+            condition: The condition for the elif statement, written as Python source without the
+                ``elif`` keyword and without the trailing colon
+
+        Returns:
+            A context manager yielding this ``CodeWriter``, with the indentation raised for the
+            body of the branch.
         """
         self.writeln(f"elif {condition}:")
         with self.indent():
@@ -334,6 +475,12 @@ class CodeWriter:
     def else_(self) -> Generator[CodeWriter, None, None]:
         """
         Create an else block
+
+        As with ``elif_``, the preceding ``if`` block is the caller's responsibility.
+
+        Returns:
+            A context manager yielding this ``CodeWriter``, with the indentation raised for the
+            body of the branch.
         """
         self.writeln("else:")
         with self.indent():
@@ -345,8 +492,12 @@ class CodeWriter:
         Create a for loop
 
         Args:
-            var: The loop variable
-            iterable: The iterable to loop over
+            var: The loop variable, or several separated by commas for tuple unpacking
+            iterable: The iterable to loop over, written as a Python expression
+
+        Returns:
+            A context manager yielding this ``CodeWriter``, with the indentation raised for the
+            loop body.
         """
         self.writeln(f"for {var} in {iterable}:")
         with self.indent():
@@ -358,7 +509,12 @@ class CodeWriter:
         Create a while loop
 
         Args:
-            condition: The condition for the while loop
+            condition: The condition for the while loop, written as Python source without the
+                ``while`` keyword and without the trailing colon
+
+        Returns:
+            A context manager yielding this ``CodeWriter``, with the indentation raised for the
+            loop body.
         """
         self.writeln(f"while {condition}:")
         with self.indent():
@@ -386,7 +542,8 @@ class CodeWriter:
         Write a return statement with an optional return value
 
         Args:
-            value: The value to return (if None, writes a bare return statement)
+            value: The value to return, written as a Python expression. ``None`` writes a bare
+                return statement, and so does the empty string, since the check is on truthiness.
         Returns:
             The CodeWriter instance
         """
@@ -410,8 +567,11 @@ class CodeWriter:
         """
         Write one or more blank lines
 
+        These bypass ``writeln`` and are appended as empty strings, so the current indentation
+        level has no effect on them.
+
         Args:
-            count: The number of blank lines to write
+            count: The number of blank lines to write. Zero and any negative number write none.
         Returns:
             The CodeWriter instance
         """
@@ -421,6 +581,13 @@ class CodeWriter:
     def to_string(self) -> str:
         """
         Get the generated code as a single string with newline characters separating lines.
+
+        The lines are joined rather than terminated, so the result has no trailing newline unless
+        the last line written was blank. ``_generate_file`` in
+        ``opentelemetry.codegen.json.generator`` relies on that for the per-proto message modules,
+        ending each one with ``blank_line``. The other files the generator produces end another
+        way: ``version/__init__.py`` through ``writemany``, and ``_json_codec.py`` and the empty
+        ``__init__.py`` files without a ``CodeWriter`` at all.
 
         Returns:
             A string containing the entire generated code.
@@ -432,6 +599,8 @@ class CodeWriter:
         Get the generated code as a list of lines
 
         Returns:
-            A list of strings, where each string is a line of generated code.
+            A list of strings, where each string is a line of generated code. This is the
+            writer's own list and not a copy, so mutating it changes what the writer will produce
+            and what a later call returns.
         """
         return self._lines
