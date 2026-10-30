@@ -35,12 +35,16 @@ OPENTELEMETRY_VERSION = version("opentelemetry-api")
 
 
 def proto_timestamp_from_time_ns(time_ns):
-    """Convert an OpenTelemetry nanosecond timestamp to an OpenCensus one.
+    """Convert a nanosecond timestamp to the OpenCensus timestamp message.
 
     OpenTelemetry records span and event times as an integer number of
-    nanoseconds since the Unix epoch, while OpenCensus carries them in the
-    protobuf ``Timestamp`` message used by the span fields ``start_time`` and
-    ``end_time`` and by the ``time`` field of a time event.
+    nanoseconds since the Unix epoch, while OpenCensus carries every time in
+    the protobuf ``Timestamp`` message. Three fields of three different
+    OpenCensus messages are filled from here: ``start_time`` and ``end_time``
+    on a span, ``time`` on a time event, and ``start_timestamp`` on the
+    process identifier that ``get_node`` builds. The first three come from
+    the OpenTelemetry span model and the fourth from a wall clock reading, so
+    the argument is a count of nanoseconds and nothing narrower.
 
     Args:
         time_ns: Time in nanoseconds since the Unix epoch, or ``None``.
