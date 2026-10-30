@@ -276,12 +276,12 @@ class SpanShim(Span):
             The OpenTracing API defines the values of *key_values* to be of any
             type. However, the OpenTelemetry API requires that the values be
             any one of the types defined in
-            ``opentelemetry.trace.util.Attributes`` therefore, only these types
+            ``opentelemetry.util.types.Attributes`` therefore, only these types
             are supported as values.
 
         Args:
             key_values: A dictionary as specified in
-                ``opentelemetry.trace.util.Attributes``.
+                ``opentelemetry.util.types.Attributes``.
             timestamp: Timestamp of the OpenTelemetry event, will be generated
                 automatically if omitted.
 
@@ -342,9 +342,15 @@ class SpanShim(Span):
         """Stores a Baggage item in the span as a key/value
         pair.
 
+        The item is stored in the :class:`SpanContextShim` of this
+        :class:`SpanShim` and nowhere else. It is not written into the current
+        OpenTelemetry context, so :func:`opentelemetry.baggage.get_all` does
+        not see it and :meth:`TracerShim.inject` does not propagate it to
+        another service.
+
         Args:
-            key: A tag key.
-            value: A tag value.
+            key: A baggage key.
+            value: A baggage value.
         """
         # pylint: disable=protected-access
         self._context._baggage = set_baggage(key, value, context=self._context._baggage)
@@ -352,10 +358,16 @@ class SpanShim(Span):
     def get_baggage_item(self, key: str) -> object | None:
         """Retrieves value of the baggage item with the given key.
 
+        Only items stored through :meth:`set_baggage_item` on this same
+        :class:`SpanShim` are visible here. Baggage carried in the current
+        OpenTelemetry context is not consulted.
+
         Args:
-            key: A tag key.
+            key: A baggage key.
+
         Returns:
-            Returns this :class:`SpanShim` instance to allow call chaining.
+            The value stored under *key* by :meth:`set_baggage_item`, or
+            `None` when no item was stored under that key.
         """
         # pylint: disable=protected-access
         return get_baggage(key, context=self._context._baggage)
@@ -784,12 +796,29 @@ class TracerShim(Tracer):
 
         See base class for more details.
 
+        The injection itself is left to the OpenTelemetry propagator returned
+        by :func:`opentelemetry.propagate.get_global_textmap`, so which keys
+        land in *carrier* is decided by the OpenTelemetry configuration rather
+        than by the OpenTracing *format*. Baggage set through
+        :meth:`SpanShim.set_baggage_item` is not injected, because the shim
+        keeps it in the :class:`SpanContextShim` instead of in the
+        OpenTelemetry context the propagator reads.
+
         Args:
-            span_context: The ``opentracing.SpanContext`` to inject.
+            span_context: The :class:`SpanContextShim` to inject. `None`
+                clears the span in the OpenTelemetry context handed to the
+                propagator, so no trace context is written into *carrier*.
             format: a Python object instance that represents a given
                 carrier format. `format` may be of any type, and `format`
                 equality is defined by Python ``==`` operator.
             carrier: the format-specific carrier object to inject into
+
+        Raises:
+            opentracing.UnsupportedFormatException: When *format* is neither
+                ``opentracing.Format.TEXT_MAP`` nor
+                ``opentracing.Format.HTTP_HEADERS``.
+                ``opentracing.Format.BINARY`` is rejected as well, since
+                OpenTelemetry Python has no binary propagator.
         """
 
         # pylint: disable=redefined-builtin
@@ -816,6 +845,13 @@ class TracerShim(Tracer):
 
         See base class for more details.
 
+        The extraction itself is left to the OpenTelemetry propagator returned
+        by :func:`opentelemetry.propagate.get_global_textmap`, so which keys
+        are read from *carrier* is decided by the OpenTelemetry configuration
+        rather than by the OpenTracing *format*. Any baggage the propagator
+        finds is discarded, because the returned :class:`SpanContextShim`
+        starts with an empty baggage store.
+
         Args:
             format: a Python object instance that represents a given
                 carrier format. ``format`` may be of any type, and ``format``
@@ -823,8 +859,20 @@ class TracerShim(Tracer):
             carrier: the format-specific carrier object to extract from
 
         Returns:
-            An ``opentracing.SpanContext`` extracted from ``carrier`` or
-            ``None`` if no such ``SpanContext`` could be found.
+            A :class:`SpanContextShim` wrapping the
+            :class:`opentelemetry.trace.SpanContext` found in ``carrier``.
+            When ``carrier`` holds no trace context, a
+            :class:`SpanContextShim` wrapping
+            ``opentelemetry.trace.INVALID_SPAN_CONTEXT`` is returned, so the
+            caller gets an object whose ``unwrap().is_valid`` is `False`
+            rather than `None`.
+
+        Raises:
+            opentracing.UnsupportedFormatException: When *format* is neither
+                ``opentracing.Format.TEXT_MAP`` nor
+                ``opentracing.Format.HTTP_HEADERS``.
+                ``opentracing.Format.BINARY`` is rejected as well, since
+                OpenTelemetry Python has no binary propagator.
         """
 
         # pylint: disable=redefined-builtin
