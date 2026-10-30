@@ -5,8 +5,8 @@
 
 The ``tool.hatch.version`` table of the ``pyproject.toml`` of the distribution
 points at this module, so ``hatchling`` reads ``__version__`` from here when it
-builds the wheel and the source distribution. The ``release`` and
-``patch-release`` subcommands of ``scripts/eachdist.py`` rewrite the
+builds the wheel and the source distribution. The ``update_versions`` and
+``update_patch_versions`` subcommands of ``scripts/eachdist.py`` rewrite the
 ``__version__`` assignment here, so this module is the single place that
 records the version of the distribution.
 """

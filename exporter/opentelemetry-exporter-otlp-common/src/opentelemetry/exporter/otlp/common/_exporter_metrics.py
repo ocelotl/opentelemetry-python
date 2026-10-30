@@ -177,7 +177,8 @@ class ExporterMetrics:
             prefixed with ``//`` first so that ``urlparse`` reads its leading
             component as the host rather than as a scheme. A host with no port
             gets 443 when ``component_type`` is one of the gRPC exporters or
-            the scheme is ``https``, and 80 when the scheme is ``http``.
+            the scheme is ``https``, and 80 when the scheme is ``http`` and
+            ``component_type`` is not one of the gRPC exporters.
             ``server.port`` is left unrecorded in every other case, and
             ``server.address`` is left unrecorded when no host could be parsed.
             ``urlparse`` itself accepts a port that is not an integer in range,
