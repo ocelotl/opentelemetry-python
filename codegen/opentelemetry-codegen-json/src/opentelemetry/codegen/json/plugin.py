@@ -46,12 +46,12 @@ def code_generation() -> Iterator[tuple[plugin.CodeGeneratorRequest, plugin.Code
     ``with`` statement to fill in. On exit it serializes the response and writes it to standard
     output.
 
-    Two cases never reach the body. A first command line argument of ``-V`` or ``--version``
-    prints the version and calls ``sys.exit``. That branch answers a version query typed directly
-    at the console script; ``protoc`` never reaches it, because ``protoc`` runs a plugin with an
-    empty argument vector. An
-    exception raised inside the body propagates, and because the serialization is placed after the
-    ``yield`` rather than in a ``finally`` block, no response is written at all, so ``protoc``
+    Two cases write no response to standard output at all. A first command line argument of
+    ``-V`` or ``--version`` prints the version and calls ``sys.exit`` before the ``yield``, so the
+    body never runs. That branch answers a version query typed directly at the console script;
+    ``protoc`` never reaches it, because ``protoc`` runs a plugin with an empty argument vector.
+    An exception raised inside the body propagates instead, and because the serialization is
+    placed after the ``yield`` rather than in a ``finally`` block, it is skipped, so ``protoc``
     reports the failure instead of accepting a partial result.
 
     Returns:
