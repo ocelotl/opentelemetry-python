@@ -5,9 +5,10 @@
 
 This is the only runtime context implementation shipped with the API. Storing
 the current :class:`~opentelemetry.context.Context` in a
-:class:`~contextvars.ContextVar` gives each thread, each task and each
-generator its own view, so a span started in one task does not become current
-in another.
+:class:`~contextvars.ContextVar` gives each thread and each task its own view,
+so a span started in one task does not become current in another. A generator
+is not included: a generator runs in the context of whoever resumes it, so a
+value the generator attaches stays visible to its caller.
 """
 
 from __future__ import annotations
