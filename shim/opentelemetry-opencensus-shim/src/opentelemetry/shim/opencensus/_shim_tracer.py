@@ -57,8 +57,9 @@ def get_shim_span_in_context() -> ShimSpan:
     Returns:
         The shim span that the most recent ``ShimTracer.start_span`` attached to the context, or
         ``None`` when no shim span is current. ``None`` is what a caller sees before the shim has
-        started any span, after the last one has been ended, and inside a span that was started
-        straight through the OpenTelemetry API.
+        started any span and after the last one has been ended. Starting a span straight through
+        the OpenTelemetry API does not produce ``None``: it leaves the key of the shim in place, so
+        a shim span that encloses it is still the one reported.
     """
     return context.get_value(_SHIM_SPAN_KEY)
 
@@ -190,7 +191,8 @@ class ShimTracer(wrapt.ObjectProxy):
         ``opencensus.trace.tracers.context_tracer.ContextTracer`` does. The token needed to detach
         it is stored on the shim span itself, so the context is restored only by ``end_span`` or by
         leaving the shim span's ``with`` block. A caller that does neither leaves the shim span
-        attached to the context, and the OpenTelemetry span is never ended.
+        attached to the context, and the OpenTelemetry span is then ended only if that caller calls
+        ``finish`` on the shim span, which ends it without restoring the context.
 
         Args:
             name: The name given both to the OpenTelemetry span and to the OpenCensus

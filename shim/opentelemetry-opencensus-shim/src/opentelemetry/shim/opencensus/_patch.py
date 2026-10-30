@@ -49,8 +49,10 @@ def install_shim(
 
     Args:
         tracer_provider: The :class:`opentelemetry.trace.TracerProvider` to obtain the tracer from.
-            When ``None``, the global tracer provider is used, resolved at the moment of this call,
-            so a provider set afterwards has no effect on an already installed shim.
+            When ``None``, the tracer comes from the global tracer provider. If no global provider
+            has been set at the moment of this call, the tracer is a proxy that resolves the global
+            provider the first time it starts a span, so a provider set after the shim is installed
+            is still honoured.
     """
     otel_tracer = trace.get_tracer(
         "opentelemetry-opencensus-shim",
