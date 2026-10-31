@@ -7,9 +7,8 @@ The encoding itself moved to
 ``opentelemetry.exporter.otlp.proto.common.trace_encoder``, which is what
 :class:`~opentelemetry.exporter.otlp.proto.http.trace_exporter.OTLPSpanExporter`
 calls. This module defines no encoding of its own. It only re-imports the names
-the removed encoder exposed, protobuf, SDK and standard library alike, so that
-code written against the old import path keeps working, and nothing here should
-be used in new code.
+the removed encoder exposed, so that code written against the old import path
+keeps working, and nothing here should be used in new code.
 """
 
 import logging  # noqa: F401
