@@ -69,6 +69,7 @@ You can run `tox` with the following arguments:
 - `tox -e ruff` to run ruff linter and formatter checks against the entire codebase
 - `tox -e typecheck` to run pyright against entire code base.
 - `tox -e public-symbols-check` to run public_symbols_checker.py.
+- `tox -e docstring-check` to run docstring_checker.py.
 - `tox -e docker-tests-{otlpexporter,opencensus}` to run tests in both or either one location.
 - `tox -e tracecontext` to run integration tests for tracecontext.
 - `tox -e precommit` to run all `pre-commit` actions
@@ -147,6 +148,20 @@ To check if your PR is adding public symbols, run `tox -e public-symbols-check`.
 behind this is that every PR that adds/removes public symbols fails in CI, forcing reviewers to check the symbols to make sure they are strictly necessary.
 If after checking them, it is considered that they are indeed necessary, the PR will be labeled with `Approve Public API check` so that this check is not
 run.
+
+### Docstrings
+
+Every public symbol needs a docstring, every parameter of a public function or method needs an entry
+in an `Args:` section, and every public function or method whose return annotation is not `None`
+needs a `Returns:` or `Yields:` section. Constructor parameters are documented on the class
+docstring rather than on `__init__`, because `docs/conf.py` does not set `special-members`, so an
+`__init__` docstring is never rendered in the API reference.
+
+To check whether your PR leaves a public symbol less documented than `main` does, run
+`tox -e docstring-check`. It compares the documentation gaps at your branch against the gaps at
+`main` and fails only on the ones your branch introduces, so the repository can close the gaps it
+already has at its own pace while no PR adds a new one. If a gap is deliberate, the PR will be
+labeled with `Approve Docstring check` so that this check is not run.
 
 Also, we try to keep our console output as clean as possible. Most of the time this means catching expected log messages in the test cases:
 
