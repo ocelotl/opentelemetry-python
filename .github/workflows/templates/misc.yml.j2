@@ -45,6 +45,11 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'Approve Public API check')
       && github.actor != 'otelbot[bot]' && github.event_name == 'pull_request'
     {%- endif %}
+    {%- if job_data == "docstring-check" %}
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'Approve Docstring check')
+      && github.actor != 'otelbot[bot]' && github.event_name == 'pull_request'
+    {%- endif %}
     {%- if job_data == "docs" %}
     if: |
       github.event_name == 'merge_group' ||
@@ -55,7 +60,7 @@ jobs:
       - name: Checkout repo @ SHA - ${% raw %}{{ github.sha }}{% endraw %}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          persist-credentials: false{% if job_data == "public-symbols-check" %}
+          persist-credentials: false{% if job_data in ("public-symbols-check", "docstring-check") %}
           fetch-depth: 0{% endif %}
       {%- if job_data in contrib_job_datas %}
 
@@ -67,7 +72,7 @@ jobs:
           ref: ${% raw %}{{ env.CONTRIB_REPO_SHA }}{% endraw %}
           path: opentelemetry-python-contrib
       {%- endif %}
-      {%- if job_data == "public-symbols-check" %}
+      {%- if job_data in ("public-symbols-check", "docstring-check") %}
       - name: Checkout main
         run: git checkout main
 

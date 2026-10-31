@@ -279,6 +279,39 @@ jobs:
       - name: Run tests
         run: uvx --with tox-uv tox -e public-symbols-check
 
+  docstring-check:
+    name: docstring-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'Approve Docstring check')
+      && github.actor != 'otelbot[bot]' && github.event_name == 'pull_request'
+    steps:
+      - name: Checkout repo @ SHA - ${{ github.sha }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Checkout main
+        run: git checkout main
+
+      - name: Pull origin
+        run: git pull --rebase=false origin main
+
+      - name: Checkout pull request
+        run: git checkout ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - name: Run tests
+        run: uvx --with tox-uv tox -e docstring-check
+
   shellcheck:
     name: shellcheck
     runs-on: ubuntu-latest
