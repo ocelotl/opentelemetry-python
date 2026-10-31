@@ -152,9 +152,12 @@ class _ProxyInstrument(ABC, Generic[InstrumentT]):
     """An instrument that stands in until a real meter provider is set.
 
     It records nothing of its own. Once a real provider is installed, the
-    creating meter calls :meth:`on_meter_set`, and every later measurement is
-    forwarded to a real instrument built from the stored name, unit and
-    description.
+    creating meter calls :meth:`on_meter_set`, and every measurement made after
+    that call returns is forwarded to a real instrument built from the stored
+    name, unit and description, together with whatever else the subclass stored:
+    the callbacks for an asynchronous instrument, the bucket advisory for a
+    histogram. A measurement made while the real instrument is being built is
+    discarded, since no lock is held across its creation.
 
     Args:
         name: The name of the instrument, which must match
@@ -202,7 +205,8 @@ class _ProxyInstrument(ABC, Generic[InstrumentT]):
 
         Returns:
             A real instrument of the type this proxy stands in for, carrying
-            the name, unit and description the proxy was built with.
+            the name, unit and description the proxy was built with, and
+            whatever else the implementing subclass stored.
         """
 
 
@@ -553,8 +557,10 @@ class _ProxyObservableCounter(_ProxyAsynchronousInstrument[ObservableCounter], O
         Returns:
             The instrument returned by
             :meth:`~opentelemetry.metrics.Meter.create_observable_counter`,
-            carrying the name, unit and description this proxy was built
-            with.
+            carrying the name, unit, description and callbacks this proxy was
+            built with. The callbacks are handed to the real instrument, so a
+            counter created before the SDK was installed starts reporting on
+            the first collection after it is.
         """
         return meter.create_observable_counter(
             self._name,
@@ -626,8 +632,10 @@ class _ProxyObservableUpDownCounter(
         Returns:
             The instrument returned by
             :meth:`~opentelemetry.metrics.Meter.create_observable_up_down_counter`,
-            carrying the name, unit and description this proxy was built
-            with.
+            carrying the name, unit, description and callbacks this proxy was
+            built with. The callbacks are handed to the real instrument, so a
+            counter created before the SDK was installed starts reporting on
+            the first collection after it is.
         """
         return meter.create_observable_up_down_counter(
             self._name,
@@ -806,7 +814,9 @@ class _ProxyHistogram(_ProxyInstrument[Histogram], Histogram):
         Returns:
             The instrument returned by
             :meth:`~opentelemetry.metrics.Meter.create_histogram`, carrying the name,
-            unit and description this proxy was built with.
+            unit and description this proxy was built with, and the bucket
+            advisory as well, so a histogram created before the SDK was
+            installed keeps the boundaries it asked for.
         """
         return meter.create_histogram(
             self._name,
@@ -878,8 +888,10 @@ class _ProxyObservableGauge(
         Returns:
             The instrument returned by
             :meth:`~opentelemetry.metrics.Meter.create_observable_gauge`,
-            carrying the name, unit and description this proxy was built
-            with.
+            carrying the name, unit, description and callbacks this proxy was
+            built with. The callbacks are handed to the real instrument, so a
+            gauge created before the SDK was installed starts reporting on the
+            first collection after it is.
         """
         return meter.create_observable_gauge(
             self._name,
