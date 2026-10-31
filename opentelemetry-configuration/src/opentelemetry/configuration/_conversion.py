@@ -23,7 +23,17 @@ _T = TypeVar("_T")
 def _unwrap_optional(type_hint: Any) -> Any:
     """Strip ``None`` from a ``X | None`` / ``Optional[X]`` annotation.
 
-    Returns the unwrapped type, or the original hint if not a union with None.
+    Nearly every field of the generated models is optional, so this runs on
+    almost every field before its type can be inspected.
+
+    Args:
+        type_hint: An evaluated annotation, as ``get_type_hints`` returns it.
+
+    Returns:
+        The single remaining member of the union when the annotation is a
+        union of exactly one type with ``None``. ``type_hint`` unchanged in
+        every other case, including a union of two or more types with
+        ``None``, which stays a union.
     """
     origin = get_origin(type_hint)
     if origin is UnionType or origin is Union:
@@ -39,6 +49,16 @@ def _is_empty_constructible_dataclass(unwrapped: Any) -> bool:
     A dataclass with only optional fields (all have a default or
     default_factory) can be built as ``cls()``; one with a required field
     cannot, and coercing a present null into it would raise ``TypeError``.
+
+    Args:
+        unwrapped: A type hint with its ``| None`` already stripped by
+            ``_unwrap_optional``. Any object is accepted, since a hint may be
+            a generic alias or a string rather than a class.
+
+    Returns:
+        ``True`` only when ``unwrapped`` is a class, is a dataclass, and
+        every one of its fields has a default or a default factory. A
+        dataclass with no fields at all satisfies this.
     """
     return (
         isinstance(unwrapped, type)
@@ -53,6 +73,37 @@ def _convert_value(value: Any, type_hint: Any) -> Any:
     Recursively converts dicts to dataclasses and lists of dicts to lists of
     dataclasses. Other values (primitives, enums, ``dict[str, Any]`` aliases)
     pass through unchanged.
+
+    A ``None`` value is kept as ``None`` for a scalar field and for a
+    dataclass that has a required field, and is replaced by an empty mapping
+    for a ``dict`` field or an empty-constructible dataclass. That is what
+    makes ``always_on:`` written with no value select the always-on sampler
+    instead of leaving the field unset.
+
+    Nothing is validated here. A value whose shape does not fit the
+    annotation is passed through, and the error comes from a dataclass
+    constructor instead. For a nested dataclass field that constructor runs
+    inside this function, through ``_dict_to_dataclass``; for any other
+    field it runs in the caller.
+
+    Args:
+        value: The parsed YAML or JSON value for one field.
+        type_hint: The annotation of that field, evaluated. ``None`` is
+            accepted, for a field name present in ``__init__`` but absent
+            from ``get_type_hints``, and makes the value pass through.
+
+    Returns:
+        The converted value: a dataclass instance, a list of converted
+        elements, an enum member, or ``value`` itself.
+
+    Raises:
+        ValueError: If ``value`` is not a member value of the enum the
+            annotation names. The enum constructor raises it.
+        TypeError: If ``value`` is a mapping for a nested dataclass field
+            and carries a key that dataclass neither declares nor captures,
+            or omits one of its fields that has no default.
+            ``_dict_to_dataclass`` splats the mapping into the constructor,
+            which rejects either one.
     """
     unwrapped = _unwrap_optional(type_hint)
     origin = get_origin(unwrapped)
@@ -105,8 +156,27 @@ def _dict_to_dataclass(data: Mapping[str, Any], cls: type[_T]) -> _T:
     Non-init fields (e.g. the generated ``additional_properties`` field on
     decorated dataclasses) are ignored as expected.
 
+    A key containing ``/``, which the configuration schema uses to mark a
+    development feature (``otlp_file/development``), is matched against the
+    field named with ``_`` in its place. Without that the key would fall
+    through to ``additional_properties`` and the component lookup would find
+    nothing.
+
+    Args:
+        data: One mapping from the parsed configuration file.
+        cls: The dataclass type to build from it.
+
+    Returns:
+        An instance of ``cls`` with every recognised key converted to its
+        annotated type and every unrecognised key passed through under its
+        original name.
+
     Raises:
-        TypeError: If ``cls`` is not a dataclass type.
+        TypeError: If ``cls`` is not a dataclass type, if ``cls`` is not
+            decorated with ``@_additional_properties`` and ``data`` holds a
+            key that is not one of its fields, or if ``data`` omits a field
+            of ``cls`` that has neither a default nor a default factory.
+            The dataclass constructor raises the last two.
     """
     if not is_dataclass(cls):
         raise TypeError(f"{cls.__name__} is not a dataclass")

@@ -53,6 +53,18 @@ _schema_cache: list[dict] = []
 
 
 def _get_schema() -> dict:
+    """Read the vendored JSON schema, parsing it at most once per process.
+
+    The schema ships as ``schema.json`` inside the
+    ``opentelemetry.configuration`` package and is read through
+    ``importlib.resources``, so it is found whether the package is installed
+    as a directory or as a zip.
+
+    Returns:
+        The parsed schema. The same mutable dict is returned on every call,
+        so a caller that modified it would change what every later
+        validation sees.
+    """
     if not _schema_cache:
         schema_path = importlib.resources.files("opentelemetry.configuration") / "schema.json"
         _schema_cache.append(json.loads(schema_path.read_text(encoding="utf-8")))
@@ -91,6 +103,10 @@ def _substitute_env_in_yaml_node(
         visited: Ids of nodes already processed in this traversal. Callers pass
             nothing; the walker creates and threads one set through the whole
             tree.
+
+    Raises:
+        ConfigurationError: If any scalar holds a malformed substitution
+            reference. ``substitute_env_vars`` raises it.
     """
     # Every anchor/alias pair shares one composed node, so the same node is
     # reached once per reference to it. Each node must be substituted exactly
@@ -172,6 +188,23 @@ def _substitute_env_in_json_value(value: Any) -> Any:
 
     JSON has explicit types and no comments, so substitution applies only to
     string values (the result stays a string) and mapping keys are left as-is.
+
+    This differs from the YAML path, where a value that is exactly one
+    unquoted reference is re-typed from the substituted text. A JSON
+    ``"${LIMIT}"`` stays the string the substitution produced, because JSON
+    has no unquoted scalar for it to have been written as.
+
+    Args:
+        value: A node of the parsed JSON document, at any depth.
+
+    Returns:
+        A new value of the same shape with every string substituted. Lists
+        and dicts are rebuilt rather than modified in place; numbers,
+        booleans and ``None`` are returned unchanged.
+
+    Raises:
+        ConfigurationError: If any string holds a malformed substitution
+            reference. ``substitute_env_vars`` raises it.
     """
     if isinstance(value, str):
         return substitute_env_vars(value)
@@ -190,9 +223,26 @@ def _parse_config_content(content: str, suffix: str, file_path: str | os.PathLik
     configuration values, with YAML node types re-resolved for standalone
     references.
 
+    Args:
+        content: The whole text of the configuration file.
+        suffix: The lowercased file extension, including the dot. Exactly
+            ``".json"`` selects the JSON parser; every other value is parsed
+            as YAML. ``load_config_file`` rejects an extension outside
+            ``.yaml``, ``.yml`` and ``.json`` before calling this.
+        file_path: The path the content came from, used only in log
+            messages, so a caller that parses text from elsewhere may pass
+            any identifying string.
+
+    Returns:
+        The parsed document: a dict for a well-formed configuration file,
+        and ``None`` for an empty or comment-only YAML file. A YAML document
+        whose root is a scalar or a list parses successfully here and is
+        rejected by ``load_config_file``.
+
     Raises:
-        ConfigurationError: If the content cannot be parsed or substitution of
-            a required environment variable fails.
+        ConfigurationError: If the content is not valid YAML or JSON, or if
+            a substitution reference in it is malformed. The message
+            distinguishes the YAML and JSON parse failures.
     """
     try:
         if suffix == ".json":
@@ -290,8 +340,21 @@ def load_config_file(
 def _validate_schema(data: dict) -> None:
     """Validate configuration dict against the OTel configuration JSON schema.
 
+    Validation runs after environment variable substitution, so a value a
+    reference produced is checked the same way a literal one is.
+
+    Args:
+        data: The parsed configuration document, already confirmed to be a
+            mapping by ``load_config_file``.
+
     Raises:
         ConfigurationError: If the data does not conform to the schema.
+            Only one violation is named: ``jsonschema.validate`` picks it
+            with ``best_match``, so it is the one that library judges most
+            relevant rather than the first in document order. The path to
+            the offending node is included when it has one. Also raised when
+            the vendored schema is itself invalid, which can only happen if
+            ``schema.json`` was edited by hand.
     """
     try:
         jsonschema.validate(
@@ -317,9 +380,19 @@ def _validate_file_format(data: dict) -> None:
     newer than the one this SDK targets. See
     https://github.com/open-telemetry/opentelemetry-configuration/blob/main/VERSIONING.md
 
+    A pre-release suffix is dropped before the comparison, so ``1.0-rc.1``
+    is read as ``1.0``. A version with no minor component is read as minor
+    ``0``, and any component beyond the minor one is ignored.
+
+    Args:
+        data: The parsed configuration document. Only its ``file_format``
+            key is read.
+
     Raises:
         ConfigurationError: If ``file_format`` is malformed or its major
-            version is not supported.
+            version is not supported. A missing or non-string
+            ``file_format`` reaches this only when the schema validation
+            that precedes it was bypassed.
     """
     file_format = data.get("file_format")
     # file_format is required and typed as a string by the schema, which is

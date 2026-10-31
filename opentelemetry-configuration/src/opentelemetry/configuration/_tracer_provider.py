@@ -1,6 +1,41 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+"""TracerProvider construction from declarative configuration.
+
+Only ``create_tracer_provider`` and ``configure_tracer_provider`` are
+meant to be called from outside this module. Everything else builds one
+piece of the provider: a sampler, an id generator, the span limits, a
+span processor and its exporter, or the experimental per-tracer
+configurator.
+
+No function here reads an environment variable. The sampler, the id
+generator and most of the span limits are passed to the SDK explicitly,
+with the constant the specification gives standing in for an absent
+configuration field, so ``OTEL_TRACES_SAMPLER`` and the
+``OTEL_SPAN_*_LIMIT`` family have no effect once a configuration file is
+in use.
+
+Three things are left to the SDK and so still follow the environment.
+``_create_span_processor`` passes an absent batch field through as
+``None``, which lets the SDK read ``OTEL_BSP_SCHEDULE_DELAY`` and its
+siblings. ``_create_span_limits`` never passes ``max_attributes``, so
+``OTEL_ATTRIBUTE_COUNT_LIMIT`` is still read for it. The OTLP exporter
+factories pass an absent endpoint, header set, timeout or compression
+through as ``None``, so the exporter still reads the
+``OTEL_EXPORTER_OTLP_*`` family for whatever the configuration file
+leaves out. The logger provider passes its batch values and its
+``max_attributes`` explicitly, which is why ``OTEL_BLRP_*`` is dead
+there and ``OTEL_BSP_*`` is not dead here; its exporter fields behave
+exactly as the ones here do.
+
+The SDK's experimental composable samplers are reachable through the
+``composite/development`` field. They are a separate sampler hierarchy
+from the stable one: a composable sampler returns a threshold rather
+than a decision, and only ``composite_sampler`` turns the outermost one
+back into a ``Sampler`` the provider accepts.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -123,7 +158,33 @@ _DEFAULT_SAMPLER = ParentBased(root=ALWAYS_ON)
 def _create_otlp_http_span_exporter(
     config: OtlpHttpExporterConfig,
 ) -> SpanExporter:
-    """Create an OTLP HTTP span exporter from config."""
+    """Create an OTLP HTTP span exporter from config.
+
+    The exporter class comes from a different distribution for each
+    encoding, so both are imported inside the function and a missing one is
+    reported as a configuration error instead of an import failure at module
+    load.
+
+    Args:
+        config: The ``otlp_http`` block of a span exporter configuration.
+            Its ``timeout``, in milliseconds, is converted to the seconds
+            the exporter expects. Its ``tls`` block is not read at all, so
+            setting ``ca_file``, ``cert_file`` or ``key_file`` has no
+            effect.
+
+    Returns:
+        An ``OTLPSpanExporter`` from the protobuf or the JSON distribution,
+        according to ``config.encoding``. Any field left absent is passed as
+        ``None``, which lets the exporter fall back to its own default or to
+        ``OTEL_EXPORTER_OTLP_*``.
+
+    Raises:
+        MissingDependencyError: If the exporter distribution for the chosen
+            encoding is not installed.
+        ConfigurationError: If ``config.encoding`` is neither protobuf nor
+            json, or if ``config.compression`` names something the exporter
+            does not support.
+    """
     headers = _parse_headers(config.headers, config.headers_list)
     timeout = (config.timeout / 1000.0) if config.timeout is not None else None
 
@@ -181,7 +242,31 @@ def _create_otlp_http_span_exporter(
 def _create_otlp_grpc_span_exporter(
     config: OtlpGrpcExporterConfig,
 ) -> SpanExporter:
-    """Create an OTLP gRPC span exporter from config."""
+    """Create an OTLP gRPC span exporter from config.
+
+    Args:
+        config: The ``otlp_grpc`` block of a span exporter configuration.
+            Its ``timeout``, in milliseconds, is converted to the seconds
+            the exporter expects. Its ``tls`` block is not read at all, so a
+            configuration that sets ``ca_file``, ``cert_file``, ``key_file``
+            or ``insecure`` gets no effect from them. The exporter
+            decides for itself. An ``https`` endpoint forces a secure
+            channel outright, overriding both variables; for any other
+            scheme ``OTEL_EXPORTER_OTLP_TRACES_INSECURE`` decides, then
+            ``OTEL_EXPORTER_OTLP_INSECURE``, then an ``http`` endpoint. The
+            three file fields come from the
+            ``OTEL_EXPORTER_OTLP_[TRACES_]CERTIFICATE``, ``..._CLIENT_KEY``
+            and ``..._CLIENT_CERTIFICATE`` family.
+
+    Returns:
+        An ``OTLPSpanExporter`` from the gRPC distribution.
+
+    Raises:
+        MissingDependencyError: If ``opentelemetry-exporter-otlp-proto-grpc``
+            or ``grpc`` is not installed.
+        ConfigurationError: If ``config.compression`` is anything other than
+            gzip or none. Deflate is rejected here, unlike on the HTTP path.
+    """
     try:
         # pylint: disable=import-outside-toplevel,no-name-in-module
         import grpc  # noqa: PLC0415  # type: ignore[import-untyped]
@@ -210,7 +295,25 @@ def _create_otlp_grpc_span_exporter(
 def _create_otlp_file_development_span_exporter(
     config: ExperimentalOtlpFileExporterConfig,
 ) -> SpanExporter:
-    """Create an OTLP file (JSON Lines) span exporter from config."""
+    """Create an OTLP file (JSON Lines) span exporter from config.
+
+    Args:
+        config: The ``otlp_file/development`` block of a span exporter
+            configuration, whose only field is ``output_stream``.
+
+    Returns:
+        A ``FileSpanExporter`` writing to the configured path, or one
+        writing to standard output when ``output_stream`` is absent or
+        ``"stdout"``.
+
+    Raises:
+        ConfigurationError: If ``opentelemetry-exporter-otlp-json-file`` is
+            not installed, or if ``output_stream`` is neither ``"stdout"``
+            nor a local ``file://`` URI with an absolute path. The missing
+            distribution is reported as a plain ConfigurationError here,
+            unlike the OTLP HTTP and gRPC exporters, which raise
+            MissingDependencyError.
+    """
     try:
         # pylint: disable=import-outside-toplevel,no-name-in-module
         from opentelemetry.exporter.otlp.json.file.trace_exporter import (  # noqa: PLC0415  # type: ignore[import-untyped]
@@ -233,6 +336,27 @@ def _create_span_exporter(config: SpanExporterConfig) -> SpanExporter:
     dataclass. Unknown exporter names captured in additional_properties
     by the @_additional_properties decorator are loaded via the
     ``opentelemetry_traces_exporter`` entry point group.
+
+    The schema permits one exporter per block. If several fields are set,
+    which is possible only when schema validation was bypassed, the first
+    match in the order otlp_http, otlp_grpc, console, otlp_file_development
+    wins and the rest are ignored.
+
+    Args:
+        config: One ``exporter`` block from a span processor configuration.
+
+    Returns:
+        The exporter the block selects. A plugin exporter is constructed
+        with its nested configuration mapping splatted as keyword
+        arguments, so a plugin that does not accept them raises ``TypeError``.
+
+    Raises:
+        ConfigurationError: If the block selects no exporter at all, or if
+            the selected one cannot be built.
+        MissingDependencyError: If the selected exporter's distribution is
+            not installed.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
     """
     match config:
         case SpanExporterConfig(otlp_http=exporter_config) if exporter_config is not None:
@@ -256,7 +380,30 @@ def _create_span_exporter(config: SpanExporterConfig) -> SpanExporter:
 def _create_span_processor(
     config: SpanProcessorConfig,
 ) -> BatchSpanProcessor | SimpleSpanProcessor:
-    """Create a span processor from config."""
+    """Create a span processor from config.
+
+    Unlike the log record batch processor, the batch fields are passed
+    through as they are, including ``None`` for an absent one, so the SDK
+    reads ``OTEL_BSP_SCHEDULE_DELAY`` and its siblings for whatever the
+    configuration file leaves out.
+
+    Args:
+        config: One entry of the ``processors`` list. Exactly one of its
+            ``batch`` and ``simple`` fields is expected to be set; ``batch``
+            is checked first.
+
+    Returns:
+        A ``BatchSpanProcessor`` or a ``SimpleSpanProcessor`` wrapping the
+        exporter the block names.
+
+    Raises:
+        ConfigurationError: If neither ``batch`` nor ``simple`` is set, or
+            if the exporter cannot be built.
+        MissingDependencyError: If the selected exporter's distribution is
+            not installed.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
+    """
     if config.batch is not None:
         exporter = _create_span_exporter(config.batch.exporter)
         return BatchSpanProcessor(
@@ -274,7 +421,29 @@ def _create_span_processor(
 def _create_experimental_composable_sampler(
     config: ComposableSamplerConfig,
 ) -> ComposableSampler:
-    """Create an experimental composable sampler from config"""
+    """Create an experimental composable sampler from config.
+
+    A composable sampler reports a sampling threshold rather than a
+    decision, which is what lets ``parent_threshold`` and ``rule_based``
+    nest other composable samplers inside themselves. This function recurses
+    for both of those, so the whole tree under ``composite/development`` is
+    built by one call on its root.
+
+    Args:
+        config: A composable sampler block. Exactly one of its fields is
+            expected to be set; they are checked in the order always_on,
+            always_off, parent_threshold, probability, rule_based.
+
+    Returns:
+        The composable sampler the block selects. ``probability`` with no
+        ``ratio`` samples everything, matching the ratio 1.0.
+
+    Raises:
+        ConfigurationError: If the block selects none of the five known
+            types. A plugin composable sampler is not supported, so an
+            entry point name reaches this branch and fails. The message
+            carries the repr of the block.
+    """
     if config.always_on is not None:
         return composable_always_on()
     if config.always_off is not None:
@@ -295,6 +464,22 @@ def _create_experimental_composable_sampler(
 def _create_rule_based_sampler_rules(
     config: RuleBasedSamplerConfig,
 ) -> RulesT:
+    """Build the (predicate, sampler) rule list of a rule-based sampler.
+
+    Args:
+        config: The ``rule_based`` block, whose ``rules`` field holds the
+            rules in the order they will be evaluated.
+
+    Returns:
+        One pair per rule, in the configured order, so the first rule whose
+        predicate matches decides. An absent ``rules`` field gives an empty
+        list, which makes the sampler drop every span, since no rule can
+        match.
+
+    Raises:
+        ConfigurationError: If any rule's nested sampler block selects no
+            known composable sampler type.
+    """
     if config.rules is None:
         return []
     return [
@@ -309,6 +494,22 @@ def _create_rule_based_sampler_rules(
 def _create_rule_based_sampler_rule_predicate(
     config: RuleBasedSamplerRuleConfig,
 ) -> PredicateT:
+    """Build the predicate of one rule-based sampler rule.
+
+    A rule may carry several conditions. They are combined with "and", so a
+    span has to satisfy every one of them for the rule to apply.
+
+    Args:
+        config: One entry of the ``rules`` list. Its ``attribute_values``,
+            ``attribute_patterns``, ``span_kinds`` and ``parent`` fields are
+            each optional and each contribute one condition.
+
+    Returns:
+        The single condition when the rule carries exactly one, an "and"
+        over them when it carries several, and a predicate matching every
+        span when it carries none. The attribute pattern condition uses the
+        configuration schema's wildcard syntax rather than ``fnmatch``.
+    """
     predicates: list[PredicateT] = []
     if config.attribute_values is not None:
         predicates.append(
@@ -346,6 +547,30 @@ def _create_sampler(config: SamplerConfig) -> Sampler:
     dataclass. User-defined sampler names captured in additional_properties
     by the @_additional_properties decorator are loaded via the
     ``opentelemetry_sampler`` entry point group.
+
+    Args:
+        config: A sampler block, from the provider's ``sampler`` field or
+            from one of the delegate fields of a parent-based sampler. The
+            built-in fields are checked in the order always_on, always_off,
+            trace_id_ratio_based, composite_development, parent_based.
+
+    Returns:
+        The sampler the block selects. ``trace_id_ratio_based`` with no
+        ``ratio`` samples everything, matching the ratio 1.0. A plugin
+        sampler is constructed with no arguments, so the nested
+        configuration mapping a user wrote under its name is discarded
+        rather than passed to it.
+
+    Raises:
+        ConfigurationError: If the block selects no sampler type this
+            function implements, in which case the message carries the repr
+            of the block. The schema declares two sampler fields that are
+            not implemented here, ``probability/development`` and
+            ``jaeger_remote/development``, so a block that sets either one
+            reaches that same error. It is raised as well when a plugin
+            sampler name is not registered in the entry point group, in
+            which case ``load_entry_point`` raises and the message names the
+            plugin and the group instead.
     """
     if config.always_on is not None:
         return ALWAYS_ON
@@ -374,6 +599,19 @@ def _create_id_generator(config: IdGeneratorConfig) -> IdGenerator:
     Built-in ``random`` resolves to ``RandomIdGenerator``; unknown names
     load from the ``opentelemetry_id_generator`` entry point group (the
     same group ``OTEL_PYTHON_ID_GENERATOR`` uses today).
+
+    Args:
+        config: The ``id_generator`` block of the tracer provider
+            configuration.
+
+    Returns:
+        A ``RandomIdGenerator`` for the built-in name, or an instance of the
+        plugin class constructed with its nested configuration mapping
+        splatted as keyword arguments.
+
+    Raises:
+        ConfigurationError: If the block names neither ``random`` nor a
+            plugin, or if the plugin name is not registered.
     """
     if config.random is not None:
         return RandomIdGenerator()
@@ -384,7 +622,22 @@ def _create_id_generator(config: IdGeneratorConfig) -> IdGenerator:
 
 
 def _create_parent_based_sampler(config: ParentBasedSamplerConfig) -> Sampler:
-    """Create a ParentBased sampler from config, applying SDK defaults for absent delegates."""
+    """Create a ParentBased sampler from config, applying SDK defaults for absent delegates.
+
+    Args:
+        config: The ``parent_based`` block. Its ``root`` and its four
+            delegate fields are each optional.
+
+    Returns:
+        A ``ParentBased`` sampler. An absent ``root`` becomes always-on. An
+        absent delegate is not passed at all, so it keeps the SDK's own
+        default: follow the parent's sampled flag.
+
+    Raises:
+        ConfigurationError: If the root or any delegate block selects no
+            sampler. Nesting is unbounded, so a parent-based sampler may
+            carry another one as a delegate.
+    """
     root = _create_sampler(config.root) if config.root is not None else ALWAYS_ON
     kwargs: dict = {"root": root}
     if config.remote_parent_sampled is not None:
@@ -407,6 +660,33 @@ def _create_span_limits(
     Absent fields fall back to global_limits (if provided), then to OTel spec
     defaults (128 for counts, unlimited for lengths).
     Explicit values suppress env-var reading — matching Java SDK behavior.
+
+    Only the two attribute limits fall back to ``global_limits``. The event
+    and link limits have no counterpart at the top level, so they take the
+    specification default when the span limits block leaves them out.
+
+    Args:
+        config: The ``limits`` block of the tracer provider configuration.
+            ``create_tracer_provider`` passes an empty block rather than
+            ``None`` when the configuration has no limits section, so every
+            field falls back.
+        global_limits: The top-level ``attribute_limits`` block, consulted
+            only for a field the span limits leave absent. ``None`` means
+            the configuration has no top-level block.
+
+    Returns:
+        ``SpanLimits`` with seven of its eight parameters set, so the SDK
+        reads none of the ``OTEL_SPAN_*`` environment variables. The
+        value-length limit is applied to both the generic and the
+        span-specific field, which is what makes it reach span attributes.
+        The generic ``max_attributes`` is the one parameter not passed, so
+        ``OTEL_ATTRIBUTE_COUNT_LIMIT`` is still read for it.
+
+    Raises:
+        ValueError: If ``OTEL_ATTRIBUTE_COUNT_LIMIT`` is set to something
+            that is not a non-negative integer. The ``SpanLimits``
+            constructor raises it, because ``max_attributes`` is the one
+            parameter this function does not pass.
     """
     attribute_count_limit = config.attribute_count_limit
     if attribute_count_limit is None and global_limits is not None:
@@ -450,6 +730,15 @@ def _to_tracer_config(config: TracerConfigConfig | None) -> _TracerConfig:
 
     Only ``enabled`` is honored — it is the sole field the SDK
     ``_TracerConfig`` exposes. An absent ``enabled`` leaves the tracer enabled.
+
+    Args:
+        config: The ``config`` field of one tracer matcher, or the
+            ``default_config`` of the configurator. ``None`` means the field
+            was absent.
+
+    Returns:
+        A ``_TracerConfig``. The SDK default, which is enabled, for a
+        ``None`` config and for one whose ``enabled`` is absent.
     """
     if config is None or config.enabled is None:
         return _TracerConfig.default()
@@ -464,6 +753,14 @@ def _create_tracer_configurator(
     Each entry in ``tracers`` maps an instrumentation-scope name glob to a
     per-tracer config; ``default_config`` applies to scopes matching no glob.
     Rules are evaluated in order, so earlier entries take precedence.
+
+    Args:
+        config: The ``tracer_configurator/development`` block of the tracer
+            provider configuration.
+
+    Returns:
+        A ``_RuleBasedTracerConfigurator``. An absent ``tracers`` field
+        gives no rules, so every tracer takes ``default_config``.
     """
     rules = [
         (
@@ -497,6 +794,18 @@ def create_tracer_provider(
 
     Returns:
         A configured TracerProvider.
+
+    Raises:
+        ConfigurationError: If the sampler, the id generator or a span
+            processor names a component that cannot be built.
+        MissingDependencyError: If a span exporter's distribution is not
+            installed.
+        TypeError: If a plugin component's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
+        ValueError: If ``OTEL_ATTRIBUTE_COUNT_LIMIT`` is set to something
+            that is not a non-negative integer. ``_create_span_limits``
+            leaves ``max_attributes`` unset, so the ``SpanLimits``
+            constructor reads that variable.
     """
     sampler = _create_sampler(config.sampler) if config is not None and config.sampler is not None else _DEFAULT_SAMPLER
     id_generator = (
@@ -547,6 +856,20 @@ def configure_tracer_provider(
         resource: Resource to attach to the provider.
         global_attribute_limits: Top-level attribute_limits from the root config,
             used as a fallback when per-signal limits are not specified.
+
+    Raises:
+        ConfigurationError: If any component the configuration names cannot
+            be built.
+        MissingDependencyError: If a span exporter's distribution is not
+            installed.
+        TypeError: If a plugin component's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
+        ValueError: If ``OTEL_ATTRIBUTE_COUNT_LIMIT`` is set to something
+            that is not a non-negative integer. ``_create_span_limits``
+            leaves ``max_attributes`` unset, so the ``SpanLimits``
+            constructor reads that variable. The global is left as it was
+            for every one of these, because ``create_tracer_provider``
+            builds the provider before it is set.
     """
     if config is None:
         return

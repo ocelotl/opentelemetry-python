@@ -1,5 +1,43 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
+# pylint: disable=too-many-lines
+
+"""MeterProvider construction from declarative configuration.
+
+Only ``create_meter_provider`` and ``configure_meter_provider`` are
+meant to be called from outside this module. The rest build one piece:
+a metric reader, its exporter, a view, the exemplar filter, the
+cardinality limits, or the experimental per-meter configurator.
+
+No function here reads an environment variable. The temporality and
+histogram aggregation preferences in particular are always passed to the
+exporter as an explicit mapping, even when the configuration file
+selects the default, so that
+``OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE`` and
+``OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION`` cannot
+change what a configuration file asked for.
+
+Metrics have two kinds of reader. A periodic reader owns a push
+exporter and sends on a timer. A pull reader has no separate exporter
+object: the thing the schema calls its exporter, Prometheus being the
+only built-in one, is itself the reader, and constructing it starts an
+HTTP listener.
+
+Several fields the schema accepts are not supported by the Python SDK.
+Five are ignored with a warning naming them: the excluded half of a
+view's attribute keys, a pull reader's metric producers, the Prometheus
+scope info and resource constant labels, and cardinality limits on a
+plugin pull exporter. Three more of those are ignored with no warning at
+all, so a configuration file that sets one looks as though it took
+effect: ``periodic.producers``,
+``periodic.max_export_batch_size/development`` and
+``prometheus/development.translation_strategy``.
+
+The ``tls`` block of the ``otlp_http`` and ``otlp_grpc`` exporters is a
+separate case and is dropped just as quietly. The SDK exporters do
+support TLS through their own parameters; this module simply never reads
+the block, as the two exporter factories record.
+"""
 
 from __future__ import annotations
 
@@ -137,6 +175,20 @@ def _map_temporality(
 
     Always returns an explicit dict to suppress OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE.
     Default (None or cumulative) → all instruments CUMULATIVE.
+
+    Args:
+        pref: The ``temporality_preference`` field of an exporter
+            configuration block. ``None`` means the field was absent and is
+            read as cumulative.
+
+    Returns:
+        Six entries, one per instrument class except the synchronous gauge,
+        which is left out. Delta and low_memory differ only for the
+        observable counter, which low_memory keeps cumulative; the
+        observable gauge is pinned to cumulative in all three mappings.
+
+    Raises:
+        ConfigurationError: If ``pref`` is some other enum member.
     """
     if pref is None or pref == ExporterTemporalityPreference.cumulative:
         return {
@@ -178,6 +230,19 @@ def _map_histogram_aggregation(
     Always returns an explicit dict to suppress
     OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION.
     Default (None or explicit_bucket_histogram) → ExplicitBucketHistogramAggregation.
+
+    Args:
+        pref: The ``default_histogram_aggregation`` field of an exporter
+            configuration block. ``None`` means the field was absent.
+
+    Returns:
+        A single entry mapping the histogram instrument class to the chosen
+        aggregation, constructed with its own defaults: the schema has no
+        place to configure bucket boundaries or scale for the exporter-wide
+        preference. A view is the way to set those.
+
+    Raises:
+        ConfigurationError: If ``pref`` is some other enum member.
     """
     if pref is None or pref == ExporterDefaultHistogramAggregation.explicit_bucket_histogram:
         return {Histogram: ExplicitBucketHistogramAggregation()}
@@ -190,7 +255,23 @@ def _map_histogram_aggregation(
 
 
 def _create_aggregation(config: AggregationConfig) -> Aggregation:
-    """Create an SDK Aggregation from config, passing through detail parameters."""
+    """Create an SDK Aggregation from config, passing through detail parameters.
+
+    Args:
+        config: The ``aggregation`` field of a view's stream. Exactly one of
+            its fields is expected to be set; they are checked in the order
+            default, drop, explicit_bucket_histogram,
+            base2_exponential_bucket_histogram, last_value, sum.
+
+    Returns:
+        The aggregation the block selects. For the explicit bucket histogram
+        an absent ``record_min_max`` becomes ``True``; for the exponential
+        one an absent field is not passed at all, so the SDK default applies.
+
+    Raises:
+        ConfigurationError: If the block selects none of the six known
+            types. The message carries the repr of the block.
+    """
     if config.default is not None:
         return DefaultAggregation()
     if config.drop is not None:
@@ -225,7 +306,33 @@ def _create_aggregation(config: AggregationConfig) -> Aggregation:
 
 
 def _create_view(config: ViewConfig) -> View:
-    """Create an SDK View from config."""
+    """Create an SDK View from config.
+
+    The Python SDK's View matches an instrument by an include list only, so
+    the ``excluded`` half of ``attribute_keys`` is ignored with a warning
+    rather than applied.
+
+    Args:
+        config: One entry of the ``views`` list, carrying the ``selector``
+            that chooses instruments and the ``stream`` that says what to do
+            with them.
+
+    Returns:
+        A ``View``. A selector field left absent is passed as ``None``,
+        which matches any instrument on that dimension.
+
+    Raises:
+        ConfigurationError: If ``selector.instrument_type`` names an
+            instrument kind this module has no SDK class for, or if the
+            stream's aggregation block selects nothing.
+        Exception: Raised by the ``View`` constructor itself, as a bare
+            ``Exception``, in three cases: the selector sets none of its
+            six matching fields; the stream sets ``name`` while the
+            selector leaves ``instrument_name`` absent; the stream sets
+            ``name`` while ``instrument_name`` holds a wildcard character.
+            None of the three is translated into a ConfigurationError, so
+            each reaches the caller of ``configure_sdk`` as it is.
+    """
     selector = config.selector
     stream = config.stream
 
@@ -266,7 +373,19 @@ def _create_view(config: ViewConfig) -> View:
 def _create_console_metric_exporter(
     config: ConsoleMetricExporterConfig,
 ) -> MetricExporter:
-    """Create a ConsoleMetricExporter from config."""
+    """Create a ConsoleMetricExporter from config.
+
+    Args:
+        config: The ``console`` block of a push metric exporter
+            configuration. Its only fields are the two preferences.
+
+    Returns:
+        A ``ConsoleMetricExporter`` writing to standard output.
+
+    Raises:
+        ConfigurationError: If a preference field names something
+            unsupported.
+    """
     preferred_temporality = _map_temporality(config.temporality_preference)
     preferred_aggregation = _map_histogram_aggregation(config.default_histogram_aggregation)
     return ConsoleMetricExporter(
@@ -278,7 +397,26 @@ def _create_console_metric_exporter(
 def _create_otlp_http_metric_exporter(
     config: OtlpHttpMetricExporterConfig,
 ) -> MetricExporter:
-    """Create an OTLP HTTP metric exporter from config."""
+    """Create an OTLP HTTP metric exporter from config.
+
+    Args:
+        config: The ``otlp_http`` block of a push metric exporter
+            configuration. Its ``timeout``, in milliseconds, is converted to
+            the seconds the exporter expects. Its ``tls`` block is not read
+            at all, so setting ``ca_file``, ``cert_file`` or ``key_file``
+            has no effect.
+
+    Returns:
+        An ``OTLPMetricExporter`` from the protobuf or the JSON
+        distribution, according to ``config.encoding``.
+
+    Raises:
+        MissingDependencyError: If the exporter distribution for the chosen
+            encoding is not installed.
+        ConfigurationError: If ``config.encoding`` is neither protobuf nor
+            json, or if a compression or preference field names something
+            unsupported.
+    """
     headers = _parse_headers(config.headers, config.headers_list)
     timeout = (config.timeout / 1000.0) if config.timeout is not None else None
     preferred_temporality = _map_temporality(config.temporality_preference)
@@ -342,7 +480,25 @@ def _create_otlp_http_metric_exporter(
 def _create_otlp_grpc_metric_exporter(
     config: OtlpGrpcMetricExporterConfig,
 ) -> MetricExporter:
-    """Create an OTLP gRPC metric exporter from config."""
+    """Create an OTLP gRPC metric exporter from config.
+
+    Args:
+        config: The ``otlp_grpc`` block of a push metric exporter
+            configuration. Its ``timeout``, in milliseconds, is converted to
+            the seconds the exporter expects. Its ``tls`` block is not read
+            at all, so ``ca_file``, ``cert_file``, ``key_file`` and
+            ``insecure`` have no effect.
+
+    Returns:
+        An ``OTLPMetricExporter`` from the gRPC distribution.
+
+    Raises:
+        MissingDependencyError: If ``opentelemetry-exporter-otlp-proto-grpc``
+            or ``grpc`` is not installed.
+        ConfigurationError: If ``config.compression`` is anything other than
+            gzip or none, or if a preference field names something
+            unsupported.
+    """
     try:
         # pylint: disable=import-outside-toplevel,no-name-in-module
         import grpc  # noqa: PLC0415  # type: ignore[import-untyped]
@@ -375,7 +531,26 @@ def _create_otlp_grpc_metric_exporter(
 def _create_otlp_file_development_metric_exporter(
     config: ExperimentalOtlpFileMetricExporterConfig,
 ) -> MetricExporter:
-    """Create an OTLP file (JSON Lines) metric exporter from config."""
+    """Create an OTLP file (JSON Lines) metric exporter from config.
+
+    Args:
+        config: The ``otlp_file/development`` block of a push metric
+            exporter configuration, carrying ``output_stream`` and the two
+            preferences.
+
+    Returns:
+        A ``FileMetricExporter`` writing to the configured path, or one
+        writing to standard output when ``output_stream`` is absent or
+        ``"stdout"``.
+
+    Raises:
+        ConfigurationError: If ``opentelemetry-exporter-otlp-json-file`` is
+            not installed, if ``output_stream`` is neither ``"stdout"`` nor
+            a local ``file://`` URI with an absolute path, or if a
+            preference field names something unsupported. The missing
+            distribution is reported as a plain ConfigurationError here,
+            unlike the OTLP HTTP and gRPC exporters.
+    """
     try:
         # pylint: disable=import-outside-toplevel,no-name-in-module
         from opentelemetry.exporter.otlp.json.file.metric_exporter import (  # noqa: PLC0415  # type: ignore[import-untyped]
@@ -413,6 +588,29 @@ def _create_push_metric_exporter(
     dataclass. Unknown exporter names captured in additional_properties
     by the @_additional_properties decorator are loaded via the
     ``opentelemetry_metrics_exporter`` entry point group.
+
+    The schema permits one exporter per block. If several fields are set,
+    which is possible only when schema validation was bypassed, the first
+    match in the order otlp_http, otlp_grpc, console, otlp_file_development
+    wins and the rest are ignored.
+
+    Args:
+        config: The ``exporter`` block of a periodic metric reader
+            configuration.
+
+    Returns:
+        The exporter the block selects. A plugin exporter is constructed
+        with its nested configuration mapping splatted as keyword
+        arguments, with no preference translation, so whatever keys the
+        mapping holds reach its constructor unchanged.
+
+    Raises:
+        ConfigurationError: If the block selects no exporter, or if the
+            selected one cannot be built.
+        MissingDependencyError: If the selected exporter's distribution is
+            not installed.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
     """
     match config:
         case PushMetricExporterConfig(otlp_http=exporter_config) if exporter_config is not None:
@@ -438,6 +636,17 @@ def _create_cardinality_limits(config: CardinalityLimitsConfig | None) -> Cardin
 
     Each instrument type uses its own limit and falls back to ``default``.
     Instrument types left out of the result use the SDK default limit.
+
+    Args:
+        config: The ``cardinality_limits`` block of a metric reader
+            configuration. ``None`` means the field was absent.
+
+    Returns:
+        A mapping from instrument class to limit, holding only the
+        instrument types that ended up with one. ``None`` for a ``None``
+        config, and an empty mapping for a block that set neither
+        ``default`` nor any per-instrument field; both leave every
+        instrument on the SDK default.
     """
     if config is None:
         return None
@@ -463,6 +672,28 @@ def _create_periodic_metric_reader(
     """Create a PeriodicExportingMetricReader from config.
 
     Passes explicit interval/timeout defaults to suppress env var reading.
+
+    Constructing the reader starts its background export thread, so a
+    failure later in ``create_meter_provider`` leaves that thread running.
+
+    Args:
+        config: One ``periodic`` block from the ``readers`` list. Its
+            ``interval`` and ``timeout`` are in milliseconds; an absent one
+            becomes the specification default, 60000 and 30000. Its
+            ``producers`` and ``max_export_batch_size/development`` fields
+            are read by nothing and no warning names them, so setting
+            either has no effect and leaves no trace in the log.
+
+    Returns:
+        A ``PeriodicExportingMetricReader`` owning the configured exporter.
+
+    Raises:
+        ConfigurationError: If the exporter block selects nothing or cannot
+            be built.
+        MissingDependencyError: If the exporter's distribution is not
+            installed.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
     """
     exporter = _create_push_metric_exporter(config.exporter)
     interval = config.interval if config.interval is not None else _DEFAULT_EXPORT_INTERVAL_MILLIS
@@ -484,6 +715,30 @@ def _create_prometheus_metric_reader(
     Dynamically imports the prometheus exporter package to avoid a hard
     dependency. Maps config fields to constructor parameters and starts
     the HTTP server.
+
+    The listener is started here and never stopped, so building a provider
+    that is then discarded leaves the port bound for the life of the
+    process, and a second reader on the same port fails to bind.
+    ``scope_info_enabled`` and ``resource_constant_labels`` are ignored
+    with a warning naming each; ``translation_strategy`` is ignored with
+    no warning.
+
+    Args:
+        config: The ``prometheus/development`` block of a pull metric
+            exporter configuration. An absent ``port`` becomes 9464 and an
+            absent ``host`` becomes ``"localhost"``.
+        cardinality_limits: Per-instrument limits to hand to the reader.
+            ``None`` leaves the SDK defaults in place.
+
+    Returns:
+        A ``PrometheusMetricReader``, with the HTTP listener already
+        accepting scrapes. Target info is emitted unless
+        ``target_info_enabled/development`` is explicitly false.
+
+    Raises:
+        MissingDependencyError: If ``opentelemetry-exporter-prometheus`` is
+            not installed.
+        OSError: If the configured port cannot be bound.
     """
     try:
         # pylint: disable=import-outside-toplevel,no-name-in-module
@@ -532,6 +787,28 @@ def _create_pull_metric_exporter(
 
     Plugin pull exporters are loaded via the ``opentelemetry_pull_metric_exporter``
     entry point group.
+
+    Args:
+        config: The ``exporter`` block of a pull metric reader
+            configuration.
+        cardinality_limits: Per-instrument limits from the reader. They
+            reach the Prometheus reader. For a plugin they are ignored, and
+            a warning is logged only when they are not ``None``.
+
+    Returns:
+        The reader the block selects.
+
+    Raises:
+        ConfigurationError: If the block names neither
+            ``prometheus/development`` nor a plugin, or if the plugin name
+            is not registered.
+        MissingDependencyError: If the Prometheus exporter distribution is
+            not installed.
+        OSError: If the Prometheus listener cannot bind the configured
+            port. ``_create_prometheus_metric_reader`` starts it before
+            returning, so the failure reaches this caller.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
     """
     if config.prometheus_development is not None:
         return _create_prometheus_metric_reader(config.prometheus_development, cardinality_limits)
@@ -554,6 +831,26 @@ def _create_pull_metric_reader(
 
     The pull reader's exporter is itself a MetricReader (combined reader+exporter).
     producers are not yet supported.
+
+    Args:
+        config: One ``pull`` block from the ``readers`` list. Its
+            ``producers`` field is ignored with a warning, because the
+            Python SDK has no metric producer plugin point.
+
+    Returns:
+        The reader its exporter block names. A Prometheus reader carries
+        the reader's cardinality limits; a plugin reader does not, because
+        ``_create_pull_metric_exporter`` drops them.
+
+    Raises:
+        ConfigurationError: If the exporter block selects nothing or cannot
+            be built.
+        MissingDependencyError: If the Prometheus exporter distribution is
+            not installed.
+        OSError: If the exporter block is ``prometheus/development`` and
+            its listener cannot bind the configured port.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
     """
     if config.producers:
         _logger.warning(
@@ -563,7 +860,28 @@ def _create_pull_metric_reader(
 
 
 def _create_metric_reader(config: MetricReaderConfig) -> MetricReader:
-    """Create a MetricReader from config."""
+    """Create a MetricReader from config.
+
+    Args:
+        config: One entry of the ``readers`` list. Exactly one of its
+            ``periodic`` and ``pull`` fields is expected to be set;
+            ``periodic`` is checked first.
+
+    Returns:
+        A ``PeriodicExportingMetricReader`` or the pull reader the block
+        names.
+
+    Raises:
+        ConfigurationError: If neither field is set, or if the reader
+            cannot be built.
+        MissingDependencyError: If the selected exporter's distribution is
+            not installed.
+        OSError: If the reader is a ``pull`` reader on
+            ``prometheus/development`` and its listener cannot bind the
+            configured port.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
+    """
     if config.periodic is not None:
         return _create_periodic_metric_reader(config.periodic)
     if config.pull is not None:
@@ -574,7 +892,21 @@ def _create_metric_reader(config: MetricReaderConfig) -> MetricReader:
 def _create_exemplar_filter(
     value: ExemplarFilterConfig,
 ) -> object:
-    """Create an SDK exemplar filter from config enum value."""
+    """Create an SDK exemplar filter from config enum value.
+
+    Args:
+        value: The ``exemplar_filter`` field of the meter provider
+            configuration.
+
+    Returns:
+        The filter instance for that value. It is annotated as ``object``
+        rather than as the SDK's ``ExemplarFilter``, which is why
+        ``create_meter_provider`` has to silence the type checker where it
+        passes the result on.
+
+    Raises:
+        ConfigurationError: If ``value`` is some other enum member.
+    """
     if value == ExemplarFilterConfig.always_on:
         return AlwaysOnExemplarFilter()
     if value == ExemplarFilterConfig.always_off:
@@ -591,6 +923,15 @@ def _to_meter_config(config: MeterConfigConfig | None) -> _MeterConfig:
 
     Only ``enabled`` is honored — it is the sole field the SDK
     ``_MeterConfig`` exposes. An absent ``enabled`` leaves the meter enabled.
+
+    Args:
+        config: The ``config`` field of one meter matcher, or the
+            ``default_config`` of the configurator. ``None`` means the
+            field was absent.
+
+    Returns:
+        A ``_MeterConfig``. The SDK default, which is enabled, for a
+        ``None`` config and for one whose ``enabled`` is absent.
     """
     if config is None or config.enabled is None:
         return _MeterConfig.default()
@@ -605,6 +946,14 @@ def _create_meter_configurator(
     Each entry in ``meters`` maps an instrumentation-scope name glob to a
     per-meter config; ``default_config`` applies to scopes matching no glob.
     Rules are evaluated in order, so earlier entries take precedence.
+
+    Args:
+        config: The ``meter_configurator/development`` block of the meter
+            provider configuration.
+
+    Returns:
+        A ``_RuleBasedMeterConfigurator``. An absent ``meters`` field gives
+        no rules, so every meter takes ``default_config``.
     """
     rules = [
         (
@@ -635,6 +984,18 @@ def create_meter_provider(
 
     Returns:
         A configured MeterProvider.
+
+    Raises:
+        ConfigurationError: If a reader, an exporter, a view or the
+            exemplar filter names something that cannot be built.
+        MissingDependencyError: If a metric exporter's distribution is not
+            installed.
+        TypeError: If a plugin component's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
+        OSError: If a ``pull`` reader on ``prometheus/development`` cannot
+            bind the configured port.
+        Exception: A bare one, from the ``View`` constructor, for a view
+            whose selector or stream the SDK rejects.
     """
     # Always pass an explicit exemplar filter to suppress env var reading.
     # Spec default is trace_based.
@@ -679,6 +1040,21 @@ def configure_meter_provider(
     Args:
         config: MeterProvider config from the parsed config file, or None.
         resource: Resource to attach to the provider.
+
+    Raises:
+        ConfigurationError: If any component the configuration names cannot
+            be built.
+        MissingDependencyError: If a metric exporter's distribution is not
+            installed.
+        TypeError: If a plugin component's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
+        OSError: If a ``pull`` reader on ``prometheus/development`` cannot
+            bind the configured port.
+        Exception: A bare one, from the ``View`` constructor, for a view
+            whose selector or stream the SDK rejects. The global is left as
+            it was for every one of these, because
+            ``create_meter_provider`` builds the provider before it is set.
+            A Prometheus listener that did start is not stopped.
     """
     if config is None:
         return

@@ -70,18 +70,44 @@ def configure_sdk(config: OpenTelemetryConfiguration) -> None:
     Builds a :class:`Resource` from ``config.resource`` and applies it to
     each signal provider. Sets the global tracer provider, meter provider,
     logger provider, and text map propagator from their respective config
-    sections. Sections absent from the config (``None``) leave the
-    corresponding global untouched — matching the spec's "noop default"
-    behavior.
+    sections. An absent tracer, meter or logger provider section leaves the
+    corresponding global untouched, matching the spec's "noop default"
+    behavior. The propagator is the exception: it is always set, so an
+    absent propagator section installs a composite that propagates nothing
+    rather than leaving the SDK's tracecontext and baggage default in
+    place.
 
     Honors the top-level ``disabled`` flag: when true, the function returns
     early without setting any globals. The ``log_level`` field, when present
     and not disabled, is applied to the internal ``opentelemetry`` logger to
-    control the verbosity of SDK self-diagnostics.
+    control the verbosity of SDK self-diagnostics. A severity the mapping
+    does not cover falls back to ``INFO``.
+
+    The providers are created and set one at a time, so an error raised
+    while building a later one leaves the globals that were already set in
+    place. There is no rollback.
 
     Args:
         config: Parsed ``OpenTelemetryConfiguration`` (typically from
             ``load_config_file``).
+
+    Raises:
+        ConfigurationError: If any section names a component that cannot be
+            built, for example an exporter whose package is not installed
+            or a sampler type the schema does not define. Instrumentation
+            is the exception: a failure there is logged and skipped.
+        Exception: Whatever this package raises outside the
+            ``ConfigurationError`` hierarchy, and whatever an SDK
+            constructor or a plugin reached through the configuration
+            raises, since nothing here translates those. A resource
+            attribute whose value does not fit its declared type raises
+            ``ValueError`` from ``_resource._coerce_attribute_value``, a
+            plugin component handed a configuration mapping its constructor
+            does not accept raises ``TypeError``, a view with an empty
+            selector raises a bare ``Exception``, and a Prometheus reader
+            on a bound port raises ``OSError``. Catching
+            ``ConfigurationError`` alone therefore does not survive every
+            bad configuration file.
 
     Example:
         >>> from opentelemetry.configuration.file import (

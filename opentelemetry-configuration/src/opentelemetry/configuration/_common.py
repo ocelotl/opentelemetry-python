@@ -1,6 +1,36 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+"""Helpers shared by the per-signal configuration factories.
+
+Four kinds of helper live here. The glob matchers implement the
+restricted wildcard syntax the configuration schema uses, which is not
+``fnmatch`` and not a regular expression. ``load_entry_point`` turns a
+component name from the configuration file into the class an entry
+point group registers under that name, and ``_resolve_component`` goes
+one step further and returns a constructed component, built-in or
+plugin. Of those two, only ``load_entry_point`` is called from anywhere
+in the package; the glob matchers, ``_additional_properties`` and the
+value translators all have callers. ``_additional_properties`` is the decorator the code generator
+puts on a model that accepts a plugin component name; it rewrites the
+generated ``__init__`` so an undeclared key is captured rather than
+rejected. The value translators turn one configuration field into the
+shape an SDK exporter constructor expects: a headers dict, a
+``Compression`` enum member, or a file path.
+
+The component resolvers and the value translators raise
+``ConfigurationError`` on bad input rather than falling back to a
+default, because a value that reached them came from a configuration
+file the user wrote on purpose. ``_parse_headers`` is the exception: a
+malformed pair is dropped with a warning so that one typo does not
+discard the rest of the header set.
+
+``_resolve_component`` has no caller in the package. Each signal factory
+open-codes the same dispatch with a ``match`` statement instead, so a
+reader following a component name from the configuration file should
+read one of those rather than this.
+"""
+
 from __future__ import annotations
 
 import dataclasses
@@ -26,6 +56,18 @@ def _matches_glob(value: str, pattern: str) -> bool:
     Only ``*`` (zero or more characters) and ``?`` (one character) are
     wildcards. All other characters, including brackets and backslashes,
     are literal.
+
+    The exact-equality test runs first, so a pattern that is itself made of
+    literal wildcard characters still matches the identical value.
+
+    Args:
+        value: The string being tested, for example an instrumentation scope
+            name or a resource attribute key.
+        pattern: The pattern from the configuration file.
+
+    Returns:
+        ``True`` when ``value`` equals ``pattern`` or the wildcards in
+        ``pattern`` cover the whole of ``value``.
     """
     # Escape opening brackets to disable fnmatch's character classes while
     # retaining its wildcard implementation and compiled-pattern cache.
@@ -33,9 +75,33 @@ def _matches_glob(value: str, pattern: str) -> bool:
 
 
 def _scope_name_matches_glob(pattern: str) -> Callable[[InstrumentationScope], bool]:
-    """Match scope names using the configuration schema's wildcard semantics."""
+    """Match scope names using the configuration schema's wildcard semantics.
+
+    The tracer, meter and logger configurators each hold a list of
+    (predicate, config) rules, where the predicate takes a whole
+    ``InstrumentationScope``. This builds such a predicate from a pattern
+    that applies to the scope name alone, ignoring the scope's version,
+    schema URL and attributes.
+
+    Args:
+        pattern: The scope-name pattern from the configuration file, with
+            the wildcard syntax ``_matches_glob`` implements.
+
+    Returns:
+        A predicate that takes an ``InstrumentationScope`` and reports
+        whether its name matches ``pattern``.
+    """
 
     def matches(scope: InstrumentationScope) -> bool:
+        """Report whether the name of ``scope`` matches the captured pattern.
+
+        Args:
+            scope: The instrumentation scope a tracer, meter or logger was
+                created with. Only its ``name`` is read.
+
+        Returns:
+            ``True`` when the scope name matches ``pattern``.
+        """
         return _matches_glob(scope.name, pattern)
 
     return matches
@@ -50,15 +116,34 @@ def _additional_properties(cls):
     component names flow through the config pipeline without modifying
     the codegen output for built-in fields.
 
-    Applied automatically by the custom template in ``opentelemetry-sdk/codegen/``
-    when ``additionalPropertiesType`` is present in the template context
-    (set by ``datamodel-codegen`` for schema types with ``additionalProperties``).
+    Applied automatically by ``opentelemetry-configuration/codegen/dataclass.jinja2``
+    when ``datamodel-codegen`` puts either ``additionalPropertiesType`` or a
+    non-false ``additionalProperties`` in the template context, which happens
+    for every schema type that accepts a plugin component name.
+
+    The wrapped ``__init__`` accepts only keyword arguments, so a positional
+    call that the generated ``__init__`` would have taken raises ``TypeError``
+    once the decorator is applied.
+
+    Args:
+        cls: The generated dataclass to wrap. It is modified in place.
+
+    Returns:
+        ``cls`` itself, so the result can be used as a decorator.
     """
     original_init = cls.__init__
     original_sig = inspect.signature(original_init)
     known_fields = frozenset(f.name for f in dataclasses.fields(cls) if f.init)
 
     def _init(self, **kwargs):
+        """Split the keyword arguments into declared fields and extras.
+
+        Args:
+            kwargs: Every keyword argument the caller passed. Names that are
+                init fields of the dataclass go to the generated
+                ``__init__``; all the others become the
+                ``additional_properties`` dict.
+        """
         known = {k: v for k, v in kwargs.items() if k in known_fields}
         extra = {k: v for k, v in kwargs.items() if k not in known_fields}
         original_init(self, **known)
@@ -78,11 +163,34 @@ def _additional_properties(cls):
 def load_entry_point(group: str, name: str) -> type:
     """Load a plugin class from an entry point group by name.
 
-    Returns the loaded class — callers are responsible for instantiation
-    with whatever arguments their config requires.
+    Nothing is instantiated here. Each caller constructs the class with
+    whatever arguments its own configuration block carries, which differs by
+    component type: a sampler takes none, a plugin exporter takes the nested
+    configuration mapping splatted as keyword arguments.
+
+    When several distributions register the same name in the same group, the
+    first entry point ``importlib.metadata`` reports is used and the rest are
+    ignored silently.
+
+    Args:
+        group: Entry point group to search, for example
+            ``"opentelemetry_traces_exporter"``.
+        name: Entry point name, taken verbatim from the key the user wrote in
+            the configuration file.
+
+    Returns:
+        The object the entry point resolves to. It is annotated as a class
+        because every group this package reads registers classes, and it is
+        returned unverified, so a group that registers a function returns
+        that function.
 
     Raises:
-        ConfigurationError: If the entry point is not found or fails to load.
+        ConfigurationError: If no entry point in ``group`` is named ``name``,
+            in which case the message names the plugin and tells the user to
+            install the package that provides it. Also if loading a
+            registered entry point raises, for instance when its module
+            fails to import, in which case the message names the plugin and
+            quotes the underlying exception instead, with no install hint.
     """
     try:
         ep = next(iter(entry_points(group=group, name=name)), None)
@@ -129,6 +237,10 @@ def _resolve_component(
     ``additional_properties`` entries are set (e.g. when schema validation
     is bypassed), the first registry match wins.
 
+    Nothing in the package calls this. Each signal factory open-codes the
+    same dispatch with a ``match`` statement, so the only callers today are
+    in ``opentelemetry-configuration/tests/test_common.py``.
+
     Args:
         config: A dataclass with ``additional_properties`` (from the
             ``@_additional_properties`` decorator).
@@ -160,8 +272,37 @@ def _parse_headers(
 ) -> dict[str, str] | None:
     """Merge headers struct and headers_list into a dict.
 
-    Returns None if neither is set, letting the exporter read env vars.
-    headers struct takes priority over headers_list for the same key.
+    An entry of ``headers_list`` with no ``=`` is dropped with a warning
+    rather than raising, so one malformed pair does not discard the rest of
+    the header set. An entry whose value is absent or empty becomes the empty
+    string, because the SDK exporters expect ``dict[str, str]`` and reject
+    ``None``.
+
+    Neither the name nor the value is stripped of quotes or URL-decoded,
+    unlike the resource ``attributes_list`` handling in
+    ``opentelemetry.configuration._resource``, which does unquote values.
+
+    Args:
+        headers: The ``headers`` field of an exporter configuration block, a
+            list of name/value pairs. Each element is either a
+            ``NameStringValuePair`` dataclass or, when schema conversion was
+            bypassed, a plain dict with ``name`` and ``value`` keys. ``None``
+            means the field was absent.
+        headers_list: The ``headers_list`` field, one string of
+            comma-separated ``name=value`` pairs. ``None`` means the field
+            was absent.
+
+    Returns:
+        The merged headers, with an entry from ``headers`` overwriting one of
+        the same name from ``headers_list``. ``None`` when both arguments are
+        ``None``, and an empty dict when a field was present but contributed
+        no usable pair.
+
+        Neither result suppresses ``OTEL_EXPORTER_OTLP_HEADERS``. The gRPC
+        exporter falls back to the variable whenever what it is given is
+        falsy, which an empty dict is, and the HTTP exporters always read
+        the variable first and then overlay what they are given, so a
+        header set only in the environment is sent either way.
     """
     if headers is None and headers_list is None:
         return None
@@ -192,7 +333,42 @@ def _map_compression(
     *,
     allow_deflate: bool = False,
 ) -> _CompressionT | None:
-    """Map a compression string to the given Compression enum value."""
+    """Map a compression string to the given Compression enum value.
+
+    Each OTLP exporter package defines its own ``Compression`` enum, and the
+    member names differ between them: ``Gzip`` in
+    ``opentelemetry.exporter.otlp.proto.http`` and in ``grpc``, and ``GZIP``
+    in ``opentelemetry.exporter.otlp.common.http``, which is the enum the
+    JSON encoding of the OTLP HTTP exporters uses. The member is therefore
+    looked up by trying both spellings rather than imported.
+
+    Args:
+        value: The ``compression`` field of an exporter configuration block.
+            ``None`` means the field was absent.
+        compression_enum: The ``Compression`` enum of the exporter package
+            that will receive the result.
+        allow_deflate: Whether ``"deflate"`` is an accepted value. The HTTP
+            exporter factories pass ``True`` and the gRPC ones leave it
+            ``False``, so a configuration file asking for deflate over gRPC
+            fails rather than silently sending gzip. That is this package's
+            choice rather than a limit of the exporter: ``grpc.Compression``
+            carries a ``Deflate`` member, which the ``supports_deflate``
+            test below finds.
+
+    Returns:
+        The enum member for ``value``, or ``None`` when ``value`` is ``None``
+        or ``"none"``. The two cases are indistinguishable to the exporter,
+        which reads ``None`` as "consult the environment", so an explicit
+        ``compression: none`` disables compression unless
+        ``OTEL_EXPORTER_OTLP_COMPRESSION`` or its signal-specific variant
+        names one.
+
+    Raises:
+        ConfigurationError: If ``value`` is anything else, including
+            ``"deflate"`` when ``allow_deflate`` is ``False`` or when
+            ``compression_enum`` has no deflate member. The message lists the
+            values that this call would have accepted.
+    """
     if value is None:
         return None
 
@@ -224,6 +400,28 @@ def _parse_otlp_file_output_stream(output_stream: str | None) -> str | None:
 
     Per the OTel file exporter spec, output_stream is "stdout" (or
     None, which means the same), or a "file://" URI giving a path.
+
+    The URI must have an empty host or ``localhost``, an absolute path, and
+    no parameters, query or fragment. A URI naming a remote host is rejected
+    rather than treated as a local path, so a typo cannot quietly write
+    telemetry to the wrong file.
+
+    Args:
+        output_stream: The ``output_stream`` field of an
+            ``otlp_file/development`` exporter configuration block. ``None``
+            means the field was absent.
+
+    Returns:
+        The absolute filesystem path the URI names, or ``None`` when the
+        exporter should write to standard output. The caller distinguishes
+        the two by calling the exporter constructor with or without a path
+        argument.
+
+    Raises:
+        ConfigurationError: If the value is neither ``"stdout"`` nor a local
+            ``file://`` URI, if it cannot be parsed as a URI at all, or if
+            its path is relative or ends in ``/``. The last two get their own
+            messages naming which rule the path broke.
     """
     if output_stream is None or output_stream == "stdout":
         return None

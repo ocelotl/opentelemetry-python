@@ -6,10 +6,20 @@
 This module provides support for configuring the OpenTelemetry SDK
 using declarative configuration files (YAML or JSON).
 
+It re-exports the loader that reads a file, the per-signal ``create_*``
+and ``configure_*`` factories that live in the parent package,
+``configure_sdk`` which calls them all, the two exception classes
+``ConfigurationError`` and ``MissingDependencyError``, and
+``substitute_env_vars`` from the sibling module
+``opentelemetry.configuration.file._env_substitution``, so an
+application can import all of those from one place.
+``configure_instrumentation`` is left out, and is importable only from
+``opentelemetry.configuration.instrumentation``.
+
 Example:
     >>> from opentelemetry.configuration.file import load_config_file
     >>> config = load_config_file("otel-config.yaml")
-    >>> print(config.file_format)
+    >>> config.file_format
     '1.0'
 """
 

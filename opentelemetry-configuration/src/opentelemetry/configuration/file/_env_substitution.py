@@ -80,6 +80,22 @@ def substitute_env_vars(text: str) -> str:
     """
 
     def replace_ref(match: re.Match[str]) -> str:
+        """Resolve one substitution reference to the text that replaces it.
+
+        Args:
+            match: A match of ``_SUBSTITUTION_REF``, so group 0 is the whole
+                ``${...}`` reference and group 1 is the text between the
+                braces.
+
+        Returns:
+            The value of the environment variable, or the default when the
+            variable is unset or empty and a default was written, or the
+            empty string when neither applies.
+
+        Raises:
+            ConfigurationError: If the text between the braces is not a
+                valid environment variable reference.
+        """
         content = match.group(1)
         env_match = _ENV_SUBSTITUTION.fullmatch(content)
         # Try the unprefixed form first so ``${VAR:-default}`` is not read as
