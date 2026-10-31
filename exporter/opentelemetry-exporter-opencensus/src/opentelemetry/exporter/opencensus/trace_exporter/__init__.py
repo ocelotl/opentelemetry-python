@@ -56,6 +56,11 @@ class OpenCensusSpanExporter(SpanExporter):
     starts on whatever that detection found and reports the name carried by
     the spans from its first non-empty export onwards.
 
+    The first of those two branches reads the attribute by subscript, so a
+    global tracer provider whose resource carries no ``service.name`` makes
+    the constructor raise ``KeyError`` rather than leave the name empty. The
+    second branch reads it with ``get`` and does not.
+
     Args:
         endpoint: Host and port of the OpenCensus receiver of the collector,
             written as ``host:port`` with no scheme, since gRPC takes a
@@ -128,8 +133,9 @@ class OpenCensusSpanExporter(SpanExporter):
             every other case. A failure covers a collector that is
             unreachable, one that rejected the request, one that closed the
             stream early, and an exception raised while translating a span,
-            which gRPC turns into a cancelled call with status ``UNKNOWN``
-            rather than letting it reach the caller of ``export``. An
+            which gRPC fails with status ``UNKNOWN`` and the details
+            ``Exception iterating requests!`` rather than letting it reach
+            the caller of ``export``. An
             exporter already shut down still exports and still reports
             success, because ``shutdown`` sets no flag to check here.
         """
