@@ -3,16 +3,21 @@
 
 """Exceptions raised by declarative configuration.
 
-Every error this package raises itself is a ``ConfigurationError`` or a
-subclass of it. That is not the whole set a caller sees, because an SDK
+Nearly every error this package raises itself is a
+``ConfigurationError`` or a subclass of it. Two places raise something
+else: ``_resource._coerce_attribute_value`` lets the ``ValueError`` from
+``int()`` or ``float()`` out when an attribute value does not fit its
+declared type, and ``file._loader._dict_to_model`` re-raises as
+``TypeError`` a configuration structure the generated models reject.
+
+That is still not the whole set a caller sees, because an SDK
 constructor or a plugin reached through the configuration raises its own
-exceptions and nothing here translates them: a resource attribute whose
-value does not fit its declared type raises ``ValueError``, a plugin
-component handed a configuration mapping its constructor does not accept
-raises ``TypeError``, a view with an empty selector raises a bare
+exceptions and nothing here translates them: a plugin component handed a
+configuration mapping its constructor does not accept raises
+``TypeError``, a view with an empty selector raises a bare
 ``Exception``, and a Prometheus reader on a bound port raises
-``OSError``. A caller that wants to survive any bad
-configuration file has to catch more than ``ConfigurationError``.
+``OSError``. A caller that wants to survive any bad configuration file
+has to catch more than ``ConfigurationError``.
 
 ``MissingDependencyError`` is the subclass raised when the configuration
 selects a component whose package is not installed. It also inherits
