@@ -680,9 +680,13 @@ def _create_span_limits(
         value-length limit is applied to both the generic and the
         span-specific field, which is what makes it reach span attributes.
         The generic ``max_attributes`` is the one parameter not passed, so
-        ``OTEL_ATTRIBUTE_COUNT_LIMIT`` is still read for it, and a value
-        that is not a non-negative integer raises ``ValueError`` from the
-        ``SpanLimits`` constructor.
+        ``OTEL_ATTRIBUTE_COUNT_LIMIT`` is still read for it.
+
+    Raises:
+        ValueError: If ``OTEL_ATTRIBUTE_COUNT_LIMIT`` is set to something
+            that is not a non-negative integer. The ``SpanLimits``
+            constructor raises it, because ``max_attributes`` is the one
+            parameter this function does not pass.
     """
     attribute_count_limit = config.attribute_count_limit
     if attribute_count_limit is None and global_limits is not None:

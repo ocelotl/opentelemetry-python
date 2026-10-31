@@ -187,6 +187,15 @@ def create_resource(config: ResourceConfig | None) -> Resource:
         config-specified attributes merged in priority order. Its schema URL
         is the one the config gives, or empty when the config gives none or
         is ``None``.
+
+    Raises:
+        ValueError: If an attribute value cannot be read as its declared
+            type, for example ``type: int`` on a value of ``"abc"``.
+            ``_coerce_attribute_value`` raises it.
+        TypeError: If an array attribute type is declared on a value that
+            is not iterable, or if a plugin detector's constructor does not
+            accept the keys of the nested configuration mapping splatted
+            into it.
     """
     # Spec requires service.name to always be present; detectors and explicit
     # config attributes can override this default.
@@ -332,6 +341,12 @@ def _run_detectors(
             ``additional_properties`` hold the plugin names it does not.
         detected_attrs: The accumulator every detector in this entry writes
             into. It is modified in place and nothing is returned.
+
+    Raises:
+        TypeError: If a plugin detector's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
+            A detector that cannot be loaded at all is skipped with a
+            warning instead, so this covers only one that was found.
     """
     for field in dataclasses.fields(detector_config):
         if not field.init:
