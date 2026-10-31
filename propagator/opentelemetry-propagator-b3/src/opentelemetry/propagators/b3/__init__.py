@@ -124,7 +124,10 @@ class B3MultiFormat(TextMapPropagator):
             A context holding a non-recording span whose span context carries
             the extracted ids and is marked remote. The context passed in is
             returned unchanged when a trace id or a span id is missing, is not
-            hexadecimal, or is of a length B3 does not allow.
+            hexadecimal, or is of a length B3 does not allow. An all-zero trace
+            id or span id passes those checks, so the span context in the
+            returned context is then invalid, and a later ``inject`` writes
+            nothing for it.
         """
         if context is None:
             context = Context()
