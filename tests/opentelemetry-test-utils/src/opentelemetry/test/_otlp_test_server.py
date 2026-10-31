@@ -46,7 +46,7 @@ class RecordedSpan:
     An OTLP request nests spans under a scope and a resource, so a span taken
     out of it on its own has lost both. This keeps the three together.
 
-    Args:
+    Attributes:
         span: The protobuf span, as received. It is the object from the parsed
             request, not a copy.
         resource: The protobuf resource of the ``ResourceSpans`` the span
@@ -67,7 +67,7 @@ class RecordedSpan:
 class RecordedMetric:
     """One metric received by the server, with the context it arrived in.
 
-    Args:
+    Attributes:
         metric: The protobuf metric, as received, carrying all of its data
             points.
         resource: The protobuf resource of the ``ResourceMetrics`` the metric
@@ -88,7 +88,7 @@ class RecordedMetric:
 class RecordedLogRecord:
     """One log record received by the server, with the context it arrived in.
 
-    Args:
+    Attributes:
         log_record: The protobuf log record, as received.
         resource: The protobuf resource of the ``ResourceLogs`` the record
             arrived in.
