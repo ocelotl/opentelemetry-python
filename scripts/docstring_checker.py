@@ -1,25 +1,33 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Fail when a branch leaves a public API object less documented than main does.
+"""Fail when a public API object is not properly documented.
 
-The check is a comparison rather than an absolute threshold. It collects every
-documentation gap in the public API at the current working tree, collects the
-same set at a base git ref, and reports only the gaps the branch introduces.
-That lets the repository adopt the check while gaps remain, and still refuses
-any pull request that adds a new one.
+The check is absolute. It walks the whole public API at the current working
+tree and reports every documentation gap it finds, whether the gap was added
+by the branch under test or has been in the repository for years. A pull
+request that adds an undocumented object therefore fails, and so does a pull
+request that changes nothing while an existing object remains undocumented.
 
 Three kinds of gap are reported, named by the ``Gap.rule`` strings
 ``missing-docstring``, ``undocumented-parameter`` and ``missing-returns``.
+
+Passing ``--against <ref>`` narrows the report to the gaps the working tree
+has and that ``<ref>`` does not, which is how a contributor can see their own
+share of the total while the total is still large. That mode is a reading aid
+and not the gate: the gate is the absolute run.
 """
 
 from __future__ import annotations
 
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
+from collections import Counter
 from dataclasses import dataclass
 from logging import ERROR, getLogger
-from sys import exit as sys_exit, stderr
+from sys import exit as sys_exit
+from sys import stderr
 
+from eachdist import find_projectroot, find_targets
 from griffe import (
     Alias,
     Class,
@@ -32,8 +40,6 @@ from griffe import (
     load,
     load_git,
 )
-
-from eachdist import find_projectroot, find_targets
 
 DIRECTORIES_NOT_SEARCHED: tuple[str, ...] = (
     "docs",
@@ -114,8 +120,7 @@ def has_returns_section(obj: Object) -> bool:
     if obj.docstring is None:
         return False
     return any(
-        section.kind in (DocstringSectionKind.returns, DocstringSectionKind.yields)
-        for section in obj.docstring.parsed
+        section.kind in (DocstringSectionKind.returns, DocstringSectionKind.yields) for section in obj.docstring.parsed
     )
 
 
@@ -266,15 +271,30 @@ def search_paths() -> list[str]:
     return paths
 
 
+RULE_EXPLANATIONS: dict[str, str] = {
+    "missing-docstring": "This object has no docstring. Write one.",
+    "undocumented-parameter": (
+        "This parameter has no entry in an Args: section. Add one. A "
+        "constructor parameter is documented on the class docstring rather "
+        "than on __init__, because docs/conf.py does not set special-members "
+        "and an __init__ docstring is therefore never rendered."
+    ),
+    "missing-returns": (
+        "This function is annotated as returning a value and never says what "
+        "the value is. Add a Returns: section, or a Yields: section for a "
+        "generator."
+    ),
+}
+
+
 def main() -> int:
     """Run the check and report.
 
     Returns:
-        ``0`` when the branch introduces no gap, ``1`` when it introduces at
-        least one.
+        ``0`` when no gap is reported, ``1`` when at least one is.
     """
     parser = ArgumentParser(
-        description="Fail when a branch introduces a public API documentation gap",
+        description="Fail when a public API object is not properly documented",
         formatter_class=ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -284,51 +304,51 @@ def main() -> int:
     )
     parser.add_argument(
         "--against",
-        default="main",
-        help="Git ref to compare against",
+        default=None,
+        help=(
+            "Git ref whose gaps are subtracted from the report, so that only "
+            "the gaps this working tree adds are shown. Omit it to report "
+            "every gap, which is what CI does"
+        ),
     )
     arguments = parser.parse_args()
 
     getLogger("griffe").setLevel(ERROR)
 
     paths: list[str] = search_paths()
-    current: set[Gap] = collect_gaps(
-        load(arguments.module, search_paths=paths, docstring_parser=Parser.google)
-    )
-    base: set[Gap] = collect_gaps(
-        load_git(
-            arguments.module,
-            ref=arguments.against,
-            search_paths=paths,
-            docstring_parser=Parser.google,
+    found: set[Gap] = collect_gaps(load(arguments.module, search_paths=paths, docstring_parser=Parser.google))
+
+    if arguments.against is not None:
+        base: set[Gap] = collect_gaps(
+            load_git(
+                arguments.module,
+                ref=arguments.against,
+                search_paths=paths,
+                docstring_parser=Parser.google,
+            )
         )
-    )
+        closed: int = len(base - found)
+        found -= base
+        if closed:
+            print(f"This working tree closes {closed} documentation gaps that {arguments.against} has.")
+            print()
 
-    introduced: list[Gap] = sorted(current - base)
-    closed: list[Gap] = sorted(base - current)
-
-    if closed:
-        print(f"This branch closes {len(closed)} documentation gaps. Thank you.")
-        print()
-
-    if not introduced:
-        print("This branch introduces no public API documentation gaps.")
+    if not found:
+        print("Every public API object checked is properly documented.")
         return 0
 
-    print("This branch introduces the following public API documentation gaps:", file=stderr)
+    counts: Counter = Counter(gap.rule for gap in found)
+    for gap in sorted(found):
+        print(gap, file=stderr)
     print(file=stderr)
-    for gap in introduced:
-        print(f"  {gap}", file=stderr)
+
+    for rule, count in sorted(counts.items()):
+        print(f"{count} {rule}", file=stderr)
+    print(f"{len(found)} documentation gaps in total.", file=stderr)
     print(file=stderr)
-    print(
-        "Every public module, class, function and method needs a docstring, "
-        "every parameter needs an entry in an Args: section, and every "
-        "function whose annotation returns a value needs a Returns: section. "
-        "Constructor parameters belong on the class docstring, because "
-        "docs/conf.py does not set special-members and an __init__ docstring "
-        "is therefore never rendered.",
-        file=stderr,
-    )
+
+    for rule in sorted(counts):
+        print(f"{rule}: {RULE_EXPLANATIONS[rule]}", file=stderr)
     return 1
 
 

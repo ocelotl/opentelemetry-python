@@ -325,6 +325,4 @@ def test_generated_trees_are_not_walked(tmp_path, monkeypatch):
 
 def test_gap_renders_with_and_without_detail():
     assert str(checker.Gap("a.b", "missing-docstring")) == "a.b: missing-docstring"
-    assert (
-        str(checker.Gap("a.b", "undocumented-parameter", "x")) == "a.b: undocumented-parameter (x)"
-    )
+    assert str(checker.Gap("a.b", "undocumented-parameter", "x")) == "a.b: undocumented-parameter (x)"
