@@ -475,6 +475,14 @@ class ScopeShim(Scope):
                 :class:`ScopeShim`.
             span_cm: A context manager as returned by
                 :meth:`opentelemetry.trace.use_span`.
+
+        Returns:
+            A :class:`ScopeShim` holding a :class:`SpanShim` that wraps the
+            `opentelemetry.trace.Span` yielded by *span_cm*, and holding
+            *span_cm* itself so that :meth:`close` can exit it. The returned
+            object is already the one :attr:`ScopeManagerShim.active` hands
+            back, because constructing it records it as the active
+            :class:`ScopeShim`.
         """
 
         # pylint: disable=unnecessary-dunder-call
