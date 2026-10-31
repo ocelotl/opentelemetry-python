@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # pylint: disable=too-many-ancestors
+# pylint: disable=too-many-lines
 
 """The instrument types a meter hands out, and their no-op implementations.
 
@@ -76,7 +77,16 @@ CallbackT = Callable[[CallbackOptions], Iterable[Observation]] | Generator[Itera
 
 
 class Instrument(ABC):
-    """Abstract class that serves as base for all instruments."""
+    """Abstract class that serves as base for all instruments.
+
+    Args:
+        name: The name of the instrument, which must match
+            ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
+        unit: The unit of the measurements, as at most 63 ASCII
+            characters.
+        description: A human-readable description of what the instrument
+            measures.
+    """
 
     @abstractmethod
     def __init__(
@@ -87,13 +97,8 @@ class Instrument(ABC):
     ) -> None:
         """Build the instrument.
 
-        Args:
-            name: The name of the instrument, which must match
-                ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
-            unit: The unit of the measurements, as at most 63 ASCII
-                characters.
-            description: A human-readable description of what the instrument
-                measures.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
 
     @staticmethod
@@ -149,6 +154,14 @@ class _ProxyInstrument(ABC, Generic[InstrumentT]):
     creating meter calls :meth:`on_meter_set`, and every later measurement is
     forwarded to a real instrument built from the stored name, unit and
     description.
+
+    Args:
+        name: The name of the instrument, which must match
+            ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
+        unit: The unit of the measurements, as at most 63 ASCII
+            characters.
+        description: A human-readable description of what the instrument
+            measures.
     """
 
     def __init__(
@@ -159,13 +172,8 @@ class _ProxyInstrument(ABC, Generic[InstrumentT]):
     ) -> None:
         """Record what to build the real instrument from, once one is possible.
 
-        Args:
-            name: The name of the instrument, which must match
-                ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
-            unit: The unit of the measurements, as at most 63 ASCII
-                characters.
-            description: A human-readable description of what the instrument
-                measures.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         self._name = name
         self._unit = unit
@@ -198,7 +206,19 @@ class _ProxyInstrument(ABC, Generic[InstrumentT]):
 
 
 class _ProxyAsynchronousInstrument(_ProxyInstrument[InstrumentT]):
-    """A proxy instrument that also carries callbacks to the real instrument."""
+    """A proxy instrument that also carries callbacks to the real instrument.
+
+    Args:
+        name: The name of the instrument, which must match
+            ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
+        callbacks: The callbacks to invoke on each collection. Each one
+            receives a :class:`CallbackOptions` and returns an iterable of
+            :class:`~opentelemetry.metrics.Observation`.
+        unit: The unit of the measurements, as at most 63 ASCII
+            characters.
+        description: A human-readable description of what the instrument
+            measures.
+    """
 
     def __init__(
         self,
@@ -209,16 +229,8 @@ class _ProxyAsynchronousInstrument(_ProxyInstrument[InstrumentT]):
     ) -> None:
         """Record what to build the real instrument from, including callbacks.
 
-        Args:
-            name: The name of the instrument, which must match
-                ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
-            callbacks: The callbacks to invoke on each collection. Each one
-                receives a :class:`CallbackOptions` and returns an iterable of
-                :class:`~opentelemetry.metrics.Observation`.
-            unit: The unit of the measurements, as at most 63 ASCII
-                characters.
-            description: A human-readable description of what the instrument
-                measures.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         super().__init__(name, unit, description)
         self._callbacks = callbacks
@@ -229,7 +241,19 @@ class Synchronous(Instrument):
 
 
 class Asynchronous(Instrument):
-    """Base class for all asynchronous instruments"""
+    """Base class for all asynchronous instruments
+
+    Args:
+        name: The name of the instrument, which must match
+            ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
+        callbacks: The callbacks to invoke on each collection. Each one
+            receives a :class:`CallbackOptions` and returns an iterable of
+            :class:`~opentelemetry.metrics.Observation`.
+        unit: The unit of the measurements, as at most 63 ASCII
+            characters.
+        description: A human-readable description of what the instrument
+            measures.
+    """
 
     @abstractmethod
     def __init__(
@@ -241,16 +265,8 @@ class Asynchronous(Instrument):
     ) -> None:
         """Build the instrument.
 
-        Args:
-            name: The name of the instrument, which must match
-                ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
-            callbacks: The callbacks to invoke on each collection. Each one
-                receives a :class:`CallbackOptions` and returns an iterable of
-                :class:`~opentelemetry.metrics.Observation`.
-            unit: The unit of the measurements, as at most 63 ASCII
-                characters.
-            description: A human-readable description of what the instrument
-                measures.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         super().__init__(name, unit=unit, description=description)
 
@@ -276,7 +292,16 @@ class Counter(Synchronous):
 
 
 class NoOpCounter(Counter):
-    """No-op implementation of `Counter`."""
+    """No-op implementation of `Counter`.
+
+    Args:
+        name: The name of the instrument, which must match
+            ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
+        unit: The unit of the measurements, as at most 63 ASCII
+            characters.
+        description: A human-readable description of what the instrument
+            measures.
+    """
 
     def __init__(
         self,
@@ -286,13 +311,8 @@ class NoOpCounter(Counter):
     ) -> None:
         """Build the no-op instrument.
 
-        Args:
-            name: The name of the instrument, which must match
-                ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
-            unit: The unit of the measurements, as at most 63 ASCII
-                characters.
-            description: A human-readable description of what the instrument
-                measures.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         super().__init__(name, unit=unit, description=description)
 
@@ -385,7 +405,16 @@ class UpDownCounter(Synchronous):
 
 
 class NoOpUpDownCounter(UpDownCounter):
-    """No-op implementation of `UpDownCounter`."""
+    """No-op implementation of `UpDownCounter`.
+
+    Args:
+        name: The name of the instrument, which must match
+            ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
+        unit: The unit of the measurements, as at most 63 ASCII
+            characters.
+        description: A human-readable description of what the instrument
+            measures.
+    """
 
     def __init__(
         self,
@@ -395,13 +424,8 @@ class NoOpUpDownCounter(UpDownCounter):
     ) -> None:
         """Build the no-op instrument.
 
-        Args:
-            name: The name of the instrument, which must match
-                ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
-            unit: The unit of the measurements, as at most 63 ASCII
-                characters.
-            description: A human-readable description of what the instrument
-                measures.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         super().__init__(name, unit=unit, description=description)
 
@@ -477,7 +501,21 @@ class ObservableCounter(Asynchronous):
 
 
 class NoOpObservableCounter(ObservableCounter):
-    """No-op implementation of `ObservableCounter`."""
+    """No-op implementation of `ObservableCounter`.
+
+    The callbacks are never invoked.
+
+    Args:
+        name: The name of the instrument, which must match
+            ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
+        callbacks: The callbacks to invoke on each collection. Each one
+            receives a :class:`CallbackOptions` and returns an iterable of
+            :class:`~opentelemetry.metrics.Observation`.
+        unit: The unit of the measurements, as at most 63 ASCII
+            characters.
+        description: A human-readable description of what the instrument
+            measures.
+    """
 
     def __init__(
         self,
@@ -488,18 +526,8 @@ class NoOpObservableCounter(ObservableCounter):
     ) -> None:
         """Build the no-op instrument.
 
-        The callbacks are never invoked.
-
-        Args:
-            name: The name of the instrument, which must match
-                ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
-            callbacks: The callbacks to invoke on each collection. Each one
-                receives a :class:`CallbackOptions` and returns an iterable of
-                :class:`~opentelemetry.metrics.Observation`.
-            unit: The unit of the measurements, as at most 63 ASCII
-                characters.
-            description: A human-readable description of what the instrument
-                measures.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         super().__init__(
             name,
@@ -543,7 +571,21 @@ class ObservableUpDownCounter(Asynchronous):
 
 
 class NoOpObservableUpDownCounter(ObservableUpDownCounter):
-    """No-op implementation of `ObservableUpDownCounter`."""
+    """No-op implementation of `ObservableUpDownCounter`.
+
+    The callbacks are never invoked.
+
+    Args:
+        name: The name of the instrument, which must match
+            ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
+        callbacks: The callbacks to invoke on each collection. Each one
+            receives a :class:`CallbackOptions` and returns an iterable of
+            :class:`~opentelemetry.metrics.Observation`.
+        unit: The unit of the measurements, as at most 63 ASCII
+            characters.
+        description: A human-readable description of what the instrument
+            measures.
+    """
 
     def __init__(
         self,
@@ -554,18 +596,8 @@ class NoOpObservableUpDownCounter(ObservableUpDownCounter):
     ) -> None:
         """Build the no-op instrument.
 
-        The callbacks are never invoked.
-
-        Args:
-            name: The name of the instrument, which must match
-                ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
-            callbacks: The callbacks to invoke on each collection. Each one
-                receives a :class:`CallbackOptions` and returns an iterable of
-                :class:`~opentelemetry.metrics.Observation`.
-            unit: The unit of the measurements, as at most 63 ASCII
-                characters.
-            description: A human-readable description of what the instrument
-                measures.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         super().__init__(
             name,
@@ -608,6 +640,17 @@ class Histogram(Synchronous):
     """Histogram is a synchronous `Instrument` which can be used to report arbitrary values
     that are likely to be statistically meaningful. It is intended for statistics such as
     histograms, summaries, and percentile.
+
+    Args:
+        name: The name of the instrument, which must match
+            ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
+        unit: The unit of the measurements, as at most 63 ASCII
+            characters.
+        description: A human-readable description of what the instrument
+            measures.
+        explicit_bucket_boundaries_advisory: The bucket boundaries the
+            instrument suggests to the SDK, in ascending order. ``None``
+            leaves the choice to the SDK.
     """
 
     @abstractmethod
@@ -620,16 +663,8 @@ class Histogram(Synchronous):
     ) -> None:
         """Build the instrument.
 
-        Args:
-            name: The name of the instrument, which must match
-                ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
-            unit: The unit of the measurements, as at most 63 ASCII
-                characters.
-            description: A human-readable description of what the instrument
-                measures.
-            explicit_bucket_boundaries_advisory: The bucket boundaries the
-                instrument suggests to the SDK, in ascending order. ``None``
-                leaves the choice to the SDK.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
 
     @abstractmethod
@@ -656,7 +691,19 @@ class Histogram(Synchronous):
 
 
 class NoOpHistogram(Histogram):
-    """No-op implementation of `Histogram`."""
+    """No-op implementation of `Histogram`.
+
+    Args:
+        name: The name of the instrument, which must match
+            ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
+        unit: The unit of the measurements, as at most 63 ASCII
+            characters.
+        description: A human-readable description of what the instrument
+            measures.
+        explicit_bucket_boundaries_advisory: The bucket boundaries the
+            instrument suggests to the SDK, in ascending order. ``None``
+            leaves the choice to the SDK.
+    """
 
     def __init__(
         self,
@@ -667,16 +714,8 @@ class NoOpHistogram(Histogram):
     ) -> None:
         """Build the no-op instrument.
 
-        Args:
-            name: The name of the instrument, which must match
-                ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
-            unit: The unit of the measurements, as at most 63 ASCII
-                characters.
-            description: A human-readable description of what the instrument
-                measures.
-            explicit_bucket_boundaries_advisory: The bucket boundaries the
-                instrument suggests to the SDK, in ascending order. ``None``
-                leaves the choice to the SDK.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         super().__init__(
             name,
@@ -708,6 +747,17 @@ class _ProxyHistogram(_ProxyInstrument[Histogram], Histogram):
     """A histogram that stands in until a real meter provider is set.
 
     It records nothing of its own until one is.
+
+    Args:
+        name: The name of the instrument, which must match
+            ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
+        unit: The unit of the measurements, as at most 63 ASCII
+            characters.
+        description: A human-readable description of what the instrument
+            measures.
+        explicit_bucket_boundaries_advisory: The bucket boundaries the
+            instrument suggests to the SDK, in ascending order. ``None``
+            leaves the choice to the SDK.
     """
 
     def __init__(
@@ -719,16 +769,8 @@ class _ProxyHistogram(_ProxyInstrument[Histogram], Histogram):
     ) -> None:
         """Record what to build the real histogram from, once one is possible.
 
-        Args:
-            name: The name of the instrument, which must match
-                ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
-            unit: The unit of the measurements, as at most 63 ASCII
-                characters.
-            description: A human-readable description of what the instrument
-                measures.
-            explicit_bucket_boundaries_advisory: The bucket boundaries the
-                instrument suggests to the SDK, in ascending order. ``None``
-                leaves the choice to the SDK.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         super().__init__(name, unit=unit, description=description)
         self._explicit_bucket_boundaries_advisory = explicit_bucket_boundaries_advisory
@@ -781,7 +823,21 @@ class ObservableGauge(Asynchronous):
 
 
 class NoOpObservableGauge(ObservableGauge):
-    """No-op implementation of `ObservableGauge`."""
+    """No-op implementation of `ObservableGauge`.
+
+    The callbacks are never invoked.
+
+    Args:
+        name: The name of the instrument, which must match
+            ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
+        callbacks: The callbacks to invoke on each collection. Each one
+            receives a :class:`CallbackOptions` and returns an iterable of
+            :class:`~opentelemetry.metrics.Observation`.
+        unit: The unit of the measurements, as at most 63 ASCII
+            characters.
+        description: A human-readable description of what the instrument
+            measures.
+    """
 
     def __init__(
         self,
@@ -792,18 +848,8 @@ class NoOpObservableGauge(ObservableGauge):
     ) -> None:
         """Build the no-op instrument.
 
-        The callbacks are never invoked.
-
-        Args:
-            name: The name of the instrument, which must match
-                ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
-            callbacks: The callbacks to invoke on each collection. Each one
-                receives a :class:`CallbackOptions` and returns an iterable of
-                :class:`~opentelemetry.metrics.Observation`.
-            unit: The unit of the measurements, as at most 63 ASCII
-                characters.
-            description: A human-readable description of what the instrument
-                measures.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         super().__init__(
             name,
@@ -867,7 +913,16 @@ class Gauge(Synchronous):
 
 
 class NoOpGauge(Gauge):
-    """No-op implementation of ``Gauge``."""
+    """No-op implementation of ``Gauge``.
+
+    Args:
+        name: The name of the instrument, which must match
+            ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
+        unit: The unit of the measurements, as at most 63 ASCII
+            characters.
+        description: A human-readable description of what the instrument
+            measures.
+    """
 
     def __init__(
         self,
@@ -877,13 +932,8 @@ class NoOpGauge(Gauge):
     ) -> None:
         """Build the no-op instrument.
 
-        Args:
-            name: The name of the instrument, which must match
-                ``[a-zA-Z][-_./a-zA-Z0-9]{0,254}``.
-            unit: The unit of the measurements, as at most 63 ASCII
-                characters.
-            description: A human-readable description of what the instrument
-                measures.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         super().__init__(name, unit=unit, description=description)
 

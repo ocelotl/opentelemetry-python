@@ -358,6 +358,15 @@ class TraceState(Mapping[str, str]):
     Implementations should conform to the `W3C Trace Context - Tracestate`_
     spec, which describes additional restrictions on valid field values.
 
+    Construction drops anything the format forbids. An invalid pair and a
+    duplicate key are each skipped with a warning. Supplying more than 32
+    pairs discards all of them, leaving an empty trace state, because the
+    format defines no way to choose which to keep.
+
+    Args:
+        entries: The pairs to store, in order. ``None`` builds an empty
+            trace state.
+
     .. _W3C Trace Context - Tracestate:
         https://www.w3.org/TR/trace-context/#tracestate-field
     """
@@ -368,14 +377,8 @@ class TraceState(Mapping[str, str]):
     ) -> None:
         """Build the trace state, dropping anything the format forbids.
 
-        An invalid pair and a duplicate key are each skipped with a warning.
-        Supplying more than 32 pairs discards all of them, leaving an empty
-        trace state, because the format defines no way to choose which to
-        keep.
-
-        Args:
-            entries: The pairs to store, in order. ``None`` builds an empty
-                trace state.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         self._dict = {}  # type: dict[str, str]
         if entries is None:
@@ -798,14 +801,17 @@ class NonRecordingSpan(Span):
     """The Span that is used when no Span implementation is available.
 
     All operations are no-op except context propagation.
+
+    Args:
+        context: The span context to carry. It is the only state this
+            span holds.
     """
 
     def __init__(self, context: SpanContext) -> None:
         """Wrap a span context so it can be made current and propagated.
 
-        Args:
-            context: The span context to carry. It is the only state this
-                span holds.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         self._context = context
 

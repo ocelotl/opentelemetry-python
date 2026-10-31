@@ -387,6 +387,13 @@ class ProxyLogger(Logger):
     :class:`LoggerProvider` has been installed. Once one is, the proxy
     resolves a real logger for its instrumentation scope, caches it, and
     forwards everything from then on.
+
+    Args:
+        name: The name of the instrumenting module, passed on to
+            :meth:`LoggerProvider.get_logger`.
+        version: The version of the instrumenting module.
+        schema_url: The schema URL the emitted records follow.
+        attributes: Attributes describing the instrumentation scope.
     """
 
     def __init__(  # pylint: disable=super-init-not-called
@@ -398,12 +405,8 @@ class ProxyLogger(Logger):
     ):
         """Record what to ask the global provider for once it exists.
 
-        Args:
-            name: The name of the instrumenting module, passed on to
-                :meth:`LoggerProvider.get_logger`.
-            version: The version of the instrumenting module.
-            schema_url: The schema URL the emitted records follow.
-            attributes: Attributes describing the instrumentation scope.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         self._name = name
         self._version = version

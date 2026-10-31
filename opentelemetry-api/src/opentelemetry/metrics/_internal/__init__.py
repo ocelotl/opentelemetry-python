@@ -247,6 +247,12 @@ class Meter(ABC):
 
     This class provides methods for creating instruments which are then
     used to produce measurements.
+
+    Args:
+        name: The name of the instrumenting module.
+        version: The version string of the instrumenting library, or
+            ``None`` when it has none.
+        schema_url: The Schema URL of the emitted telemetry, or ``None``.
     """
 
     def __init__(
@@ -257,11 +263,8 @@ class Meter(ABC):
     ) -> None:
         """Build the meter.
 
-        Args:
-            name: The name of the instrumenting module.
-            version: The version string of the instrumenting library, or
-                ``None`` when it has none.
-            schema_url: The Schema URL of the emitted telemetry, or ``None``.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         super().__init__()
         self._name = name
@@ -682,6 +685,12 @@ class _ProxyMeter(Meter):
     this meter acquires a real backing meter and each of those proxy
     instruments acquires a real backing instrument. Every instrument this meter
     creates after that call comes from the real meter directly.
+
+    Args:
+        name: The name of the instrumenting module.
+        version: The version string of the instrumenting library, or
+            ``None`` when it has none.
+        schema_url: The Schema URL of the emitted telemetry, or ``None``.
     """
 
     def __init__(
@@ -692,11 +701,8 @@ class _ProxyMeter(Meter):
     ) -> None:
         """Build the proxy meter with no real meter behind it yet.
 
-        Args:
-            name: The name of the instrumenting module.
-            version: The version string of the instrumenting library, or
-                ``None`` when it has none.
-            schema_url: The Schema URL of the emitted telemetry, or ``None``.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         super().__init__(name, version=version, schema_url=schema_url)
         self._lock = Lock()

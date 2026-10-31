@@ -110,13 +110,16 @@ class _LinkBase(ABC):
     A link associates one span with another that is causally related but is
     not its parent, for example the spans of the messages gathered into a
     batch.
+
+    Args:
+        context: The span context of the span to link to.
     """
 
     def __init__(self, context: "SpanContext") -> None:
         """Store the context of the span being linked to.
 
-        Args:
-            context: The span context of the span to link to.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         self._context = context
 
@@ -499,6 +502,15 @@ class ProxyTracer(Tracer):
     :class:`TracerProvider` has been installed. Once one is, the proxy
     resolves a real tracer for its instrumentation scope, caches it, and
     forwards everything from then on.
+
+    Args:
+        instrumenting_module_name: The uniquely identifiable name for the
+            instrumentation scope.
+        instrumenting_library_version: The version string of the
+            instrumenting library.
+        schema_url: The Schema URL of the emitted telemetry.
+        attributes: The instrumentation scope attributes to associate with
+            emitted telemetry.
     """
 
     # pylint: disable=W0222,signature-differs
@@ -511,14 +523,8 @@ class ProxyTracer(Tracer):
     ):
         """Record what to ask the global provider for once it exists.
 
-        Args:
-            instrumenting_module_name: The uniquely identifiable name for the
-                instrumentation scope.
-            instrumenting_library_version: The version string of the
-                instrumenting library.
-            schema_url: The Schema URL of the emitted telemetry.
-            attributes: The instrumentation scope attributes to associate with
-                emitted telemetry.
+        Every parameter is documented on the class itself, since that is the
+        form the API reference renders.
         """
         self._instrumenting_module_name = instrumenting_module_name
         self._instrumenting_library_version = instrumenting_library_version
