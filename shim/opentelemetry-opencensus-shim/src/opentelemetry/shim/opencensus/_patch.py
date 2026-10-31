@@ -55,9 +55,16 @@ def install_shim(
             span start and keeps the first real one it finds, so a provider set after the shim is
             installed is still honoured. A span started before that provider is set is
             non-recording, and it does not stop later spans from being recorded. When
-            ``OTEL_PYTHON_TRACER_PROVIDER`` is set, this call loads the provider it names and
+            ``OTEL_PYTHON_TRACER_PROVIDER`` is set, and names an installed entry point of the
+            ``opentelemetry_tracer_provider`` group, this call loads the provider it names and
             makes it the global one, so the tracer is a real tracer from the start and a later
             ``opentelemetry.trace.set_tracer_provider`` is refused with a warning.
+
+    Raises:
+        StopIteration: When ``tracer_provider`` is ``None``, no global provider has been set, and
+            ``OTEL_PYTHON_TRACER_PROVIDER`` is present in the environment with a value that matches
+            no installed entry point, the empty string included. Nothing is patched in that case,
+            so every OpenCensus ``Tracer`` keeps recording through OpenCensus.
     """
     otel_tracer = trace.get_tracer(
         "opentelemetry-opencensus-shim",

@@ -9,10 +9,12 @@ place of the ``tracer`` attribute of every OpenCensus ``Tracer``.
 
 This module also holds the two pieces of context translation the shim needs. The current shim span
 is kept in the OpenTelemetry context under a key of the shim's own, because what OpenCensus callers
-expect back is the shim span and not the OpenTelemetry span. An OpenCensus ``SpanContext`` is
-turned into an OpenTelemetry context whose current span is a non-recording OpenTelemetry span with
-the same identifiers, which is how trace context that an OpenCensus instrumentation extracted from
-an incoming request becomes the parent of an OpenTelemetry span.
+expect back is the shim span and not the OpenTelemetry span. An OpenCensus ``SpanContext`` that
+carries a span ID is turned into an OpenTelemetry context whose current span is a non-recording
+OpenTelemetry span with the same identifiers, which is how trace context that an OpenCensus
+instrumentation extracted from an incoming request becomes the parent of an OpenTelemetry span. An
+OpenCensus ``SpanContext`` with no span ID, which is what ``opencensus.trace.tracer.Tracer`` builds
+for itself when given none, leaves the OpenTelemetry context as it was.
 """
 
 import logging

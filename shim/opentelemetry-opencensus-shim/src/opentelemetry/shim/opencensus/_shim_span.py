@@ -89,8 +89,10 @@ class ShimSpan(wrapt.ObjectProxy):
     the documented OpenCensus ``BaseSpan`` interface, are set from the OpenTelemetry span at
     construction so they do not report the values the ``BlankSpan`` made up for itself:
     ``span_id`` is the span ID of the OpenTelemetry span as an integer, and
-    ``same_process_as_parent_span`` is false exactly when the OpenTelemetry span context is
-    remote.
+    ``same_process_as_parent_span`` is read from the span context of that same OpenTelemetry span
+    rather than from its parent. A span context an OpenTelemetry tracer builds for a span it is
+    creating is never remote, so ``same_process_as_parent_span`` is ``True`` on every shim span,
+    including one whose parent was extracted from an incoming request.
 
     Args:
         wrapped: The OpenCensus ``BlankSpan`` to proxy.
