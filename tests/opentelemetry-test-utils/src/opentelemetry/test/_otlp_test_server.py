@@ -5,9 +5,11 @@
 
 :class:`OtlpProtoTestServer` listens on a loopback port, accepts the protobuf
 over HTTP that the OTLP exporters send, and puts every span, metric and log
-record it decodes on a queue a test can read. It answers each request with the
-empty success response of the corresponding OTLP service, so the exporter under
-test sees an ordinary successful export.
+record it decodes on a queue a test can read. A request on one of the three
+OTLP paths whose body the protobuf parser accepts is answered with the empty
+success response of the corresponding service, so the exporter under test sees
+an ordinary successful export. ``do_POST`` describes the two cases answered
+otherwise.
 
 The module is private, because the queue-per-signal shape and the ``Recorded*``
 dataclasses are chosen to suit the exporter tests in this repository.

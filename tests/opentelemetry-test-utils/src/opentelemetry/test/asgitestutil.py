@@ -69,9 +69,10 @@ class AsgiTestBase(TestBase):
     the first ``send_input`` or ``get_output``, so an edit made any time before
     that first call still reaches the application.
 
-    ``tearDown`` waits for the application to finish but does not call
-    ``TestBase.tearDown``, so the trace and metrics globals this class installed
-    stay installed until the next ``setUp`` replaces them.
+    ``tearDown`` waits up to one second for the application to finish and
+    cancels it after that, and it does not call ``TestBase.tearDown``, so the
+    trace and metrics globals this class installed stay installed until the next
+    ``setUp`` replaces them.
     """
 
     def setUp(self):
