@@ -3,11 +3,13 @@
 
 """Instrumentor activation from declarative configuration.
 
-This is the one part of declarative configuration that runs third party
-code rather than building SDK objects, so it is also the one part that
-swallows failures. An instrumentor that cannot be found, cannot be
-built, or raises while instrumenting is logged and skipped, and the
-instrumentors after it still run. A configuration file that names a
+This is the part of declarative configuration that runs third party
+instrumentors rather than building SDK objects, and it swallows every
+failure. An instrumentor that cannot be found, cannot be built, or
+raises while instrumenting is logged and skipped, and the instrumentors
+after it still run. The only other place that swallows a failure is
+``_resource._load_detector``, which skips a resource detector that no
+installed distribution registers. A configuration file that names a
 package the user forgot to install therefore starts the application with
 less instrumentation rather than not at all.
 
