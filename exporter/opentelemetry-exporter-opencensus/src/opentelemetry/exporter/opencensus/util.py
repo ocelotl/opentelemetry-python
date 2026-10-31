@@ -39,7 +39,7 @@ def proto_timestamp_from_time_ns(time_ns):
 
     OpenTelemetry records span and event times as an integer number of
     nanoseconds since the Unix epoch, while OpenCensus carries every time in
-    the protobuf ``Timestamp`` message. Three fields of three different
+    the protobuf ``Timestamp`` message. Four fields of three different
     OpenCensus messages are filled from here: ``start_time`` and ``end_time``
     on a span, ``time`` on a time event, and ``start_timestamp`` on the
     process identifier that ``get_node`` builds. The first three come from
