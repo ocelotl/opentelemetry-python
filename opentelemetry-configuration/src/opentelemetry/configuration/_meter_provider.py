@@ -984,6 +984,18 @@ def create_meter_provider(
 
     Returns:
         A configured MeterProvider.
+
+    Raises:
+        ConfigurationError: If a reader, an exporter, a view or the
+            exemplar filter names something that cannot be built.
+        MissingDependencyError: If a metric exporter's distribution is not
+            installed.
+        TypeError: If a plugin component's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
+        OSError: If a ``pull`` reader on ``prometheus/development`` cannot
+            bind the configured port.
+        Exception: A bare one, from the ``View`` constructor, for a view
+            whose selector or stream the SDK rejects.
     """
     # Always pass an explicit exemplar filter to suppress env var reading.
     # Spec default is trace_based.
@@ -1028,6 +1040,22 @@ def configure_meter_provider(
     Args:
         config: MeterProvider config from the parsed config file, or None.
         resource: Resource to attach to the provider.
+
+    Raises:
+        ConfigurationError: If any component the configuration names cannot
+            be built.
+        MissingDependencyError: If a metric exporter's distribution is not
+            installed.
+        TypeError: If a plugin component's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
+        OSError: If a ``pull`` reader on ``prometheus/development`` cannot
+            bind the configured port.
+        Exception: A bare one, from the ``View`` constructor, for a view
+            whose selector or stream the SDK rejects.
+
+        The global is left as it was for every one of these, because
+        ``create_meter_provider`` builds the provider before it is set. A
+        Prometheus listener that did start is not stopped.
     """
     if config is None:
         return

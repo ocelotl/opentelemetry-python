@@ -561,6 +561,14 @@ def create_logger_provider(
 
     Returns:
         A configured LoggerProvider.
+
+    Raises:
+        ConfigurationError: If a log record processor names a component
+            that cannot be built.
+        MissingDependencyError: If a log record exporter's distribution is
+            not installed.
+        TypeError: If a plugin component's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
     """
     logger_configurator = (
         _create_logger_configurator(config.logger_configurator_development)
@@ -606,6 +614,17 @@ def configure_logger_provider(
         resource: Resource to attach to the provider.
         global_attribute_limits: Top-level attribute_limits from the root config,
             used as a fallback when per-signal limits are not specified.
+
+    Raises:
+        ConfigurationError: If any component the configuration names cannot
+            be built.
+        MissingDependencyError: If a log record exporter's distribution is
+            not installed.
+        TypeError: If a plugin component's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
+
+        The global is left as it was for every one of these, because
+        ``create_logger_provider`` builds the provider before it is set.
     """
     if config is None:
         return

@@ -790,6 +790,18 @@ def create_tracer_provider(
 
     Returns:
         A configured TracerProvider.
+
+    Raises:
+        ConfigurationError: If the sampler, the id generator or a span
+            processor names a component that cannot be built.
+        MissingDependencyError: If a span exporter's distribution is not
+            installed.
+        TypeError: If a plugin component's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
+        ValueError: If ``OTEL_ATTRIBUTE_COUNT_LIMIT`` is set to something
+            that is not a non-negative integer. ``_create_span_limits``
+            leaves ``max_attributes`` unset, so the ``SpanLimits``
+            constructor reads that variable.
     """
     sampler = _create_sampler(config.sampler) if config is not None and config.sampler is not None else _DEFAULT_SAMPLER
     id_generator = (
@@ -840,6 +852,21 @@ def configure_tracer_provider(
         resource: Resource to attach to the provider.
         global_attribute_limits: Top-level attribute_limits from the root config,
             used as a fallback when per-signal limits are not specified.
+
+    Raises:
+        ConfigurationError: If any component the configuration names cannot
+            be built.
+        MissingDependencyError: If a span exporter's distribution is not
+            installed.
+        TypeError: If a plugin component's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
+        ValueError: If ``OTEL_ATTRIBUTE_COUNT_LIMIT`` is set to something
+            that is not a non-negative integer. ``_create_span_limits``
+            leaves ``max_attributes`` unset, so the ``SpanLimits``
+            constructor reads that variable.
+
+        The global is left as it was for every one of these, because
+        ``create_tracer_provider`` builds the provider before it is set.
     """
     if config is None:
         return
