@@ -25,8 +25,9 @@ def time_seconds_to_ns(time_seconds):
     """Converts a time value in seconds to a time value in nanoseconds.
 
     This is the direction used when a timestamp arrives through the
-    OpenTracing API and has to be handed to the OpenTelemetry API, as in
-    ``SpanShim.finish`` and ``SpanShim.log_kv``.
+    OpenTracing API and has to be handed to the OpenTelemetry API. Its callers
+    under ``opentelemetry.shim.opentracing_shim`` are ``SpanShim.finish``,
+    ``SpanShim.log_kv`` and ``TracerShim.start_span``.
 
     Args:
         time_seconds: A ``float`` as returned by ``time.time()``, which
@@ -60,8 +61,10 @@ def time_seconds_from_ns(time_nanoseconds):
     Returns:
         A ``float`` representing the number of seconds since the epoch, in the
         form ``time.time()`` returns. A ``float`` holds 53 bits of mantissa, so
-        a nanosecond value measured from the epoch does not survive the
-        division unchanged.
+        at the magnitude of a timestamp measured from the epoch the result can
+        only represent instants about 238 nanoseconds apart. A whole number of
+        seconds survives the division unchanged; a nanosecond value that falls
+        between two representable instants does not.
     """
 
     return time_nanoseconds / 1e9
