@@ -20,10 +20,11 @@ between the per-signal and the generic headers variable is still made once, for
 the whole variable rather than per entry, so one entry in the per-signal
 variable suppresses every entry of the generic one.
 
-Every helper takes the names of the environment variables it reads as
-arguments, since those names are what differs between the three exporters.
+Every helper takes the names of the per-signal environment variables it reads
+as arguments, since those are the names that differ between the three
+exporters, and hard-codes the name of the generic variable it falls back to.
 ``_resolve_endpoint`` takes the signal path to append as well, and
-``_build_transport`` takes three variable names rather than one.
+``_build_transport`` takes three per-signal names rather than one.
 
 None of these helpers raises on bad input, so a typo in the environment
 degrades the configuration instead of preventing the exporter from being
