@@ -81,10 +81,13 @@ class JaegerPropagator(TextMapPropagator):
         contributes its baggage entries.
 
         A malformed trace identity header is reported by returning without
-        adding a span to the context, never by raising. The header is
-        malformed when it does not split into exactly four colon-separated
-        fields, when its flags field is not hexadecimal, or when its trace id
-        or span id field is not hexadecimal or is zero.
+        adding a span to the context, never by raising. A value holding no
+        ``:`` at all is percent-decoded before it is split, so a client that
+        encoded the delimiters along with everything else is still
+        understood. The header is malformed when the value does not then
+        split into exactly four colon-separated fields, when its flags field
+        is not hexadecimal, or when its trace id or span id field is not
+        hexadecimal or is zero.
 
         Of the flags field only the sampled bit is kept, so the debug bit that
         ``inject`` writes does not survive a round trip. The parent span id
