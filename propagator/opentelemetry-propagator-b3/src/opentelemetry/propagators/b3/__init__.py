@@ -51,9 +51,9 @@ class B3MultiFormat(TextMapPropagator):
     """Propagator for the B3 HTTP multi-header format.
 
     Injection writes one header per field: ``x-b3-traceid``, ``x-b3-spanid``
-    and ``x-b3-sampled``. Extraction reads those headers but also reads the
-    single ``b3`` header of the other B3 encoding, and prefers it when both are
-    present and its value is not empty, so this class accepts a carrier written
+    and ``x-b3-sampled``. Extraction looks up the single ``b3`` header of the
+    other B3 encoding first and reads those three headers only when ``b3`` is
+    absent or its value is empty, so this class accepts a carrier written
     either way.
     ``B3SingleFormat`` inherits that extraction and overrides injection, along
     with the ``fields`` property that reports what injection writes.
