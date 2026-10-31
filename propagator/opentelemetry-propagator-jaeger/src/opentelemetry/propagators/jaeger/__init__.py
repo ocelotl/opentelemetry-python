@@ -102,7 +102,13 @@ class JaegerPropagator(TextMapPropagator):
 
         Returns:
             A ``Context`` holding the accepted baggage entries, and a
-            non-recording remote span when the trace identity header was valid.
+            non-recording remote span when the trace identity header was not
+            malformed. Not malformed is a weaker condition than
+            ``SpanContext.is_valid``, which also bounds each id by its width
+            and rejects a negative one. A header of ``-1:-2:3:1``, or one
+            whose trace id field runs past 32 hexadecimal digits, is accepted
+            here and its span is added, yet that span reports
+            ``is_valid`` as ``False`` and ``inject`` writes nothing for it.
         """
         if context is None:
             context = Context()
