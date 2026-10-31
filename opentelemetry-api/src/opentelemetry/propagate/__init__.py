@@ -19,6 +19,8 @@ Notice that these propagator classes are defined as
 ``opentelemetry_propagator`` entry points in the ``pyproject.toml`` file of
 ``opentelemetry``.
 
+See the `Propagation API Specification`_ for what a propagator has to do.
+
 Example::
 
     import flask
