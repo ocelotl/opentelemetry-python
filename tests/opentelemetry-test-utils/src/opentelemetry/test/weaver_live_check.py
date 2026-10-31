@@ -375,8 +375,9 @@ class WeaverLiveCheck:
                 # ... configure provider, emit telemetry ...
                 provider.force_flush()
 
-                # Signals weaver to stop, raises LiveCheckError listing violations
-                # if any, or returns a LiveCheckReport on success.
+                # Signals weaver to stop, returns a LiveCheckReport when weaver
+                # exits zero, and raises LiveCheckError with the violations
+                # listed in the message when it does not.
                 report = weaver.end_and_check()
             # __exit__ calls close(), which is idempotent if end_and_check() was already called
 
@@ -395,9 +396,11 @@ class WeaverLiveCheck:
     Lifecycle:
         - :meth:`start` — launches weaver and waits for it to become ready.
         - :attr:`otlp_endpoint` — gRPC OTLP endpoint to point exporters at.
-        - :meth:`end` — signals weaver to stop and always returns a
-          :class:`LiveCheckReport`.  Never raises for semconv violations; use
-          this when you want to write your own assertions.
+        - :meth:`end` — signals weaver to stop and returns the
+          :class:`LiveCheckReport` whether or not it holds violations.  Never
+          raises for semconv violations, which is why you write your own
+          assertions against it; see the method itself for the three ways it
+          raises instead of returning.
         - :meth:`end_and_check` — signals weaver to stop and raises
           :class:`LiveCheckError` with a human-readable violation list and the
           full report attached if weaver exits non-zero.  Returns a
@@ -649,8 +652,9 @@ class WeaverLiveCheck:
 
         Returns:
             A tuple of the parsed report and the exit status of the weaver
-            process. A non-zero status is how weaver reports that it found
-            violations, so it is returned rather than raised on.
+            process. The status is the one ``_shutdown`` returns and means what
+            that method documents: non-zero is any failure weaver reports,
+            usually violations. It is returned rather than raised on.
 
         Raises:
             RuntimeError: When weaver never became ready, so there is nothing
