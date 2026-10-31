@@ -1,6 +1,23 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+"""Span exporter that sends OTLP over HTTP with a protobuf body.
+
+:class:`OTLPSpanExporter` encodes a batch of finished spans as an
+``ExportTraceServiceRequest`` and posts it to a collector. It performs no
+batching of its own, so it is normally registered with
+:class:`~opentelemetry.sdk.trace.export.BatchSpanProcessor`, which decides when
+a batch is complete and calls :meth:`OTLPSpanExporter.export` with it.
+
+``DEFAULT_TRACES_EXPORT_PATH`` is the path appended to a base endpoint that
+carries no signal path of its own. The other module-level ``DEFAULT_`` names
+are kept for callers that import them. The resolution code reads its own
+fallbacks from ``opentelemetry.exporter.otlp.proto.http._common``, so rebinding
+one of those other three names does not change what an exporter does.
+Rebinding ``DEFAULT_TRACES_EXPORT_PATH`` does, because the constructor passes
+that name itself to the resolution code every time an exporter is built.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -64,6 +81,66 @@ DEFAULT_TIMEOUT = 10  # in seconds
 
 
 class OTLPSpanExporter(SpanExporter):
+    """OTLP HTTP span exporter.
+
+    ``endpoint``, the three TLS file paths, ``timeout`` and ``compression`` may
+    each be left unset, in which case the value is resolved from the
+    environment: first the per-signal ``OTEL_EXPORTER_OTLP_TRACES_*`` variable,
+    then the signal-independent ``OTEL_EXPORTER_OTLP_*`` one, then a built-in
+    fallback. An argument given here overrides both variables. ``headers`` is
+    merged key by key over the headers of whichever one of the two variables is
+    used, but the two variables do not merge with each other: the per-signal one
+    replaces the signal-independent one entirely when it is set.
+
+    ``max_request_size`` and ``meter_provider`` have no environment variable of
+    either kind, so they can only be set here. ``session`` reverses the
+    precedence above, as its entry explains.
+
+    Args:
+        endpoint: Full URL of the OTLP/HTTP signal endpoint, including the signal
+            path. Example: ``http://collector:4318/v1/traces``. For a base URL without a
+            signal path, set the ``OTEL_EXPORTER_OTLP_ENDPOINT`` environment variable.
+        certificate_file: Path to the CA certificate file for TLS.
+        client_key_file: Path to the client key file for mTLS. It is used only
+            together with ``client_certificate_file``.
+        client_certificate_file: Path to the client certificate file for mTLS.
+        headers: Headers to send with each export request. They are merged key
+            by key over the headers parsed from the environment, which are in
+            turn merged over the ``Content-Type`` and ``User-Agent`` this
+            exporter always sets. A header the environment supplies and this
+            argument does not is therefore still sent. Keys are lowercased
+            before merging, so a key given in a different case replaces the
+            earlier value rather than adding a second header.
+        timeout: Timeout in seconds for each export request. It covers the
+            retries and the waits between them, not one HTTP attempt.
+        compression: Compression to use; one of none, gzip, deflate.
+        session: Requests session to use at export. When it is not given and a
+            credential provider is configured, the session that provider
+            returns is used instead. The provider is named by the
+            signal-independent
+            ``OTEL_PYTHON_EXPORTER_OTLP_HTTP_CREDENTIAL_PROVIDER``, and only if
+            that is unset by the per-signal
+            ``OTEL_PYTHON_EXPORTER_OTLP_HTTP_TRACES_CREDENTIAL_PROVIDER``,
+            which is the reverse of the precedence every other setting follows.
+        max_request_size: Maximum size in bytes of a serialized request,
+            measured before compression. A request exceeding this size is
+            dropped before being sent. Defaults to 64 MiB; a value of 0 (or
+            any non-positive value) disables the limit. Batch processors
+            group spans by count rather than serialized size, so a batch
+            whose serialized request exceeds this limit is dropped as a
+            whole and recorded as a failed export; reduce the processor's
+            ``max_export_batch_size`` (or raise/disable this limit) if
+            batches may approach it.
+        meter_provider: MeterProvider used for the exporter's own metrics.
+            Those metrics are only recorded when
+            ``OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED`` is set to ``true``.
+        _transport: Private, and shown here only because it appears in the
+            second overload above. It replaces the transport that would
+            otherwise be built, which leaves the three TLS file paths,
+            ``session`` and the credential provider unused. The tests pass it
+            to intercept requests. It is not part of the public API.
+    """
+
     @overload
     def __init__(
         self,
@@ -112,29 +189,13 @@ class OTLPSpanExporter(SpanExporter):
         meter_provider: MeterProvider | None = None,
         _transport: BaseHTTPTransport | None = None,
     ) -> None:
-        """OTLP HTTP span exporter.
+        """Resolve the configuration and open the HTTP client.
 
-        Args:
-            endpoint: Full URL of the OTLP/HTTP signal endpoint, including the signal
-                path. Example: ``http://collector:4318/v1/traces``. For a base URL without a
-                signal path, set the ``OTEL_EXPORTER_OTLP_ENDPOINT`` environment variable.
-            certificate_file: Path to the CA certificate file for TLS.
-            client_key_file: Path to the client key file for mTLS.
-            client_certificate_file: Path to the client certificate file for mTLS.
-            headers: Headers to send with each export request.
-            timeout: Timeout in seconds for each export request.
-            compression: Compression to use; one of none, gzip, deflate.
-            session: Requests session to use at export.
-            max_request_size: Maximum size in bytes of a serialized request,
-                measured before compression. A request exceeding this size is
-                dropped before being sent. Defaults to 64 MiB; a value of 0 (or
-                any non-positive value) disables the limit. Batch processors
-                group spans by count rather than serialized size, so a batch
-                whose serialized request exceeds this limit is dropped as a
-                whole and recorded as a failed export; reduce the processor's
-                ``max_export_batch_size`` (or raise/disable this limit) if
-                batches may approach it.
-            meter_provider: MeterProvider used for the exporter's own metrics.
+        The parameters are documented on the class. ``_transport`` is private:
+        it replaces the transport that would otherwise be built, and the tests
+        use it to intercept requests. When it is given, the three TLS file
+        paths, ``session`` and the credential provider are all unused, which is
+        why the overload that accepts it types the TLS paths as None.
         """
         self._endpoint = endpoint or _resolve_endpoint(OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, DEFAULT_TRACES_EXPORT_PATH)
         self._compression = _normalize_compression(compression) or _resolve_compression(
@@ -170,6 +231,27 @@ class OTLPSpanExporter(SpanExporter):
         )
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        """Encode a batch of spans and post it to the collector.
+
+        The call blocks until the collector answers, the configured timeout
+        expires or the retries are exhausted. Transient failures are retried
+        inside the HTTP client, so a single call may issue several requests.
+
+        Args:
+            spans: The finished spans to send. They are sent as one request,
+                whatever their number, since this exporter does no batching of
+                its own.
+
+        Returns:
+            ``SpanExportResult.SUCCESS`` when the collector accepted the
+            request. ``SpanExportResult.FAILURE`` when the exporter has already
+            been shut down, when the batch could not be encoded, when its
+            serialized size exceeds ``max_request_size``, or when the request
+            failed and could not be retried within the timeout. The batch is
+            dropped in every failure case; nothing is kept for a later attempt.
+            No exception is raised, because a span processor calls this on its
+            own thread.
+        """
         if self._shutdown:
             _logger.warning("Exporter already shutdown, ignoring batch")
             return SpanExportResult.FAILURE
@@ -208,6 +290,12 @@ class OTLPSpanExporter(SpanExporter):
         return SpanExportResult.SUCCESS
 
     def shutdown(self):
+        """Close the HTTP client and reject any further export.
+
+        An export already in progress on another thread is interrupted at its
+        next retry, which abandons the batch it was sending. A second call logs
+        a warning and does nothing, so shutting down twice is harmless.
+        """
         if self._shutdown:
             _logger.warning("Exporter already shutdown, ignoring call")
             return
@@ -215,5 +303,13 @@ class OTLPSpanExporter(SpanExporter):
         self._client.shutdown()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
-        """Nothing is buffered in this exporter, so this method does nothing."""
+        """Nothing is buffered in this exporter, so this method does nothing.
+
+        Args:
+            timeout_millis: Accepted because :class:`~opentelemetry.sdk.trace.export.SpanExporter`
+                declares it, and ignored, since there is nothing to wait for.
+
+        Returns:
+            True, always.
+        """
         return True
