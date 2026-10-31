@@ -60,7 +60,8 @@ def encode_logs(
         ``batch`` gives a request with no resource logs.
 
     Raises:
-        TypeError: if the body of a record is of a type OTLP has no
+        TypeError: if the body of a record, or any value nested inside a
+            mapping or a sequence body, is of a type OTLP has no
             representation for. Unlike an attribute of such a type, which is
             dropped with a log message, a body of such a type fails the whole
             batch.
@@ -86,7 +87,8 @@ def _encode_log(readable_log_record: ReadableLogRecord) -> JSONLogRecord:
         and is zero when the attributes were never bounded.
 
     Raises:
-        TypeError: if the body of the record is of a type OTLP has no
+        TypeError: if the body of the record, or any value nested inside a
+            mapping or a sequence body, is of a type OTLP has no
             representation for.
     """
     return JSONLogRecord(
@@ -129,7 +131,8 @@ def _encode_resource_logs(
         unset.
 
     Raises:
-        TypeError: if the body of a record is of a type OTLP has no
+        TypeError: if the body of a record, or any value nested inside a
+            mapping or a sequence body, is of a type OTLP has no
             representation for.
     """
     sdk_resource_logs = defaultdict(lambda: defaultdict(list))
