@@ -103,6 +103,10 @@ def _substitute_env_in_yaml_node(
         visited: Ids of nodes already processed in this traversal. Callers pass
             nothing; the walker creates and threads one set through the whole
             tree.
+
+    Raises:
+        ConfigurationError: If any scalar holds a malformed substitution
+            reference. ``substitute_env_vars`` raises it.
     """
     # Every anchor/alias pair shares one composed node, so the same node is
     # reached once per reference to it. Each node must be substituted exactly

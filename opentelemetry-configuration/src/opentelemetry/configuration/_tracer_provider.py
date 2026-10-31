@@ -250,12 +250,13 @@ def _create_otlp_grpc_span_exporter(
             the exporter expects. Its ``tls`` block is not read at all, so a
             configuration that sets ``ca_file``, ``cert_file``, ``key_file``
             or ``insecure`` gets no effect from them. The exporter
-            decides for itself: ``OTEL_EXPORTER_OTLP_TRACES_INSECURE``, then
-            ``OTEL_EXPORTER_OTLP_INSECURE``, then the endpoint scheme for
-            the channel, and the
+            decides for itself. An ``https`` endpoint forces a secure
+            channel outright, overriding both variables; for any other
+            scheme ``OTEL_EXPORTER_OTLP_TRACES_INSECURE`` decides, then
+            ``OTEL_EXPORTER_OTLP_INSECURE``, then an ``http`` endpoint. The
+            three file fields come from the
             ``OTEL_EXPORTER_OTLP_[TRACES_]CERTIFICATE``, ``..._CLIENT_KEY``
-            and ``..._CLIENT_CERTIFICATE`` family for the three file
-            fields.
+            and ``..._CLIENT_CERTIFICATE`` family.
 
     Returns:
         An ``OTLPSpanExporter`` from the gRPC distribution.
