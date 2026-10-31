@@ -867,10 +867,9 @@ def configure_tracer_provider(
         ValueError: If ``OTEL_ATTRIBUTE_COUNT_LIMIT`` is set to something
             that is not a non-negative integer. ``_create_span_limits``
             leaves ``max_attributes`` unset, so the ``SpanLimits``
-            constructor reads that variable.
-
-        The global is left as it was for every one of these, because
-        ``create_tracer_provider`` builds the provider before it is set.
+            constructor reads that variable. The global is left as it was
+            for every one of these, because ``create_tracer_provider``
+            builds the provider before it is set.
     """
     if config is None:
         return

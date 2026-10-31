@@ -1051,11 +1051,10 @@ def configure_meter_provider(
         OSError: If a ``pull`` reader on ``prometheus/development`` cannot
             bind the configured port.
         Exception: A bare one, from the ``View`` constructor, for a view
-            whose selector or stream the SDK rejects.
-
-        The global is left as it was for every one of these, because
-        ``create_meter_provider`` builds the provider before it is set. A
-        Prometheus listener that did start is not stopped.
+            whose selector or stream the SDK rejects. The global is left as
+            it was for every one of these, because
+            ``create_meter_provider`` builds the provider before it is set.
+            A Prometheus listener that did start is not stopped.
     """
     if config is None:
         return

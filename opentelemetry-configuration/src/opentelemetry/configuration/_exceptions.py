@@ -4,11 +4,13 @@
 """Exceptions raised by declarative configuration.
 
 Nearly every error this package raises itself is a
-``ConfigurationError`` or a subclass of it. Two places raise something
-else: ``_resource._coerce_attribute_value`` lets the ``ValueError`` from
+``ConfigurationError`` or a subclass of it. Three places raise something
+else. ``_resource._coerce_attribute_value`` lets the ``ValueError`` from
 ``int()`` or ``float()`` out when an attribute value does not fit its
-declared type, and ``file._loader._dict_to_model`` re-raises as
-``TypeError`` a configuration structure the generated models reject.
+declared type. ``_conversion._dict_to_dataclass`` raises ``TypeError``
+for a class that is not a dataclass, and lets the one from the dataclass
+constructor out. ``file._loader._dict_to_model`` re-raises that second
+``TypeError`` with a message of its own.
 
 That is still not the whole set a caller sees, because an SDK
 constructor or a plugin reached through the configuration raises its own

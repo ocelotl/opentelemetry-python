@@ -622,9 +622,9 @@ def configure_logger_provider(
             not installed.
         TypeError: If a plugin component's constructor does not accept the
             keys of the nested configuration mapping splatted into it.
-
-        The global is left as it was for every one of these, because
-        ``create_logger_provider`` builds the provider before it is set.
+            The global is left as it was for every one of these, because
+            ``create_logger_provider`` builds the provider before it is
+            set.
     """
     if config is None:
         return
