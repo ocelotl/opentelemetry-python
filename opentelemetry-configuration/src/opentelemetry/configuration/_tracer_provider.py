@@ -401,6 +401,8 @@ def _create_span_processor(
             if the exporter cannot be built.
         MissingDependencyError: If the selected exporter's distribution is
             not installed.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
     """
     if config.batch is not None:
         exporter = _create_span_exporter(config.batch.exporter)

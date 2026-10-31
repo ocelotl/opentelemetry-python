@@ -351,6 +351,8 @@ def _create_batch_log_record_processor(
             be built.
         MissingDependencyError: If the exporter's distribution is not
             installed.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
     """
     exporter = _create_log_record_exporter(config.exporter)
     schedule_delay = config.schedule_delay if config.schedule_delay is not None else _DEFAULT_SCHEDULE_DELAY_MILLIS
@@ -386,6 +388,8 @@ def _create_simple_log_record_processor(
             be built.
         MissingDependencyError: If the exporter's distribution is not
             installed.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
     """
     exporter = _create_log_record_exporter(config.exporter)
     return SimpleLogRecordProcessor(exporter)
@@ -410,6 +414,8 @@ def _create_log_record_processor(
             cannot be built.
         MissingDependencyError: If the selected exporter's distribution is
             not installed.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
     """
     if config.batch is not None:
         return _create_batch_log_record_processor(config.batch)

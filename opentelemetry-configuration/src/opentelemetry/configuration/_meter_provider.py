@@ -692,6 +692,8 @@ def _create_periodic_metric_reader(
             be built.
         MissingDependencyError: If the exporter's distribution is not
             installed.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
     """
     exporter = _create_push_metric_exporter(config.exporter)
     interval = config.interval if config.interval is not None else _DEFAULT_EXPORT_INTERVAL_MILLIS
@@ -805,6 +807,8 @@ def _create_pull_metric_exporter(
         OSError: If the Prometheus listener cannot bind the configured
             port. ``_create_prometheus_metric_reader`` starts it before
             returning, so the failure reaches this caller.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
     """
     if config.prometheus_development is not None:
         return _create_prometheus_metric_reader(config.prometheus_development, cardinality_limits)
@@ -845,6 +849,8 @@ def _create_pull_metric_reader(
             not installed.
         OSError: If the exporter block is ``prometheus/development`` and
             its listener cannot bind the configured port.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
     """
     if config.producers:
         _logger.warning(
@@ -873,6 +879,8 @@ def _create_metric_reader(config: MetricReaderConfig) -> MetricReader:
         OSError: If the reader is a ``pull`` reader on
             ``prometheus/development`` and its listener cannot bind the
             configured port.
+        TypeError: If a plugin exporter's constructor does not accept the
+            keys of the nested configuration mapping splatted into it.
     """
     if config.periodic is not None:
         return _create_periodic_metric_reader(config.periodic)
