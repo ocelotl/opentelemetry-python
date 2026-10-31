@@ -114,9 +114,10 @@ class Instrument(ABC):
 
         Args:
             name: The candidate instrument name.
-            unit: The candidate unit. ``None`` is treated as the empty string.
-            description: The candidate description. ``None`` is treated as the
-                empty string.
+            unit: The candidate unit. A ``None`` reaching this method despite
+                the annotation is treated as the empty string.
+            description: The candidate description. A ``None`` reaching this
+                method despite the annotation is treated as the empty string.
 
         Returns:
             A dict with the keys ``"name"``, ``"unit"`` and ``"description"``.
