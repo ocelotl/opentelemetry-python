@@ -24,26 +24,32 @@ Example::
     import flask
     import requests
     from opentelemetry import propagate
+    from opentelemetry.propagators.textmap import Getter, Setter
 
 
     PROPAGATOR = propagate.get_global_textmap()
 
 
-    def get_header_from_flask_request(request, key):
-        return request.headers.get_all(key)
+    class FlaskGetter(Getter[flask.Request]):
+        def get(self, carrier: flask.Request, key: str) -> list[str] | None:
+            return carrier.headers.get_all(key) or None
+
+        def keys(self, carrier: flask.Request) -> list[str]:
+            return list(carrier.headers.keys())
 
 
-    def set_header_into_requests_request(request: requests.Request, key: str, value: str):
-        request.headers[key] = value
+    class RequestsSetter(Setter[requests.Request]):
+        def set(self, carrier: requests.Request, key: str, value: str) -> None:
+            carrier.headers[key] = value
 
 
-    def example_route():
-        context = PROPAGATOR.extract(get_header_from_flask_request, flask.request)
+    def example_route() -> None:
+        context = PROPAGATOR.extract(flask.request, getter=FlaskGetter())
         request_to_downstream = requests.Request("GET", "http://httpbin.org/get")
         PROPAGATOR.inject(
-            set_header_into_requests_request,
             request_to_downstream,
             context=context,
+            setter=RequestsSetter(),
         )
         session = requests.Session()
         session.send(request_to_downstream.prepare())
