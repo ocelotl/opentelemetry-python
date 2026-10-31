@@ -13,11 +13,13 @@ to the server, from the moment the exporter starts that delivery to the moment
 it succeeds or gives up, so an exporter that retries holds the ``with`` body
 open across every retry and every backoff wait between them, and each
 instrument is recorded once for the payload rather than once per request. What
-else falls inside the ``with`` body is up to the exporter: the span and log
-exporters serialize inside it, while ``OTLPMetricExporter`` of
-``opentelemetry-exporter-otlp-proto-http`` encodes and splits first and then
-opens one export operation per sub-batch. The instrument names depend on the
-signal, so a span exporter records ``otel.sdk.exporter.span.inflight`` and
+else falls inside the ``with`` body is up to the exporter: every OTLP exporter
+that records these instruments serializes its payload inside it, and
+``OTLPMetricExporter`` of ``opentelemetry-exporter-otlp-proto-http``
+additionally builds the protobuf request and splits it into sub-batches before
+opening anything, then opens one export operation per sub-batch. The
+instrument names depend on the signal, so a span exporter records
+``otel.sdk.exporter.span.inflight`` and
 ``otel.sdk.exporter.span.exported`` while a metric exporter records
 ``otel.sdk.exporter.metric_data_point.inflight`` and
 ``otel.sdk.exporter.metric_data_point.exported``. The duration histogram is

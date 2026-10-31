@@ -9,8 +9,8 @@ payload over HTTP and retries it when the failure is transient,
 ``_aggregation`` turns the OTLP metric environment variables into the
 temporality and aggregation preferences an exporter passes to the SDK, and
 ``_exporter_metrics`` records how much telemetry an exporter submitted and how
-long each export operation took, counting every retry of one batch as part of
-the same export operation.
+long each export operation took, counting every retry of one payload as part
+of the same export operation.
 
 Every name in this package is internal to the OTLP exporters and is not covered
 by the backward compatibility policy of the project, so an application that
