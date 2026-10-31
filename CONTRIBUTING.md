@@ -157,11 +157,17 @@ needs a `Returns:` or `Yields:` section. Constructor parameters are documented o
 docstring rather than on `__init__`, because `docs/conf.py` does not set `special-members`, so an
 `__init__` docstring is never rendered in the API reference.
 
-To check whether your PR leaves a public symbol less documented than `main` does, run
-`tox -e docstring-check`. It compares the documentation gaps at your branch against the gaps at
-`main` and fails only on the ones your branch introduces, so the repository can close the gaps it
-already has at its own pace while no PR adds a new one. If a gap is deliberate, the PR will be
-labeled with `Approve Docstring check` so that this check is not run.
+Run `tox -e docstring-check` to list every public symbol that does not meet those requirements.
+The check is absolute: it reports every gap in the public API, not only the gaps your PR adds, so a
+PR that adds an undocumented symbol fails and so does a PR that changes nothing while an existing
+symbol stays undocumented.
+
+Run `tox -e docstring-check -- --against main` to see only the gaps your working tree has and that
+`main` does not. That narrows a long report down to your own share of it. It is a reading aid; the
+check that gates CI is the absolute run.
+
+If a gap is deliberate, the PR will be labeled with `Approve Docstring check` so that this check is
+not run.
 
 Also, we try to keep our console output as clean as possible. Most of the time this means catching expected log messages in the test cases:
 
