@@ -511,9 +511,13 @@ def _split_metrics_data(
     Args:
         metrics_data: metrics object based on HTTP protocol buffer definition
         max_export_batch_size: Largest number of data points to put in one
-            request. A request that is already smaller than this is yielded
-            unchanged apart from the copying. Passing 0 or None yields nothing
-            at all, because the generator returns before its first ``yield``.
+            request. A request holding at least one data point and fewer than
+            this is yielded as a single rebuilt copy, carrying the resource,
+            the scope and each metric's name, description, unit and data
+            points, and nothing else the original metric held. A request
+            holding no data point at all yields nothing. Passing 0 or None
+            yields nothing at all either, because the generator returns before
+            its first ``yield``.
 
     Yields:
         One ``ExportMetricsServiceRequest`` per batch, each built from new
