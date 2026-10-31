@@ -22,6 +22,12 @@ IpInput = str | int | None
 
 An address may be given as a string such as ``"192.168.0.1"``, as the integer
 the address packs into, or as ``None`` when the address is unknown.
+
+``ipaddress.ip_address`` reads an integer by its magnitude rather than by the
+attribute it is assigned to, so every integer below ``2**32`` parses as IPv4.
+An IPv6 address whose integer falls below that, such as ``::1``, which packs
+into 1, is rejected when it is given to ``ipv6``, and has to be given as a
+string instead.
 """
 
 
@@ -127,15 +133,17 @@ class NodeEndpoint:
         """Parse and store an IPv6 address.
 
         Args:
-            address: The address, as a string, as the integer it packs into,
-                or ``None`` to record that no IPv6 address is known.
+            address: The address, as a string, as the integer it packs into
+                when that integer is ``2**32`` or greater, or ``None`` to
+                record that no IPv6 address is known.
 
         Raises:
             ValueError: If ``address`` parses as an IP address of a family
-                other than IPv6, which in practice means an IPv4 address was
-                assigned to the IPv6 attribute. ``ipaddress.ip_address``
-                raises its own ``ValueError`` first when ``address`` is not an
-                IP address at all.
+                other than IPv6, which happens for an IPv4 address and for an
+                IPv6 address given as an integer below ``2**32``, since
+                ``ipaddress.ip_address`` reads such an integer as IPv4.
+                ``ipaddress.ip_address`` raises its own ``ValueError`` first
+                when ``address`` is not an IP address at all.
         """
         if address is None:
             self._ipv6 = None

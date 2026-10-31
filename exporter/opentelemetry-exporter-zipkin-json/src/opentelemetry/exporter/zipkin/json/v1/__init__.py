@@ -47,10 +47,12 @@ class V1Encoder(Encoder):
             tags.
 
         Raises:
-            TypeError: If ``max_tag_value_length`` is ``None``, which is what
-                ``ZipkinExporter`` passes when its own
-                ``max_tag_value_length`` argument is left unset, because the
-                comparison against zero has no meaning for ``None``.
+            TypeError: If ``max_tag_value_length`` is ``None`` and the span
+                contributes at least one tag whose value is a string, because
+                the comparison against zero has no meaning for ``None``. A
+                span that contributes no such tag never reaches the
+                comparison. ``ZipkinExporter`` passes ``None`` whenever its
+                own ``max_tag_value_length`` argument is left unset.
         """
         binary_annotations = []
         for tag_key, tag_value in self._extract_tags_from_span(span).items():

@@ -125,9 +125,9 @@ class ZipkinExporter(SpanExporter):
 
     Raises:
         ValueError: If ``local_node_ipv4`` or ``local_node_ipv6`` does not
-            parse as an address of the matching family, or if
-            :envvar:`OTEL_EXPORTER_ZIPKIN_TIMEOUT` is set to a value that is
-            not a decimal integer.
+            parse as an address of the matching family, or if ``timeout`` is
+            ``None`` or zero and :envvar:`OTEL_EXPORTER_ZIPKIN_TIMEOUT` is
+            set to a value that is not a decimal integer.
         KeyError: If the resource of the globally registered tracer provider
             carries no ``service.name`` attribute, which ``NodeEndpoint``
             reads with a plain subscript.
