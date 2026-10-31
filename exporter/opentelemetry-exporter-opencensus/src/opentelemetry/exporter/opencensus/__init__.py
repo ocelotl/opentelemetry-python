@@ -20,7 +20,9 @@ those two modules names what its own conversion drops.
 An application need not import the class at all. The distribution registers
 it under the entry point group ``opentelemetry_traces_exporter`` with the
 name ``opencensus``, so setting ``OTEL_TRACES_EXPORTER=opencensus`` makes
-``opentelemetry.sdk._configuration`` build one with no arguments.
+``opentelemetry.sdk._configuration`` build one. It is built with no
+arguments, and so on the default endpoint over an insecure channel, unless
+the argument map that ``_init_tracing`` takes supplies some.
 
 The receiver endpoint defaults to ``localhost:55678`` and the channel opened
 to it is insecure, so a collector reached over an untrusted network needs a
