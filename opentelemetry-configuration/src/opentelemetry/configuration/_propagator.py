@@ -55,9 +55,10 @@ def _propagators_from_textmap_config(
     and unknown plugin names from additional_properties are loaded via the
     ``opentelemetry_propagator`` entry point group.
 
-    One entry may select more than one propagator, since the schema allows
-    several fields to be set on the same block, and all of them are
-    returned.
+    The schema permits one propagator per entry, with ``minProperties`` and
+    ``maxProperties`` both 1 on ``TextMapPropagator``. If several fields are
+    set, which is possible only when schema validation was bypassed, every
+    one of them is returned.
 
     Args:
         config: One entry of the ``composite`` list from the propagator

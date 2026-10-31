@@ -348,10 +348,12 @@ def _validate_schema(data: dict) -> None:
             mapping by ``load_config_file``.
 
     Raises:
-        ConfigurationError: If the data does not conform to the schema. Only
-            the first violation ``jsonschema`` reports is named, with the
-            path to the offending node when it has one. Also raised when the
-            vendored schema is itself invalid, which can only happen if
+        ConfigurationError: If the data does not conform to the schema.
+            Only one violation is named: ``jsonschema.validate`` picks it
+            with ``best_match``, so it is the one that library judges most
+            relevant rather than the first in document order. The path to
+            the offending node is included when it has one. Also raised when
+            the vendored schema is itself invalid, which can only happen if
             ``schema.json`` was edited by hand.
     """
     try:
