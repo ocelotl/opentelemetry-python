@@ -248,9 +248,10 @@ class B3MultiFormat(TextMapPropagator):
         reuses a request object, reads the names from here instead of hard
         coding them. ``b3`` and ``x-b3-flags`` are absent because ``inject``
         never writes either, even though ``extract`` reads both. A caller
-        reusing a carrier that already holds a ``b3`` header has to delete that
-        header as well, because ``extract`` at the next hop prefers a non-empty
-        ``b3`` value over the three names returned here.
+        reusing a carrier has to delete those two names as well. ``extract`` at
+        the next hop prefers a non-empty ``b3`` value over the three names
+        returned here, and treats ``x-b3-flags`` of ``1`` as turning sampling
+        on whatever ``x-b3-sampled`` says.
 
         Returns:
             The three multi-header names, ``x-b3-traceid``, ``x-b3-spanid`` and
