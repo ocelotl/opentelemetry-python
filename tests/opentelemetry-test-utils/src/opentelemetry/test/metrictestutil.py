@@ -7,8 +7,10 @@ A metrics exporter is tested by handing it a ``Metric`` and checking what it
 produces, which means a test needs a ``Metric`` with a known shape. Building one
 by hand takes a nested ``Metric``, data and data point construction every time,
 so these functions fill in the parts a test does not care about: the timestamps
-are fixed constants rather than the current time, the temporality is always
-cumulative, and the description and unit default to ``"foo"`` and ``"s"``.
+are fixed constants rather than the current time, except the gauge start
+timestamp, which is ``None``; the temporality is cumulative wherever the data
+type carries one, which a ``Gauge`` does not; and the description and unit
+default to ``"foo"`` and ``"s"``.
 
 Every name here is private, because the exact values are chosen to suit the
 exporter tests in this repository and are changed whenever those tests need

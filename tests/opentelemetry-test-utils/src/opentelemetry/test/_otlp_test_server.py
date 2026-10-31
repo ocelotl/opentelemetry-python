@@ -317,7 +317,10 @@ class OtlpProtoTestServer:
     ``get_span``, ``wait_for_span`` and their metric and log counterparts, or by
     taking whatever has arrived, with ``drain_spans``, ``drain_metrics`` and
     ``drain_log_records``. Every read removes what it returns, so an item is
-    seen once.
+    seen once. A waiting read also removes and discards what it passes over: a
+    ``wait_for_*`` call drops every non-matching item it takes off the queue,
+    and a ``get_*`` call that gives up drops the items it had already collected
+    along with raising ``TimeoutError``.
 
     Requests are served from a single daemon thread, so exports are decoded one
     at a time in the order they arrive.
