@@ -8,9 +8,12 @@
 received, following https://www.w3.org/TR/baggage/.
 
 The format caps the size of the header, of each list-member, and the number of
-list-members. An entry that breaks a limit, holds a non-ASCII character or
-fails validation is dropped with a warning rather than raising, so oversized
-baggage degrades the telemetry instead of the request.
+list-members. Nothing here raises, so oversized baggage degrades the telemetry
+instead of the request. Which entries go is not uniform: an entry that holds a
+non-ASCII character, fails validation or exceeds the per-entry limit is dropped
+on its own with a warning, while exceeding the entry count or the total header
+length stops processing there and discards every remaining entry, including
+entries that would have fitted.
 """
 
 from collections.abc import Iterable, Iterator, Mapping
