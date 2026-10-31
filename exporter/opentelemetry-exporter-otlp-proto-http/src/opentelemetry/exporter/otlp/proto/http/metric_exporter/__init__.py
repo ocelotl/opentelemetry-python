@@ -513,11 +513,13 @@ def _split_metrics_data(
         max_export_batch_size: Largest number of data points to put in one
             request. A request holding at least one data point and fewer than
             this is yielded as a single rebuilt copy, carrying the resource,
-            the scope and each metric's name, description, unit and data
-            points, and nothing else the original metric held. A request
-            holding no data point at all yields nothing. Passing 0 or None
-            yields nothing at all either, because the generator returns before
-            its first ``yield``.
+            the scope, their schema URLs, and each metric's name, description,
+            unit and data points, plus its aggregation temporality and its
+            monotonicity where the metric type has them. The one field not
+            carried over is ``Metric.metadata``. A request holding no data
+            point at all yields nothing. Passing 0 or None yields nothing at
+            all either, because the generator returns before its first
+            ``yield``.
 
     Yields:
         One ``ExportMetricsServiceRequest`` per batch, each built from new
