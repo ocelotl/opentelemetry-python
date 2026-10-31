@@ -149,6 +149,10 @@ class SpanContextShim(SpanContext):
     """
 
     def __init__(self, otel_context: OtelSpanContext):
+        """Initializes a :class:`SpanContextShim`.
+
+        The parameters are documented on the class.
+        """
         self._otel_context = otel_context
         # Context is being used here since it must be immutable.
         self._baggage = Context()
@@ -166,7 +170,24 @@ class SpanContextShim(SpanContext):
 
     @property
     def baggage(self) -> Context:
-        """Returns the ``baggage`` associated with this object"""
+        """Returns the ``baggage`` associated with this object.
+
+        The baggage is stored in an :class:`opentelemetry.context.Context`
+        because that type is immutable: :meth:`SpanShim.set_baggage_item`
+        replaces this attribute with a new context rather than modifying the
+        existing one. The context is private to this
+        :class:`SpanContextShim` and is never attached, so reading it does not
+        go through :func:`opentelemetry.context.get_current`.
+
+        Returns:
+            An :class:`opentelemetry.context.Context` holding the OpenTracing
+            baggage items set through :meth:`SpanShim.set_baggage_item` on the
+            :class:`SpanShim` that owns this :class:`SpanContextShim`. It is
+            empty when no baggage item was set, and it stays empty for a
+            :class:`SpanContextShim` produced by :meth:`TracerShim.extract`,
+            because the shim does not carry baggage across a propagation
+            boundary.
+        """
 
         return self._baggage
 
@@ -182,6 +203,10 @@ class SpanShim(Span):
     """
 
     def __init__(self, tracer, context: SpanContextShim, span):
+        """Initializes a :class:`SpanShim`.
+
+        The parameters are documented on the class.
+        """
         super().__init__(tracer, context)
         self._otel_span = span
 
@@ -251,12 +276,12 @@ class SpanShim(Span):
             The OpenTracing API defines the values of *key_values* to be of any
             type. However, the OpenTelemetry API requires that the values be
             any one of the types defined in
-            ``opentelemetry.trace.util.Attributes`` therefore, only these types
+            ``opentelemetry.util.types.AnyValue`` therefore, only these types
             are supported as values.
 
         Args:
             key_values: A dictionary as specified in
-                ``opentelemetry.trace.util.Attributes``.
+                ``opentelemetry.util.types.Attributes``.
             timestamp: Timestamp of the OpenTelemetry event, will be generated
                 automatically if omitted.
 
@@ -275,19 +300,68 @@ class SpanShim(Span):
 
     @deprecated("This method is deprecated in favor of log_kv")
     def log(self, **kwargs):
+        """Logs an event for the wrapped OpenTelemetry span.
+
+        Deprecated by the OpenTracing API in favour of :meth:`log_kv`, and
+        kept here only so that already instrumented code keeps working. The
+        OpenTracing base class implementation puts the ``event`` and
+        ``payload`` keyword arguments into a dictionary, and passes that
+        dictionary and the ``timestamp`` keyword argument as the two arguments
+        of :meth:`log_kv`, so an event reaches the OpenTelemetry span through
+        the same path as a direct call to :meth:`log_kv`. Any other keyword
+        argument is discarded without warning.
+
+        Unlike :meth:`opentracing.Span.log`, this override discards what
+        :meth:`log_kv` returns and returns `None`, so a call to it cannot be
+        chained the way a call to :meth:`log_kv` can.
+
+        Args:
+            kwargs: The keyword arguments accepted by
+                :meth:`opentracing.Span.log`, which are ``event``,
+                ``payload`` and ``timestamp``.
+        """
         super().log(**kwargs)
 
     @deprecated("This method is deprecated in favor of log_kv")
     def log_event(self, event, payload=None):
+        """Logs an event for the wrapped OpenTelemetry span.
+
+        Deprecated by the OpenTracing API in favour of :meth:`log_kv`, and
+        kept here only so that already instrumented code keeps working. The
+        OpenTracing base class implementation builds a dictionary from the
+        arguments and calls :meth:`log_kv` with it, which records an
+        OpenTelemetry event named after *event*.
+
+        Unlike :meth:`opentracing.Span.log_event`, this override discards what
+        :meth:`log_kv` returns and returns `None`, so a call to it cannot be
+        chained the way a call to :meth:`log_kv` can.
+
+        Args:
+            event: The name of the event, stored under the ``event`` key of
+                the dictionary passed to :meth:`log_kv`.
+            payload: An arbitrary value stored under the ``payload`` key of
+                the same dictionary. When it is `None` the key is left out
+                altogether. A value whose type is not one of those listed in
+                ``opentelemetry.util.types.AnyValue`` is replaced by the
+                OpenTelemetry span, with its ``str()`` when the type defines
+                ``__str__`` or ``__repr__`` and with ``None`` otherwise. The
+                ``payload`` key itself is kept either way.
+        """
         super().log_event(event, payload=payload)
 
     def set_baggage_item(self, key: str, value: str):
         """Stores a Baggage item in the span as a key/value
         pair.
 
+        The item is stored in the :class:`SpanContextShim` of this
+        :class:`SpanShim` and nowhere else. It is not written into the current
+        OpenTelemetry context, so :func:`opentelemetry.baggage.get_all` does
+        not see it and :meth:`TracerShim.inject` does not propagate it to
+        another service.
+
         Args:
-            key: A tag key.
-            value: A tag value.
+            key: A baggage key.
+            value: A baggage value.
         """
         # pylint: disable=protected-access
         self._context._baggage = set_baggage(key, value, context=self._context._baggage)
@@ -295,10 +369,16 @@ class SpanShim(Span):
     def get_baggage_item(self, key: str) -> object | None:
         """Retrieves value of the baggage item with the given key.
 
+        Only items stored through :meth:`set_baggage_item` on this same
+        :class:`SpanShim` are visible here. Baggage carried in the current
+        OpenTelemetry context is not consulted.
+
         Args:
-            key: A tag key.
+            key: A baggage key.
+
         Returns:
-            Returns this :class:`SpanShim` instance to allow call chaining.
+            The value stored under *key* by :meth:`set_baggage_item`, or
+            `None` when no item was stored under that key.
         """
         # pylint: disable=protected-access
         return get_baggage(key, context=self._context._baggage)
@@ -341,6 +421,27 @@ class ScopeShim(Scope):
     """
 
     def __init__(self, manager: ScopeManagerShim, span: SpanShim, span_cm=None):
+        """Initializes a :class:`ScopeShim` and records it as the active one.
+
+        The parameters are documented on the class. Creating a
+        :class:`ScopeShim` attaches an OpenTelemetry context that holds this
+        object under a private key, which is what
+        :attr:`ScopeManagerShim.active` reads. The object has to be closed, by
+        :meth:`close` or by leaving the ``with`` block that produced it, for
+        the previously recorded :class:`ScopeShim` to be the active one again.
+
+        This does not make the OpenTelemetry span current, and does not
+        change what :func:`opentelemetry.trace.get_current_span` returns.
+        Making the span current is done by
+        :meth:`opentelemetry.trace.use_span` on the
+        :meth:`from_context_manager` path, before this method runs. The
+        OpenTelemetry span was already started earlier than that, by the
+        OpenTelemetry tracer in :meth:`TracerShim.start_span`. So for a
+        :class:`ScopeShim` built directly from a :class:`SpanShim`,
+        :attr:`ScopeManagerShim.active` hands back this object while some
+        OpenTelemetry span is current, whichever span that is, and returns
+        `None` while none is.
+        """
         super().__init__(manager, span)
         self._span_cm = span_cm
         self._token = attach(set_value(_SHIM_KEY, self))
@@ -355,7 +456,10 @@ class ScopeShim(Scope):
 
         The method extracts a `opentelemetry.trace.Span` object from the
         context manager by calling the context manager's ``__enter__()``
-        method. This causes the span to start in the OpenTelemetry tracer.
+        method. This makes the span current in the OpenTelemetry tracer. The
+        span was started earlier, by the call to
+        :meth:`opentelemetry.trace.Tracer.start_span` that produced it, and
+        :meth:`opentelemetry.trace.use_span` does not start anything.
 
         Example usage::
 
@@ -371,6 +475,14 @@ class ScopeShim(Scope):
                 :class:`ScopeShim`.
             span_cm: A context manager as returned by
                 :meth:`opentelemetry.trace.use_span`.
+
+        Returns:
+            A :class:`ScopeShim` holding a :class:`SpanShim` that wraps the
+            `opentelemetry.trace.Span` yielded by *span_cm*, and holding
+            *span_cm* itself so that :meth:`close` can exit it. The returned
+            object is already the one :attr:`ScopeManagerShim.active` hands
+            back, because constructing it records it as the active
+            :class:`ScopeShim`.
         """
 
         # pylint: disable=unnecessary-dunder-call
@@ -403,6 +515,23 @@ class ScopeShim(Scope):
         """
         Override the __exit__ method of `opentracing.scope.Scope` so we can report
         exceptions correctly in opentelemetry specification format.
+
+        The OpenTracing base class implementation would set the OpenTracing
+        ``error`` tag and record the exception as OpenTracing log fields. This
+        override hands the exception to the OpenTelemetry side instead,
+        through ``_end_span_scope``. It reaches the OpenTelemetry span,
+        as an exception event and a span status of ``ERROR``, only when this
+        :class:`ScopeShim` holds the context manager returned by
+        :meth:`opentelemetry.trace.use_span`, which is the case for one built
+        by :meth:`from_context_manager`. For a :class:`ScopeShim` built
+        directly from a :class:`SpanShim` the three arguments are discarded
+        and the exception is not recorded anywhere.
+
+        Args:
+            exc_type: The class of the exception that left the ``with`` block,
+                or `None` when the block was left without one.
+            exc_val: The exception instance, or `None`.
+            exc_tb: The traceback of the exception, or `None`.
         """
         self._end_span_scope(exc_type, exc_val, exc_tb)
 
@@ -412,6 +541,42 @@ class ScopeShim(Scope):
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
+        """Detaches the OpenTelemetry context and ends the wrapped span.
+
+        Both :meth:`close` and :meth:`__exit__` go through this method, so
+        that closing a :class:`ScopeShim` by hand and leaving a ``with`` block
+        behave the same way. Either way the OpenTelemetry context attached
+        when this :class:`ScopeShim` was created is detached first, which
+        makes whichever :class:`ScopeShim` was active before this one active
+        again.
+
+        What happens to the span then depends on how this :class:`ScopeShim`
+        was built. One built by :meth:`from_context_manager` holds the context
+        manager returned by :meth:`opentelemetry.trace.use_span`, and the
+        three arguments are passed to that context manager's ``__exit__()``
+        method. An exception is then recorded on the OpenTelemetry span, as an
+        exception event and a span status of ``ERROR``, as long as the span is
+        recording and the exception derives from :class:`Exception`.
+        :meth:`opentelemetry.trace.use_span` ignores one that derives from
+        :class:`BaseException` alone, and records nothing on a span that is
+        not recording, such as the one a sampler declined to sample. None of
+        that depends on *finish_on_close*. The ending of the span is the part
+        that does: it happens only if *finish_on_close* was `True` when
+        :meth:`ScopeManagerShim.activate` created this :class:`ScopeShim`,
+        because that is the value handed to the ``end_on_exit`` parameter of
+        :meth:`opentelemetry.trace.use_span`.
+
+        One built directly from a :class:`SpanShim` has no context manager, so
+        the OpenTelemetry span is ended unconditionally and the three
+        arguments are ignored, which means an exception leaving such a scope
+        is not recorded.
+
+        Args:
+            exc_type: The class of the exception that ended the scope, or
+                `None` when the scope ended without one.
+            exc_val: The exception instance, or `None`.
+            exc_tb: The traceback of the exception, or `None`.
+        """
         detach(self._token)
         if self._span_cm is not None:
             self._span_cm.__exit__(exc_type, exc_val, exc_tb)
@@ -436,6 +601,10 @@ class ScopeManagerShim(ScopeManager):
     """
 
     def __init__(self, tracer: TracerShim):
+        """Initializes a :class:`ScopeManagerShim`.
+
+        The parameters are documented on the class.
+        """
         # The only thing the ``__init__()``` method on the base class does is
         # initialize `self._noop_span` and `self._noop_scope` with no-op
         # objects. Therefore, it doesn't seem useful to call it.
@@ -524,6 +693,13 @@ class TracerShim(Tracer):
     """
 
     def __init__(self, tracer: OtelTracer):
+        """Initializes a :class:`TracerShim`.
+
+        The parameters are documented on the class. The
+        :class:`ScopeManagerShim` that the :class:`TracerShim` exposes as its
+        OpenTracing scope manager is created here and holds a reference back
+        to this :class:`TracerShim`.
+        """
         super().__init__(scope_manager=ScopeManagerShim(self))
         self._otel_tracer = tracer
         self._supported_formats = (
@@ -670,12 +846,29 @@ class TracerShim(Tracer):
 
         See base class for more details.
 
+        The injection itself is left to the OpenTelemetry propagator returned
+        by :func:`opentelemetry.propagate.get_global_textmap`, so which keys
+        land in *carrier* is decided by the OpenTelemetry configuration rather
+        than by the OpenTracing *format*. Baggage set through
+        :meth:`SpanShim.set_baggage_item` is not injected, because the shim
+        keeps it in the :class:`SpanContextShim` instead of in the
+        OpenTelemetry context the propagator reads.
+
         Args:
-            span_context: The ``opentracing.SpanContext`` to inject.
+            span_context: The :class:`SpanContextShim` to inject. `None`
+                clears the span in the OpenTelemetry context handed to the
+                propagator, so no trace context is written into *carrier*.
             format: a Python object instance that represents a given
                 carrier format. `format` may be of any type, and `format`
                 equality is defined by Python ``==`` operator.
             carrier: the format-specific carrier object to inject into
+
+        Raises:
+            opentracing.UnsupportedFormatException: When *format* is neither
+                ``opentracing.Format.TEXT_MAP`` nor
+                ``opentracing.Format.HTTP_HEADERS``.
+                ``opentracing.Format.BINARY`` is rejected as well, since
+                OpenTelemetry Python has no binary propagator.
         """
 
         # pylint: disable=redefined-builtin
@@ -702,6 +895,13 @@ class TracerShim(Tracer):
 
         See base class for more details.
 
+        The extraction itself is left to the OpenTelemetry propagator returned
+        by :func:`opentelemetry.propagate.get_global_textmap`, so which keys
+        are read from *carrier* is decided by the OpenTelemetry configuration
+        rather than by the OpenTracing *format*. Any baggage the propagator
+        finds is discarded, because the returned :class:`SpanContextShim`
+        starts with an empty baggage store.
+
         Args:
             format: a Python object instance that represents a given
                 carrier format. ``format`` may be of any type, and ``format``
@@ -709,8 +909,20 @@ class TracerShim(Tracer):
             carrier: the format-specific carrier object to extract from
 
         Returns:
-            An ``opentracing.SpanContext`` extracted from ``carrier`` or
-            ``None`` if no such ``SpanContext`` could be found.
+            A :class:`SpanContextShim` wrapping the
+            :class:`opentelemetry.trace.SpanContext` found in ``carrier``.
+            When ``carrier`` holds no trace context, a
+            :class:`SpanContextShim` wrapping
+            ``opentelemetry.trace.INVALID_SPAN_CONTEXT`` is returned, so the
+            caller gets an object whose ``unwrap().is_valid`` is `False`
+            rather than `None`.
+
+        Raises:
+            opentracing.UnsupportedFormatException: When *format* is neither
+                ``opentracing.Format.TEXT_MAP`` nor
+                ``opentracing.Format.HTTP_HEADERS``.
+                ``opentracing.Format.BINARY`` is rejected as well, since
+                OpenTelemetry Python has no binary propagator.
         """
 
         # pylint: disable=redefined-builtin
