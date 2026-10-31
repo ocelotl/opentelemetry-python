@@ -393,6 +393,14 @@ class Encoder(abc.ABC):
             One annotation per event, in the order the events were recorded,
             or ``None`` when there are no events. The encoders omit the
             ``annotations`` field when this is ``None``.
+
+        Raises:
+            AttributeError: If an event has ``attributes`` of ``None``, since
+                the attributes are read with ``.items()`` without guarding.
+                An event recorded through ``Span.add_event`` carries an empty
+                mapping instead, so the SDK never produces one, while an
+                ``opentelemetry.sdk.trace.Event`` built directly without
+                attributes does.
         """
         if not events:
             return None
