@@ -24,7 +24,8 @@ An address may be given as a string such as ``"192.168.0.1"``, as the integer
 the address packs into, or as ``None`` when the address is unknown.
 
 ``ipaddress.ip_address`` reads an integer by its magnitude rather than by the
-attribute it is assigned to, so every integer below ``2**32`` parses as IPv4.
+attribute it is assigned to, so every integer from 0 up to ``2**32 - 1``
+parses as IPv4.
 An IPv6 address whose integer falls below that, such as ``::1``, which packs
 into 1, is rejected when it is given to ``ipv6``, and has to be given as a
 string instead.

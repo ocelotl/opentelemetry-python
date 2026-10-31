@@ -21,6 +21,16 @@ OpenTelemetry Zipkin Exporters
     :undoc-members:
     :show-inheritance:
 
+.. automodule:: opentelemetry.exporter.zipkin.json.v1
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: opentelemetry.exporter.zipkin.json.v2
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 .. automodule:: opentelemetry.exporter.zipkin.proto.http
     :members:
     :undoc-members:

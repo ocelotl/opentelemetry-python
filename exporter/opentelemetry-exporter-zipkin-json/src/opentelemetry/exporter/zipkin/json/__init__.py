@@ -192,8 +192,9 @@ class ZipkinExporter(SpanExporter):
         Raises:
             TypeError: If the exporter was built with ``Protocol.V1`` and
                 ``max_tag_value_length`` left unset, and the batch holds a
-                span that contributes at least one tag, which in practice is
-                every span. Give ``max_tag_value_length`` a length to use
+                span that contributes at least one tag whose value is a
+                string, which in practice is every span. Give
+                ``max_tag_value_length`` a length to use
                 ``Protocol.V1``.
         """
         # After the call to Shutdown subsequent calls to Export are

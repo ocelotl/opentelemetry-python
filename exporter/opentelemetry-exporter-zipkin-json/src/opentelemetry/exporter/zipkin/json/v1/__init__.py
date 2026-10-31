@@ -99,7 +99,7 @@ class JsonV1Encoder(JsonEncoder, V1Encoder):
 
         Raises:
             TypeError: If ``max_tag_value_length`` is ``None`` and the span
-                contributes at least one tag. See
+                contributes at least one tag whose value is a string. See
                 ``_extract_binary_annotations``.
         """
         context = span.get_span_context()
