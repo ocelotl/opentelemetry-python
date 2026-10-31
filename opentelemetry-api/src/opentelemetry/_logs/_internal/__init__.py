@@ -422,7 +422,8 @@ class ProxyLogger(Logger):
         Returns:
             The logger obtained from the global :class:`LoggerProvider` once
             one is set, cached thereafter. A :class:`NoOpLogger` until then,
-            which is not cached, so a later provider is still picked up.
+            built once and returned on every call, which the proxy never
+            adopts as its real logger, so a later provider is still picked up.
         """
         if self._real_logger:
             return self._real_logger
