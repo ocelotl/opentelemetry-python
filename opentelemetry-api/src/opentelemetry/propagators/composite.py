@@ -4,9 +4,11 @@
 
 An application usually needs more than one wire format at once, for example
 W3C trace context together with W3C baggage.
-:class:`CompositePropagator` presents several propagators as one, which is
-what :func:`opentelemetry.propagate.get_global_textmap` returns when the
-``OTEL_PROPAGATORS`` environment variable names more than one.
+:class:`CompositePropagator` presents several propagators as one. It is what
+:func:`opentelemetry.propagate.get_global_textmap` returns in every case, since
+``OTEL_PROPAGATORS`` naming a single propagator still produces a
+:class:`CompositePropagator` wrapping that one, and naming ``none`` produces
+one wrapping no propagator at all.
 """
 
 import collections.abc
