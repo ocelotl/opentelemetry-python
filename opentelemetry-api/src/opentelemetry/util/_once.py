@@ -15,7 +15,11 @@ from threading import Lock
 
 
 class Once:
-    """Execute a function exactly once and block all callers until the function returns
+    """Execute a function once and block all callers until the function returns
+
+    A call that raises leaves the instance unmarked, so the next call to
+    :meth:`do_once` executes the callable again. Counting only the calls that
+    return, the callable runs exactly once per instance.
 
     Same as golang's `sync.Once <https://pkg.go.dev/sync#Once>`_
     """
