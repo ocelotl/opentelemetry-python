@@ -8,16 +8,18 @@ by ``ExporterMetricsT.export_operation`` and records three instruments defined
 by the semantic conventions: an up-down counter of the telemetry handed to the
 exporter but not yet exported, a counter of the telemetry whose export has
 finished whether it succeeded or failed, and a histogram of how long the
-operation took in seconds. An export operation is the delivery of one payload
-to the server, from the moment the exporter starts that delivery to the moment
-it succeeds or gives up, so an exporter that retries holds the ``with`` body
-open across every retry and every backoff wait between them, and each
-instrument is recorded once for the payload rather than once per request. How
-many export operations one call to an exporter's ``export`` method makes is up
-to that exporter: one that splits what it was handed into several payloads
-opens one export operation per payload, which is what both metric exporters do
-when ``max_export_batch_size`` is set. The instrument names depend on the
-signal, so a span exporter records ``otel.sdk.exporter.span.inflight`` and
+operation took in seconds. An export operation begins when the exporter enters
+the context manager and ends when it leaves, so it covers serializing the
+telemetry, every request sent for it, and every backoff wait between them, and
+each instrument is recorded once for the whole operation rather than once per
+request. Telemetry the exporter drops locally without sending anything, because
+it failed to serialize or because it exceeded a size limit, still ends an
+export operation and is still counted on the exported counter. How many export
+operations one call to an exporter's ``export`` method makes is up to that
+exporter: one that splits what it was handed into several parts opens one
+export operation per part, which is what both metric exporters do when
+``max_export_batch_size`` is set. The instrument names depend on the signal,
+so a span exporter records ``otel.sdk.exporter.span.inflight`` and
 ``otel.sdk.exporter.span.exported`` while a metric exporter records
 ``otel.sdk.exporter.metric_data_point.inflight`` and
 ``otel.sdk.exporter.metric_data_point.exported``. The duration histogram is
@@ -260,10 +262,10 @@ class ExporterMetrics:
         happens in a ``finally`` block, so an exception that propagates out of
         the ``with`` body still leaves the inflight counter balanced.
 
-        The exporter holds the ``with`` body open for the whole export
-        operation, so a retried export stays in the inflight counter across
-        every retry and every backoff wait, and reaches the exported counter
-        only after the last retry has ended.
+        The exporter runs its retries inside the ``with`` body, so a retried
+        export stays in the inflight counter across every retry and every
+        backoff wait, and reaches the exported counter only after the last
+        retry has ended.
 
         An exception that propagates out of the ``with`` body is not inspected.
         The export operation counts as a failure only when the caller assigns
