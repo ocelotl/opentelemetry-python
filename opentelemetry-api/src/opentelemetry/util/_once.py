@@ -4,8 +4,10 @@
 """One-shot execution primitive used to guard global provider initialisation.
 
 This module provides :class:`Once`, which runs a callable the first time it is
-asked to and ignores every later request. The API uses it to make sure a global
-provider is set exactly once even when several threads race to set it.
+asked to and ignores every later request once that call has returned. The API
+uses it to make sure a global provider is set exactly once even when several
+threads race to set it. A call that raises leaves the instance unmarked, so the
+next request runs the callable again.
 """
 
 from collections.abc import Callable
