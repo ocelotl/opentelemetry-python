@@ -58,11 +58,15 @@ def _as_entry_points(eps: Any) -> EntryPoints:
 
 @cache
 def _original_entry_points_cached() -> EntryPoints:
-    """Read every installed entry point once and cache the result.
+    """Read every installed entry point and cache the result.
 
     Reading entry points touches the filesystem, so the result is cached for
     the lifetime of the process. A distribution installed after the first call
     is therefore not visible.
+
+    :func:`functools.cache` holds no lock across the wrapped call, so threads
+    that arrive before the first call returns each perform the read, and the
+    last one to finish supplies the cached value.
 
     Returns:
         Every entry point installed in the current environment.
