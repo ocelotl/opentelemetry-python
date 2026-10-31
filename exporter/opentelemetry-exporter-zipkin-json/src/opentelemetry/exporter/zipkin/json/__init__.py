@@ -114,7 +114,9 @@ class ZipkinExporter(SpanExporter):
         timeout: Maximum time the Zipkin exporter will wait for each batch export.
             The default value is 10s. When ``None`` or zero, the value of the
             :envvar:`OTEL_EXPORTER_ZIPKIN_TIMEOUT` environment variable is
-            used, falling back to 10 seconds.
+            used, falling back to 10 seconds when that variable is unset.
+            The variable has to hold a decimal integer, since its value is
+            passed to ``int``.
         session: Connection session to the Zipkin collector endpoint. When
             ``None``, the exporter creates its own ``requests.Session`` and
             closes it on shutdown. A session passed in here is closed on
@@ -123,7 +125,9 @@ class ZipkinExporter(SpanExporter):
 
     Raises:
         ValueError: If ``local_node_ipv4`` or ``local_node_ipv6`` does not
-            parse as an address of the matching family.
+            parse as an address of the matching family, or if
+            :envvar:`OTEL_EXPORTER_ZIPKIN_TIMEOUT` is set to a value that is
+            not a decimal integer.
         KeyError: If the resource of the globally registered tracer provider
             carries no ``service.name`` attribute, which ``NodeEndpoint``
             reads with a plain subscript.

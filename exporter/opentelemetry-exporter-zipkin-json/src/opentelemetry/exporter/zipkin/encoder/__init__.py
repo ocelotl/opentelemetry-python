@@ -212,7 +212,7 @@ class Encoder(abc.ABC):
         a sequence when ``max_tag_value_length`` is 1, is dropped with a
         warning on the ``opentelemetry.exporter.zipkin.encoder`` logger rather
         than failing the export. A sequence whose elements do not fit the
-        limit is not dropped: it is kept as the empty array ``"[]"``.
+        limit is kept as the empty array ``"[]"``.
 
         Values are truncated to ``max_tag_value_length`` characters when that
         limit is set to a positive number. Truncation applies to the rendered
@@ -326,9 +326,10 @@ class Encoder(abc.ABC):
         and ``otel.scope.version`` and the older ``otel.library.name`` and
         ``otel.library.version``. These four bypass the stringification and
         the truncation that the attribute groups go through, so a scope name
-        or version longer than ``max_tag_value_length`` reaches the payload
-        at its full length while every attribute value was cut to that
-        limit.
+        or version longer than ``max_tag_value_length`` reaches the v2
+        payload at its full length while every attribute value was cut to
+        that limit. The v1 encoder cuts them to the limit of its own accord
+        when it builds the binary annotations.
 
         ``otel.status_code`` is written only when the status is not UNSET, and
         ``error`` is added alongside it when the status is ERROR, holding the
