@@ -129,10 +129,13 @@ class TestBase(unittest.TestCase):
             span: The span to inspect. Its ``instrumentation_scope`` is read, so
                 it has to be an SDK span and not a non-recording one.
             module: The module object the span is expected to come from. Its
-                ``__name__`` is compared against the scope name and its
-                ``__version__`` against the scope version, so a module without
-                ``__version__`` raises ``AttributeError`` rather than failing
-                the assertion.
+                ``__name__`` is compared against the scope name first, and its
+                ``__version__`` against the scope version only once that
+                comparison has passed. A module without ``__version__``
+                therefore raises ``AttributeError`` rather than failing the
+                assertion, but only when its ``__name__`` already matches; a
+                name mismatch fails the first assertion and never reads
+                ``__version__``.
         """
         self.assertEqual(span.instrumentation_scope.name, module.__name__)
         self.assertEqual(span.instrumentation_scope.version, module.__version__)

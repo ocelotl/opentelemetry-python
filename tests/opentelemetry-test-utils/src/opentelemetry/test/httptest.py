@@ -32,7 +32,10 @@ class HttpTestBase(unittest.TestCase):
 
     Override ``Handler`` in a subclass to answer differently. ``create_server``
     reads ``cls.Handler``, so the override takes effect without touching the
-    other methods.
+    other methods. Overriding ``DEFAULT_RESPONSE`` instead does nothing:
+    ``do_GET`` reads ``HttpTestBase.DEFAULT_RESPONSE`` off this class, so a
+    subclass attribute of that name is never consulted and the body stays
+    ``b"Hello!"``.
     """
 
     DEFAULT_RESPONSE = b"Hello!"

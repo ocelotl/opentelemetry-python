@@ -15,8 +15,12 @@ nothing, or :meth:`WeaverLiveCheck.end` to get the report and assert on it
 directly. :class:`LiveCheckReport` wraps the JSON report and
 :class:`LiveCheckError` is what a failed check raises.
 
-The ``weaver`` binary, version 0.27 or later, has to be on ``PATH``, and
-constructing :class:`WeaverLiveCheck` raises ``RuntimeError`` when it is not.
+The ``weaver`` binary has to be on ``PATH``, and constructing
+:class:`WeaverLiveCheck` raises ``RuntimeError`` when no binary of that name is
+found. Version 0.27 or later is required, and nothing checks the version: an
+older weaver is accepted by the constructor and rejects one of the managed flags
+later, which surfaces as a ``RuntimeError`` out of
+:meth:`WeaverLiveCheck.start` naming only the exit status.
 Downloads are at https://github.com/open-telemetry/weaver/releases
 
 This module is experimental and its API may change without notice.
