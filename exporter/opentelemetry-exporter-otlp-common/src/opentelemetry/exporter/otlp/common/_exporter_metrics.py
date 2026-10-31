@@ -12,14 +12,12 @@ operation took in seconds. An export operation is the delivery of one payload
 to the server, from the moment the exporter starts that delivery to the moment
 it succeeds or gives up, so an exporter that retries holds the ``with`` body
 open across every retry and every backoff wait between them, and each
-instrument is recorded once for the payload rather than once per request. What
-else falls inside the ``with`` body is up to the exporter: every OTLP exporter
-that records these instruments serializes its payload inside it, and
-``OTLPMetricExporter`` of ``opentelemetry-exporter-otlp-proto-http``
-additionally builds the protobuf request and splits it into sub-batches before
-opening anything, then opens one export operation per sub-batch. The
-instrument names depend on the signal, so a span exporter records
-``otel.sdk.exporter.span.inflight`` and
+instrument is recorded once for the payload rather than once per request. How
+many export operations one call to an exporter's ``export`` method makes is up
+to that exporter: one that splits what it was handed into several payloads
+opens one export operation per payload, which is what both metric exporters do
+when ``max_export_batch_size`` is set. The instrument names depend on the
+signal, so a span exporter records ``otel.sdk.exporter.span.inflight`` and
 ``otel.sdk.exporter.span.exported`` while a metric exporter records
 ``otel.sdk.exporter.metric_data_point.inflight`` and
 ``otel.sdk.exporter.metric_data_point.exported``. The duration histogram is
