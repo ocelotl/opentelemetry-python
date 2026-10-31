@@ -8,7 +8,8 @@
 distribution takes its version from. The string is not edited here by hand:
 ``scripts/eachdist.py`` rewrites it from the version recorded for the
 ``[stable]`` package set in ``eachdist.ini``. The exporters also send it in the
-``User-Agent`` header of every export request.
+``User-Agent`` header of every export request, unless the resolved headers
+carry a ``user-agent`` key of their own, which replaces it.
 """
 
 __version__ = "1.46.0.dev"
