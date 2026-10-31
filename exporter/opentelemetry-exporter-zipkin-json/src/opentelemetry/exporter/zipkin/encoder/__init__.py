@@ -191,9 +191,11 @@ class Encoder(abc.ABC):
 
         Raises:
             AttributeError: If the argument is a ``Span`` whose ``parent`` is
-                ``None``, since that branch reads ``span.parent.span_id``
-                without guarding. Both encoders pass ``span.parent`` rather
-                than the span, so they never reach this.
+                ``None``, or one with no ``parent`` attribute at all, such
+                as ``NonRecordingSpan``, since that branch reads
+                ``span.parent.span_id`` without guarding. Both encoders pass
+                ``span.parent`` rather than the span, so they never reach
+                this.
         """
         if isinstance(span_context, Span):
             parent_id = span_context.parent.span_id
@@ -259,11 +261,12 @@ class Encoder(abc.ABC):
         the array, and the remaining elements are dropped silently.
 
         That running length measures each element before ``json.dumps``
-        escapes it, so an element holding a non-ASCII character, a double
-        quote or a backslash renders longer than it was counted as, and the
-        array can come back longer than ``max_tag_value_length``. The caller
-        then truncates it, which is the one case in which a sequence tag ends
-        up as invalid JSON.
+        escapes it, so an element holding any character that JSON escapes,
+        which is a non-ASCII character, a double quote, a backslash or a
+        control character such as a newline, renders longer than it was
+        counted as, and the array can come back longer than
+        ``max_tag_value_length``. The caller then truncates it, which is the
+        one case in which a sequence tag ends up as invalid JSON.
 
         An element that is not a bool, a number, a string or ``None`` is
         skipped without ending the array, and without counting towards the

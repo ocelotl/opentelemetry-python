@@ -101,8 +101,9 @@ class ZipkinExporter(SpanExporter):
         endpoint: The endpoint of the Zipkin collector. When ``None``, the
             value of the :envvar:`OTEL_EXPORTER_ZIPKIN_ENDPOINT` environment
             variable is used, falling back to
-            ``http://localhost:9411/api/v2/spans``. The endpoint has to match
-            the chosen version, since the default path names the v2 API.
+            ``http://localhost:9411/api/v2/spans`` when that variable is
+            unset or empty. The endpoint has to match the chosen version,
+            since the default path names the v2 API.
         local_node_ipv4: Primary IPv4 address associated with this connection.
         local_node_ipv6: Primary IPv6 address associated with this connection.
         local_node_port: Depending on context, this could be a listen port or the
