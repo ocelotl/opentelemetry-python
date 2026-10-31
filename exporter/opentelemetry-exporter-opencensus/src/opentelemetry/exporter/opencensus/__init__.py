@@ -17,6 +17,11 @@ OpenCensus API is a different job, done by ``opentelemetry-opencensus-shim``.
 calls. The two models do not line up field for field, and each docstring in
 those two modules names what its own conversion drops.
 
+An application need not import the class at all. The distribution registers
+it under the entry point group ``opentelemetry_traces_exporter`` with the
+name ``opencensus``, so setting ``OTEL_TRACES_EXPORTER=opencensus`` makes
+``opentelemetry.sdk._configuration`` build one with no arguments.
+
 The receiver endpoint defaults to ``localhost:55678`` and the channel opened
 to it is insecure, so a collector reached over an untrusted network needs a
 ``TraceServiceStub`` built elsewhere and passed to the exporter.
