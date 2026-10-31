@@ -69,6 +69,7 @@ You can run `tox` with the following arguments:
 - `tox -e ruff` to run ruff linter and formatter checks against the entire codebase
 - `tox -e typecheck` to run pyright against entire code base.
 - `tox -e public-symbols-check` to run public_symbols_checker.py.
+- `tox -e docstring-check` to run docstring_checker.py.
 - `tox -e docker-tests-{otlpexporter,opencensus}` to run tests in both or either one location.
 - `tox -e tracecontext` to run integration tests for tracecontext.
 - `tox -e precommit` to run all `pre-commit` actions
@@ -147,6 +148,26 @@ To check if your PR is adding public symbols, run `tox -e public-symbols-check`.
 behind this is that every PR that adds/removes public symbols fails in CI, forcing reviewers to check the symbols to make sure they are strictly necessary.
 If after checking them, it is considered that they are indeed necessary, the PR will be labeled with `Approve Public API check` so that this check is not
 run.
+
+### Docstrings
+
+Every public symbol needs a docstring, every parameter of a public function or method needs an entry
+in an `Args:` section, and every public function or method whose return annotation is not `None`
+needs a `Returns:` or `Yields:` section. Constructor parameters are documented on the class
+docstring rather than on `__init__`, because `docs/conf.py` does not set `special-members`, so an
+`__init__` docstring is never rendered in the API reference.
+
+Run `tox -e docstring-check` to list every public symbol that does not meet those requirements.
+The check is absolute: it reports every gap in the public API, not only the gaps your PR adds, so a
+PR that adds an undocumented symbol fails and so does a PR that changes nothing while an existing
+symbol stays undocumented.
+
+Run `tox -e docstring-check -- --against main` to see only the gaps your working tree has and that
+`main` does not. That narrows a long report down to your own share of it. It is a reading aid; the
+check that gates CI is the absolute run.
+
+If a gap is deliberate, the PR will be labeled with `Approve Docstring check` so that this check is
+not run.
 
 Also, we try to keep our console output as clean as possible. Most of the time this means catching expected log messages in the test cases:
 
