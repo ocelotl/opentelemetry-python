@@ -11,9 +11,12 @@ attribute lists that hang off nearly every OTLP message, and the fixed-width
 byte form of trace and span identifiers that ``to_dict`` on the enclosing
 message renders as hexadecimal.
 
-Nothing here is public. The names are imported by the three sibling packages
-under ``opentelemetry.exporter.otlp.json.common._internal`` and by nothing
-outside this distribution.
+Nothing here is public, and nothing outside this distribution imports these
+names. The trace, metrics and log encoder packages under
+``opentelemetry.exporter.otlp.json.common._internal`` each import the ones they
+need, which is not the same set for all three. ``_encode_key_value`` is
+imported by none of them: it is reached only from ``_encode_value`` and
+``_encode_attributes`` in this module.
 """
 
 from __future__ import annotations
