@@ -51,9 +51,14 @@ class OTLPSpanExporter(SpanExporter):
 
     Each call to :meth:`export` encodes the batch it is handed as one JSON
     document and posts it to a single endpoint. A transient failure is retried
-    over at most six attempts and for no longer than the timeout. The wait
-    between attempts doubles each time, unless the response carries a
-    ``Retry-After`` header, in which case that value is waited instead. A
+    over at most six attempts and for no longer than the timeout. An attempt
+    that ends in a connection error is re-sent once immediately before the next
+    attempt is counted, so the batch can leave this process up to twelve times.
+    The wait between attempts doubles each time and is then multiplied by a
+    random factor between 0.8 and 1.2; a retryable response carrying a
+    ``Retry-After`` header the client can read, as a number of seconds or as an
+    HTTP date, replaces that wait with the header's value. A wait longer than
+    the time left in the timeout ends the export rather than being served. A
     permanent failure is logged and reported to the caller, which drops the
     batch.
 

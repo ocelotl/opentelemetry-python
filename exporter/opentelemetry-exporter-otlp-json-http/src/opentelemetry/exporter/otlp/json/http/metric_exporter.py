@@ -70,10 +70,15 @@ class OTLPMetricExporter(MetricExporter):
     Each call to :meth:`export` encodes the collection it is handed and posts
     it, as one request or as several when ``max_export_batch_size`` is set. A
     transient failure is retried over at most six attempts and for no longer
-    than the timeout. The wait between attempts doubles each time, unless the
-    response carries a ``Retry-After`` header, in which case that value is
-    waited instead. A permanent failure is logged and reported to the caller,
-    which drops the collection.
+    than the timeout. An attempt that ends in a connection error is re-sent
+    once immediately before the next attempt is counted, so one request can
+    leave this process up to twelve times. The wait between attempts doubles
+    each time and is then multiplied by a random factor between 0.8 and 1.2; a
+    retryable response carrying a ``Retry-After`` header the client can read,
+    as a number of seconds or as an HTTP date, replaces that wait with the
+    header's value. A wait longer than the time left in the timeout ends the
+    request rather than being served. A permanent failure is logged and
+    reported to the caller, which drops the collection.
 
     Every argument may be left as ``None``, but the fallback that follows is
     not the same for all of them. ``endpoint``, ``certificate_file``,
