@@ -53,7 +53,6 @@ AttributesAsKey = tuple[
 ]
 """A set of attributes flattened into a hashable tuple of name/value pairs.
 
-.. deprecated::
-    This alias is retained for backwards compatibility and is not used by the
-    API. Use :data:`Attributes` instead.
+This alias is deprecated. It is retained for backwards compatibility and is
+not used by the API. Use :data:`Attributes` instead.
 """
