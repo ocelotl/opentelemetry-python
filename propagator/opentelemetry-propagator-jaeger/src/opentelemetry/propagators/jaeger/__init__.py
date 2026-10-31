@@ -106,8 +106,8 @@ class JaegerPropagator(TextMapPropagator):
             malformed. Not malformed is a weaker condition than
             ``SpanContext.is_valid``, which also bounds each id by its width
             and rejects a negative one. A header of ``-1:-2:3:1``, or one
-            whose trace id field runs past 32 hexadecimal digits, is accepted
-            here and its span is added, yet that span reports
+            whose trace id does not fit in 128 bits, is accepted here and its
+            span is added, yet the ``SpanContext`` of that span reports
             ``is_valid`` as ``False`` and ``inject`` writes nothing for it.
         """
         if context is None:
