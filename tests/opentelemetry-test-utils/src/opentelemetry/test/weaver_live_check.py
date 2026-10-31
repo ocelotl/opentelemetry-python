@@ -178,10 +178,10 @@ def _format_violations(violations: list) -> str:
 class LiveCheckError(AssertionError):
     """Raised by :meth:`WeaverLiveCheck.end_and_check` when semconv violations are found.
 
-    Captured process output is available as :attr:`stdout` and :attr:`stderr`,
+    Captured process output is available as ``stdout`` and ``stderr``,
     including after the live-check context has closed.
 
-    The full :class:`LiveCheckReport` is attached as :attr:`report` for
+    The full :class:`LiveCheckReport` is attached as ``report`` for
     structured inspection beyond the human-readable message::
 
         with pytest.raises(LiveCheckError) as exc_info:
@@ -196,12 +196,11 @@ class LiveCheckError(AssertionError):
     Args:
         message: The failure message, which :meth:`WeaverLiveCheck.end_and_check`
             builds from the formatted violation list.
-        report: The full report the violations came from, kept as
-            :attr:`report`.
+        report: The full report the violations came from, kept as ``report``.
         stdout: Everything weaver wrote to stdout up to the failure, kept as
-            :attr:`stdout`.
+            ``stdout``.
         stderr: Everything weaver wrote to stderr up to the failure, kept as
-            :attr:`stderr`.
+            ``stderr``.
     """
 
     def __init__(self, message: str, report: "LiveCheckReport", stdout: str = "", stderr: str = "") -> None:
@@ -295,7 +294,8 @@ class LiveCheckReport:
             is computed once and cached on the instance, and it is the cached
             list itself rather than a copy, so editing it changes what later
             reads return. A report with no violation gives an empty list, which
-            is not the same as :meth:`end_and_check` passing: that method
+            is not the same as :meth:`WeaverLiveCheck.end_and_check` passing:
+            that method
             decides on weaver's exit status, so weaver can exit non-zero for a
             reason that produces no violation entry and raise
             :class:`LiveCheckError` with an empty list in the message.
@@ -558,8 +558,7 @@ class WeaverLiveCheck:
         :attr:`stdout` and :attr:`stderr` read and :meth:`close` deletes.
 
         Returns:
-            This instance, so the call can be chained, as :meth:`__enter__`
-            does.
+            This instance, so the call can be chained, as ``__enter__`` does.
 
         Raises:
             RuntimeError: When weaver exits before becoming ready. The
@@ -721,7 +720,7 @@ class WeaverLiveCheck:
         Raises:
             RuntimeError: When weaver was already stopped without a report
                 having been collected, which is the state :meth:`close` leaves
-                behind and the state :meth:`__exit__` forces after the block
+                behind and the state ``__exit__`` forces after the block
                 raised.
         """
         if not self._stopped:
@@ -770,7 +769,7 @@ class WeaverLiveCheck:
         Does **not** return if weaver exits with a non-zero status — raises
         :exc:`LiveCheckError` (a subclass of :exc:`AssertionError`) with a
         human-readable list of violations and the full :class:`LiveCheckReport`
-        attached as :attr:`LiveCheckError.report`.
+        attached as ``LiveCheckError.report``.
         Use :meth:`end` if you need the report regardless of violations.
 
         Repeated calls check the cached result and raise again for violations.
