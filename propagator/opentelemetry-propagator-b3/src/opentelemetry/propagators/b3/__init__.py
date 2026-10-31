@@ -96,7 +96,10 @@ class B3MultiFormat(TextMapPropagator):
         one field carries a sampling state and no ids, and one of more than
         four fields is malformed; neither yields a span. The B3 sampling state
         "deferred" has no counterpart in a ``SpanContext``, so a ``b3`` header
-        that omits the sampling state is treated as sampled.
+        that omits the sampling state is treated as sampled. The multi-header
+        encoding does the opposite: an absent ``x-b3-sampled`` leaves sampling
+        off, so the same deferred decision gives a sampled span context through
+        ``b3`` and an unsampled one through the multi headers.
 
         Sampling is turned on, in either encoding, when the sampling state is
         one of ``1``, ``True``, ``true`` or ``d``. The multi-header encoding
