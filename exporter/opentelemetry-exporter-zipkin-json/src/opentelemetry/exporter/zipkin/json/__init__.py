@@ -81,11 +81,87 @@ from opentelemetry.trace import Span
 
 DEFAULT_ENDPOINT = "http://localhost:9411/api/v2/spans"
 REQUESTS_SUCCESS_STATUS_CODES = (200, 202)
+_DEFAULT_TIMEOUT = 10
 
 logger = logging.getLogger(__name__)
 
 
+def _timeout_from_env() -> int:
+    """Read the export timeout from the environment.
+
+    An unset, empty or whitespace-only value is treated as absent rather than
+    as an error, so the default applies silently. A value that is set but does
+    not parse as an integer is reported at warning level before the default
+    applies, because that one is a mistake worth telling the operator about.
+
+    Returns:
+        The number of seconds from ``OTEL_EXPORTER_ZIPKIN_TIMEOUT``, or
+        ``_DEFAULT_TIMEOUT`` when the variable is absent or unparsable.
+    """
+    value = environ.get(OTEL_EXPORTER_ZIPKIN_TIMEOUT)
+    if value is None or not value.strip():
+        return _DEFAULT_TIMEOUT
+    try:
+        return int(value)
+    except ValueError:
+        logger.warning(
+            "Invalid value %r for %s, using default of %s seconds",
+            value,
+            OTEL_EXPORTER_ZIPKIN_TIMEOUT,
+            _DEFAULT_TIMEOUT,
+        )
+        return _DEFAULT_TIMEOUT
+
+
 class ZipkinExporter(SpanExporter):
+    """Span exporter that sends JSON over HTTP to a Zipkin collector.
+
+    Each call to ``export`` encodes the batch it is given and sends it as one
+    POST request, which makes export synchronous and blocking. Pair the
+    exporter with a ``BatchSpanProcessor`` to keep that work off the thread
+    that ends the spans.
+
+    The tuple (local_node_ipv4, local_node_ipv6, local_node_port) is used to
+    represent the network context of a node in the service graph.
+
+    Args:
+        version: The protocol version to be used.
+        endpoint: The endpoint of the Zipkin collector. When ``None``, the
+            value of the :envvar:`OTEL_EXPORTER_ZIPKIN_ENDPOINT` environment
+            variable is used, falling back to
+            ``http://localhost:9411/api/v2/spans`` when that variable is
+            unset or empty. The endpoint has to match the chosen version,
+            since the default path names the v2 API.
+        local_node_ipv4: Primary IPv4 address associated with this connection.
+        local_node_ipv6: Primary IPv6 address associated with this connection.
+        local_node_port: Depending on context, this could be a listen port or the
+            client-side of a socket.
+        max_tag_value_length: Max length string attribute values can have.
+            Under ``Protocol.V2``, ``None`` leaves tag values untruncated.
+            Under ``Protocol.V1``, ``None`` makes ``export`` raise
+            ``TypeError``, so a length has to be given to use that version.
+        timeout: Maximum time the Zipkin exporter will wait for each batch export.
+            The default value is 10s. When ``None`` or zero, the value of the
+            :envvar:`OTEL_EXPORTER_ZIPKIN_TIMEOUT` environment variable is
+            used, falling back to 10 seconds when that variable is unset.
+            The variable has to hold a decimal integer, since its value is
+            passed to ``int``.
+        session: Connection session to the Zipkin collector endpoint. When
+            ``None``, the exporter creates its own ``requests.Session`` and
+            closes it on shutdown. A session passed in here is closed on
+            shutdown too, so do not share one with code that outlives the
+            exporter.
+
+    Raises:
+        ValueError: If ``local_node_ipv4`` or ``local_node_ipv6`` does not
+            parse as an address of the matching family, or if ``timeout`` is
+            ``None`` or zero and :envvar:`OTEL_EXPORTER_ZIPKIN_TIMEOUT` is
+            set to a value that is not a decimal integer.
+        KeyError: If the resource of the globally registered tracer provider
+            carries no ``service.name`` attribute, which ``NodeEndpoint``
+            reads with a plain subscript.
+    """
+
     def __init__(
         self,
         version: Protocol = Protocol.V2,
@@ -97,22 +173,9 @@ class ZipkinExporter(SpanExporter):
         timeout: int | None = None,
         session: requests.Session | None = None,
     ):
-        """Zipkin exporter.
+        """Initialize the exporter.
 
-        Args:
-            version: The protocol version to be used.
-            endpoint: The endpoint of the Zipkin collector.
-            local_node_ipv4: Primary IPv4 address associated with this connection.
-            local_node_ipv6: Primary IPv6 address associated with this connection.
-            local_node_port: Depending on context, this could be a listen port or the
-                client-side of a socket.
-            max_tag_value_length: Max length string attribute values can have.
-            timeout: Maximum time the Zipkin exporter will wait for each batch export.
-                The default value is 10s.
-            session: Connection session to the Zipkin collector endpoint.
-
-            The tuple (local_node_ipv4, local_node_ipv6, local_node_port) is used to represent
-            the network context of a node in the service graph.
+        The parameters are documented on the class.
         """
         self.local_node = NodeEndpoint(local_node_ipv4, local_node_ipv6, local_node_port)
 
@@ -128,9 +191,41 @@ class ZipkinExporter(SpanExporter):
         self.session = session or requests.Session()
         self.session.headers.update({"Content-Type": self.encoder.content_type()})
         self._closed = False
-        self.timeout = timeout or int(environ.get(OTEL_EXPORTER_ZIPKIN_TIMEOUT, 10))
+        self.timeout = timeout or _timeout_from_env()
 
     def export(self, spans: Sequence[Span]) -> SpanExportResult:
+        """Encode a batch of spans and POST it to the Zipkin collector.
+
+        The call blocks until the collector answers or the timeout expires.
+        The service name of the local node is replaced, at the start of every
+        non-empty export, with the one on the resource of the first span of
+        that batch, whenever that span carries one. Otherwise the value held
+        from before is kept, which for the first export is the one sampled
+        when the exporter was built. Reading only the first span rests on the
+        assumption that a span processor serves a single tracer provider and
+        so a batch cannot mix resources.
+
+        Failures are reported through the return value and logged on the
+        ``opentelemetry.exporter.zipkin.json`` logger. A transport failure is
+        not caught, so the exception raised by ``requests`` propagates to the
+        caller, which for a ``BatchSpanProcessor`` means the batch is lost.
+
+        Args:
+            spans: The ended spans to export.
+
+        Returns:
+            ``SpanExportResult.SUCCESS`` when the collector answered 200 or
+            202, and ``SpanExportResult.FAILURE`` for any other status code or
+            when the exporter has already been shut down.
+
+        Raises:
+            TypeError: If the exporter was built with ``Protocol.V1`` and
+                ``max_tag_value_length`` left unset, and the batch holds a
+                span that contributes at least one tag whose value is a
+                string, which in practice is every span. Give
+                ``max_tag_value_length`` a length to use
+                ``Protocol.V1``.
+        """
         # After the call to Shutdown subsequent calls to Export are
         # not allowed and should return a Failure result
         if self._closed:
@@ -162,6 +257,13 @@ class ZipkinExporter(SpanExporter):
         return SpanExportResult.SUCCESS
 
     def shutdown(self) -> None:
+        """Close the HTTP session and refuse any further export.
+
+        Every later call to ``export`` returns
+        ``SpanExportResult.FAILURE`` without contacting the collector. Calling
+        this a second time does nothing beyond logging a warning on the
+        ``opentelemetry.exporter.zipkin.json`` logger.
+        """
         if self._closed:
             logger.warning("Exporter already shutdown, ignoring call")
             return
@@ -169,4 +271,16 @@ class ZipkinExporter(SpanExporter):
         self._closed = True
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
+        """Report that there is nothing buffered to flush.
+
+        The exporter sends each batch during ``export`` and holds no queue of
+        its own, so there is no work for this to do.
+
+        Args:
+            timeout_millis: Ignored, since the call returns at once. It is
+                accepted so that the signature matches ``SpanExporter``.
+
+        Returns:
+            Always True.
+        """
         return True
