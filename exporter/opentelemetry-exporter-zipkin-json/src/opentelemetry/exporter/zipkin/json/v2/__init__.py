@@ -11,6 +11,15 @@ class JsonV2Encoder(JsonEncoder):
     """Zipkin Export Encoder for JSON v2 API
 
     API spec: https://github.com/openzipkin/zipkin-api/blob/master/zipkin2-api.yaml
+
+    ``SPAN_KIND_MAP`` translates an OpenTelemetry ``SpanKind`` into the Zipkin
+    span kind of the same name. INTERNAL has no Zipkin counterpart and maps to
+    ``None``, which Zipkin reads as a local span.
+
+    Args:
+        max_tag_value_length: maximum length of an exported tag value. Values
+          will be truncated to conform. Since values are serialized to a JSON
+          list string, max_tag_value_length is honored at the element boundary.
     """
 
     SPAN_KIND_MAP = {
@@ -22,6 +31,22 @@ class JsonV2Encoder(JsonEncoder):
     }
 
     def _encode_span(self, span: Span, encoded_local_endpoint: dict) -> dict:
+        """Encode one span in the v2 JSON format.
+
+        ``traceId``, ``id``, ``name``, ``timestamp``, ``duration``,
+        ``localEndpoint`` and ``kind`` are always written, with ``kind`` set
+        to ``None`` for an INTERNAL span. ``tags``, ``annotations``, ``debug``
+        and ``parentId`` are written only when the span has something to put
+        in them, which is what the specification asks for.
+
+        Args:
+            span: The ended span to encode.
+            encoded_local_endpoint: The already encoded local endpoint,
+                written once as ``localEndpoint``.
+
+        Returns:
+            The encoded span.
+        """
         context = span.get_span_context()
         encoded_span = {
             "traceId": self._encode_trace_id(context.trace_id),
