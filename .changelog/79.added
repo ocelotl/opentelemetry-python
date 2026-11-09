@@ -1,0 +1,1 @@
+Add a `docstring-check` CI job that fails a pull request which adds an undocumented public API object

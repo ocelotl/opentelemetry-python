@@ -45,6 +45,10 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'Approve Public API check')
       && github.actor != 'otelbot[bot]' && github.event_name == 'pull_request'
     {%- endif %}
+    {%- if job_data == "docstring-check" %}
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'Approve Docstring check')
+    {%- endif %}
     {%- if job_data == "docs" %}
     if: |
       github.event_name == 'merge_group' ||
